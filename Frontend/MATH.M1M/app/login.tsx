@@ -7,24 +7,30 @@ export default function LoginScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Logo */}
+      {/* 🔽 LOGO LOCAL - Cambia por tu ruta 🔽 */}
       <Image
-        source={{
-          uri: 'https://cdn-icons-png.flaticon.com/512/3004/3004298.png',
-        }}
+        source={require("../components/images/iconoLogo.png")} // Ajusta el nombre de tu archivo
         style={styles.logo}
         resizeMode="contain"
       />
+      {/* 🔼 LOGO LOCAL 🔼 */}
 
       {/* Título */}
-      <Text style={styles.title}>MATE APP</Text>
+      <Text style={styles.title}>Taskpin</Text>
 
       {/* Botones */}
-      <TouchableOpacity style={styles.button} onPress={() => router.replace("/inicio")}>
-        <Text style={styles.buttonText}>Iniciar Sesión</Text>
+      <TouchableOpacity 
+        style={styles.buttonPrimary} 
+        onPress={() => router.replace("/pantallaSignIn")}
+      >
+        <Text style={styles.buttonPrimaryText}>Crear Sesión</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={() => router.replace("/pantallaSignIn")}>
-        <Text style={styles.buttonText}>Registro</Text>
+      <TouchableOpacity 
+        style={styles.buttonSecondary} 
+        onPress={() => router.replace("/inicio")}
+      >
+        <Text style={styles.buttonSecondaryText}>Iniciar Sesión</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -36,38 +42,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F9FAFB', // Fondo gris muy claro
   },
   logo: {
-    width: 200,
-    height: 200,
-    marginBottom: 20,
+    width: 120,
+    height: 120,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
-    letterSpacing: 4,
-    color: '#F4B400',
-    marginBottom: 40,
+    letterSpacing: -0.5,
+    color: '#1F2937', // Gris oscuro como en la imagen
+    marginBottom: 80,
   },
-  button: {
-    backgroundColor: '#A4D96C',
-    paddingVertical: 15,
-    // Elimina paddingHorizontal y usa width fijo para igualar tamaño
-    width: 200,
-    borderRadius: 30,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 4,
-    justifyContent: 'center', // centrar texto horizontalmente
+  buttonPrimary: {
+    backgroundColor: '#A78BFA', // Morado principal
+    paddingVertical: 16,
+    width: 240,
+    borderRadius: 25,
+    marginTop: 12,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  buttonPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  buttonSecondary: {
+    backgroundColor: '#E0E7FF', // Morado claro
+    paddingVertical: 16,
+    width: 240,
+    borderRadius: 25,
+    marginTop: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonSecondaryText: {
+    color: '#6366F1', // Morado oscuro para contraste
+    fontWeight: '600',
     fontSize: 16,
   },
 });

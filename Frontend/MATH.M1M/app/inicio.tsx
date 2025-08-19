@@ -68,18 +68,26 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Título */}
       <Text style={styles.title}>Iniciar Sesión</Text>
-      <Image
-        source={{
-          uri: "https://cdn-icons-png.flaticon.com/512/201/201623.png",
-        }}
-        style={styles.logo}
-      />
       
-      <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
+      {/* Logo */}
+      {/* 🔽 LOGO LOCAL - Cambia por tu ruta 🔽 */}
+      <Image
+        source={require("../components/images/logo.png")} // Ajusta el nombre de tu archivo
+        style={styles.logo}
+        resizeMode="contain"
+      />
+      {/* 🔼 LOGO LOCAL 🔼 */}
+      
+    
+      
+      {/* Formulario */}
+      <Text style={styles.label}>NICKNAME</Text>
       <TextInput
         style={styles.input}
-        placeholder="ejemplo@correo.com"
+        placeholder="hola@taskpineresawesome.co"
+        placeholderTextColor="#9CA3AF"
         value={correo_electronico}
         onChangeText={setCorreoElectronico}
         keyboardType="email-address"
@@ -90,29 +98,32 @@ export default function LoginScreen() {
       <Text style={styles.label}>CONTRASEÑA</Text>
       <TextInput
         style={styles.input}
-        placeholder="••••••••••••"
+        placeholder="••••••"
+        placeholderTextColor="#9CA3AF"
         secureTextEntry
         value={contraseña}
         onChangeText={setContraseña}
         autoCapitalize="none"
       />
       
+      {/* Link de registro */}
+      <TouchableOpacity 
+        style={styles.registerLink}
+        onPress={() => router.push("/pantallaSignIn")} 
+      >
+        <Text style={styles.registerLinkText}>
+          ¿No tienes cuenta? Crea una aquí
+        </Text>
+      </TouchableOpacity>
+      
+      {/* Botón de login */}
       <TouchableOpacity 
         style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
         onPress={handleLogin}
         disabled={loading}
       >
         <Text style={styles.loginButtonText}>
-          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.registerLink}
-        onPress={() => router.push("/pantallaSignIn")} 
-      >
-        <Text style={styles.registerLinkText}>
-          ¿No tienes cuenta? Regístrate aquí
+          {loading ? "Iniciando sesión..." : "Regístrate"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -124,54 +135,80 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 32,
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#F9FAFB", // Fondo gris claro
   },
   title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "green",
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#10B981", // Verde como en la imagen
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 24,
   },
   logo: { 
-    width: 100, 
-    height: 100, 
+    width: 150, 
+    height: 150, 
     alignSelf: "center", 
-    marginBottom: 20 
+    marginBottom: 40,
+  },
+  appName: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#1F2937", // Gris oscuro
+    textAlign: "center",
+    marginBottom: 32,
+    letterSpacing: -0.5,
   },
   label: { 
     fontSize: 12, 
-    color: "#999", 
-    marginBottom: 5, 
-    marginTop: 10 
+    color: "#9CA3AF", // Gris medio
+    marginBottom: 8, 
+    marginTop: 16,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   input: {
-    backgroundColor: "#eee",
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 10,
-  },
-  loginButton: {
-    backgroundColor: "#ffb703",
-    padding: 16,
+    backgroundColor: "#F3F4F6", // Gris muy claro
     borderRadius: 8,
-    marginTop: 40,
-    alignItems: "center",
-  },
-  loginButtonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  loginButtonText: { 
-    color: "#fff", 
-    fontWeight: "bold", 
-    fontSize: 16 
+    padding: 16,
+    marginBottom: 4,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   registerLink: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: "center",
   },
   registerLinkText: {
-    color: "#007bff",
+    color: "#6B7280", // Gris medio
     fontSize: 14,
+    textAlign: "center",
+  },
+  loginButton: {
+    backgroundColor: "#8B5CF6", // Morado como en la imagen
+    padding: 18,
+    borderRadius: 25,
+    marginTop: 32,
+    alignItems: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#D1D5DB",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  loginButtonText: { 
+    color: "#FFFFFF", 
+    fontWeight: "600", 
+    fontSize: 16,
   },
 });
