@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "title": "Ejercicios de ejemplo para MATH_M1M",
+    "created_at": "2025-08-06T18:46:51.731828",
+    "total_exercises": 6
+  },
+  "exercises": [
+    {
+      "id": "sample_1",
+      "topic": "aritmetica",
+      "difficulty": "basico",
+      "problem": "Calcula: 25 + 17",
+      "answer": "42",
+      "steps": [
+        "Sumamos 25 + 17",
+        "25 + 17 = 42"
+      ],
+      "hints": [
+        "Puedes usar los dedos para contar",
+        "Empieza desde 25 y cuenta 17 hacia adelante"
+      ]
+    },
+    {
+      "id": "sample_2",
+      "topic": "aritmetica",
+      "difficulty": "basico",
+      "problem": "Calcula: 50 - 23",
+      "answer": "27",
+      "steps": [
+        "Restamos 50 - 23",
+        "50 - 23 = 27"
+      ],
+      "hints": [
+        "Cuenta hacia atrás desde 50",
+        "¿Cuánto necesitas quitar de 50 para llegar a 23?"
+      ]
+    },
+    {
+      "id": "sample_3",
+      "topic": "aritmetica",
+      "difficulty": "intermedio",
+      "problem": "Calcula: (15 + 8) × 3",
+      "answer": "69",
+      "steps": [
+        "Primero resolvemos el paréntesis: 15 + 8 = 23",
+        "Luego multiplicamos: 23 × 3 = 69"
+      ],
+      "hints": [
+        "Recuerda resolver primero lo que está entre paréntesis",
+        "Orden de operaciones: paréntesis primero"
+      ]
+    },
+    {
+      "id": "sample_4",
+      "topic": "algebra",
+      "difficulty": "basico",
+      "problem": "Resuelve para x: x + 12 = 25",
+      "answer": "13",
+      "steps": [
+        "x + 12 = 25",
+        "x = 25 - 12",
+        "x = 13"
+      ],
+      "hints": [
+        "Pasa el 12 al otro lado cambiando el signo",
+        "¿Qué número más 12 da 25?"
+      ]
+    },
+    {
+      "id": "sample_5",
+      "topic": "geometria",
+      "difficulty": "basico",
+      "problem": "Calcula el área de un rectángulo de 8 cm de largo y 5 cm de ancho",
+      "answer": "40 cm²",
+      "steps": [
+        "Área del rectángulo = largo × ancho",
+        "Área = 8 × 5",
+        "Área = 40 cm²"
+      ],
+      "hints": [
+        "La fórmula es: largo × ancho",
+        "Multiplica 8 por 5"
+      ]
+    },
+    {
+      "id": "sample_6",
+      "topic": "fracciones",
+      "difficulty": "basico",
+      "problem": "Calcula: 2/5 + 1/5",
+      "answer": "3/5",
+      "steps": [
+        "Como tienen el mismo denominador, sumamos los numeradores:",
+        "2 + 1 = 3",
+        "Resultado: 3/5"
+      ],
+      "hints": [
+        "Cuando el denominador es igual, solo sumas los de arriba",
+        "2 + 1 = ?"
+      ]
+    }
+  ]
+}
