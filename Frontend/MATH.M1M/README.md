@@ -48,3 +48,11 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+  
+## IMPORTANTEEEEEEE
+
+PARA CORRER BACKEND:
+PS C:\Users\ferbe\OneDrive\Documentos\TASKPIN\Taskpin\Backend> python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000                    
+PARA CORRER FRONTEND:
+PS C:\Users\ferbe\OneDrive\Documentos\TASKPIN\Taskpin\Frontend\MATH.M1M> npx expo start
