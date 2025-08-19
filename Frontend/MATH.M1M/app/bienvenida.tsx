@@ -41,7 +41,7 @@ export default function BienvenidaScreen() {
         </View>
 
         {/* Título de la app */}
-        <Text style={styles.appTitle}>MATE APP</Text>
+        <Text style={styles.appTitle}>TASKPIN</Text>
 
         {/* Mensaje de bienvenida */}
         <Text style={styles.welcomeMessage}>¡Bienvenido de nuevo {username}!</Text>
@@ -63,7 +63,7 @@ export default function BienvenidaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F9FAFB",
   },
   content: {
     flex: 1,
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   iconBackground: {
     width: 100,
     height: 100,
-    backgroundColor: "#FFC043",
+    backgroundColor: "#A78BFA",
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#FFC043",
+    color: "#A78BFA",
     letterSpacing: 3,
     marginBottom: 20,
   },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   menuButton: {
-    backgroundColor: "#FFC043",
+    backgroundColor: "#A78BFA",
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: "center",
