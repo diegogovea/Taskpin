@@ -77,20 +77,20 @@ export default function TabsLayout() {
             case "perfil":
               sectionName = "Mi Perfil";            // Para perfil del usuario
               break;
-            case "configuracion":
-              sectionName = "Configuración";        // Para ajustes
+            case "habitos":
+              sectionName = "Mis Hábitos";        // Para ajustes
               break;
             case "favoritos":
               sectionName = "Favoritos";            // Para ejercicios favoritos
               break;
-            case "estadisticas":
-              sectionName = "Estadísticas";         // Para progreso y datos
+            case "planes":
+              sectionName = "Mis Planes";         // Para progreso y datos
               break;
             case "materia":
               sectionName = "Materias";             // Para categorías de matemáticas
               break;
             default:
-              sectionName = "MATH.M1M";             // Texto por defecto
+              sectionName = "Taskpin";             // Texto por defecto
           }
           
           // Retorna el componente del header con el título correspondiente
@@ -125,7 +125,7 @@ export default function TabsLayout() {
           let icon;
           
           // CONFIGURACIÓN: Check ✓
-          if (route.name === "configuracion") {
+          if (route.name === "habitos") {
             icon = (
               <View style={[
                 focused ? styles.focusedIcon : styles.normalIcon,
@@ -141,7 +141,7 @@ export default function TabsLayout() {
           } 
           
           // ESTADÍSTICAS: Gráfico de barras 📊
-          else if (route.name === "estadisticas") {
+          else if (route.name === "planes") {
             icon = (
               <View style={[
                 focused ? styles.focusedIcon : styles.normalIcon,
@@ -218,8 +218,8 @@ export default function TabsLayout() {
       })}
     >
       {/* ========== DEFINICIÓN DE LAS PANTALLAS/PESTAÑAS ========== */}
-      <Tabs.Screen name="configuracion" /> {/* Check / Settings */}
-      <Tabs.Screen name="estadisticas" />  {/* Gráfico */}
+      <Tabs.Screen name="habitos" /> {/* Check / Settings */}
+      <Tabs.Screen name="planes" />  {/* Gráfico */}
       <Tabs.Screen name="home" />          {/* Casa (centro) */}
       <Tabs.Screen name="favoritos" />     {/* Estrella */}
       <Tabs.Screen name="perfil" />        {/* Persona */}
