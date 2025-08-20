@@ -2,9 +2,9 @@
 // IMPORTACIONES NECESARIAS
 // =====================================
 import { Tabs } from "expo-router";
-import { Ionicons, FontAwesome5, MaterialIcons, Entypo } from "@expo/vector-icons";
+import { Ionicons, FontAwesome5, MaterialIcons, Entypo, AntDesign } from "@expo/vector-icons";
 import { View, Platform, Text, SafeAreaView } from "react-native";
-import { LinearGradient } from "expo-linear-gradient"; // Para los gradientes bonitos
+import { LinearGradient } from "expo-linear-gradient";
 
 // =====================================
 // COMPONENTE DEL HEADER GLOBAL BONITO
@@ -14,10 +14,10 @@ function GlobalHeader({ title }: { title: string }) {
   return (
     <>
       {/* SafeAreaView para evitar que se pegue con la barra de estado del celular */}
-      <SafeAreaView style={{ backgroundColor: "#FFC043" }} />
+      <SafeAreaView style={{ backgroundColor: "#86EFAC" }} />
       
-      {/* Header principal con gradiente naranja */}
-      <LinearGradient colors={["#FFC043", "#FF8A00"]} style={styles.header}>
+      {/* Header principal con gradiente verde pastel */}
+      <LinearGradient colors={["#86EFAC", "#6EE7B7"]} style={styles.header}>
         <View style={styles.headerContent}>
           
           {/* ========== LADO IZQUIERDO: AVATAR + TEXTO ========== */}
@@ -27,9 +27,9 @@ function GlobalHeader({ title }: { title: string }) {
               <Ionicons name="person" size={24} color="white" />
             </View>
             
-            {/* Textos del usuario */}
+            {            /* Textos del usuario */}
             <View>
-              <Text style={styles.welcomeText}>¡Hola!</Text>
+              <Text style={styles.welcomeText}>¡Bienvenido!</Text>
               {/* Este texto cambia según la sección actual */}
               <Text style={styles.sectionTitle}>{title}</Text>
             </View>
@@ -39,13 +39,13 @@ function GlobalHeader({ title }: { title: string }) {
           <View style={styles.statsContainer}>
             {/* Racha de días consecutivos */}
             <View style={styles.statItem}>
-              <Ionicons name="flame" size={20} color="#FF6B35" />
+              <Ionicons name="flame" size={20} color="#F59E0B" />
               <Text style={styles.statText}>5</Text>
             </View>
             
             {/* Gemas/Puntos del usuario */}
             <View style={styles.statItem}>
-              <Ionicons name="diamond" size={20} color="#00BCD4" />
+              <Ionicons name="diamond" size={20} color="#06B6D4" />
               <Text style={styles.statText}>250</Text>
             </View>
           </View>
@@ -72,25 +72,25 @@ export default function TabsLayout() {
           // Determina qué texto mostrar según la pestaña actual
           switch (route.name) {
             case "home":
-              sectionName = "Matemático";        // Para la pantalla principal
+              sectionName = "Inicio";               // Pantalla principal simplificada
               break;
             case "perfil":
-              sectionName = "Mi Perfil";         // Para perfil del usuario
+              sectionName = "Mi Perfil";            // Para perfil del usuario
               break;
             case "configuracion":
-              sectionName = "Configuración";     // Para ajustes
+              sectionName = "Configuración";        // Para ajustes
               break;
             case "favoritos":
-              sectionName = "Favoritos";         // Para ejercicios favoritos
+              sectionName = "Favoritos";            // Para ejercicios favoritos
               break;
             case "estadisticas":
-              sectionName = "Estadísticas";      // Para progreso y datos
+              sectionName = "Estadísticas";         // Para progreso y datos
               break;
             case "materia":
-              sectionName = "Materias";          // Para categorías de matemáticas
+              sectionName = "Materias";             // Para categorías de matemáticas
               break;
             default:
-              sectionName = "MATH.M1M";          // Texto por defecto
+              sectionName = "MATH.M1M";             // Texto por defecto
           }
           
           // Retorna el componente del header con el título correspondiente
@@ -99,23 +99,23 @@ export default function TabsLayout() {
         
         // ========== ESTILOS DE LA BARRA DE NAVEGACIÓN INFERIOR ==========
         tabBarStyle: {
-          backgroundColor: "#FFC043",                    // Color principal (amarillo)
+          backgroundColor: "#8B5CF6",                    // Color púrpura principal
           borderTopWidth: 0,                             // Sin borde superior
           height: Platform.OS === 'ios' ? 85 : 70,      // Altura según dispositivo
           paddingTop: 8,                                 // Espaciado superior
           paddingBottom: Platform.OS === 'ios' ? 25 : 8, // Espaciado inferior (más en iOS)
-          paddingHorizontal: 10,                         // Espaciado lateral
+          paddingHorizontal: 15,                         // Más espaciado lateral
           
           // Sombra elegante hacia arriba
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8,
-          elevation: 10,                                 // Sombra en Android
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
+          elevation: 12,                                 // Sombra en Android
           
           // Esquinas redondeadas en la parte superior
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
+          borderTopLeftRadius: 25,
+          borderTopRightRadius: 25,
         },
         
         tabBarShowLabel: false, // Ocultar texto de las pestañas (solo iconos)
@@ -124,23 +124,23 @@ export default function TabsLayout() {
         tabBarIcon: ({ focused, color, size }) => {
           let icon;
           
-          // CONFIGURACIÓN: Icono cuando está en la sección actual
+          // CONFIGURACIÓN: Check ✓
           if (route.name === "configuracion") {
             icon = (
               <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon, // Estilo según si está seleccionado
+                focused ? styles.focusedIcon : styles.normalIcon,
                 styles.iconContainer
               ]}>
-                <Ionicons 
-                  name="settings" 
+                <AntDesign 
+                  name="check" 
                   size={24} 
-                  color={focused ? "#FFC043" : "white"}  // Color según estado
+                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
                 />
               </View>
             );
           } 
           
-          // ESTADÍSTICAS: Gráficos y progreso
+          // ESTADÍSTICAS: Gráfico de barras 📊
           else if (route.name === "estadisticas") {
             icon = (
               <View style={[
@@ -150,38 +150,38 @@ export default function TabsLayout() {
                 <MaterialIcons 
                   name="bar-chart" 
                   size={24} 
-                  color={focused ? "#FFC043" : "white"} 
+                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
                 />
               </View>
             );
           } 
           
-          // HOME: Icono especial más grande (pantalla principal)
+          // HOME: Casa 🏠 (icono central más grande)
           else if (route.name === "home") {
             icon = (
               <View style={styles.homeIcon}>
-                <Entypo name="home" size={28} color="#FFC043" />
+                <Entypo name="home" size={28} color="#8B5CF6" />
               </View>
             );
           } 
           
-          // FAVORITOS: Ejercicios marcados como favoritos
+          // FAVORITOS: Estrella ⭐
           else if (route.name === "favoritos") {
             icon = (
               <View style={[
                 focused ? styles.focusedIcon : styles.normalIcon,
                 styles.iconContainer
               ]}>
-                <FontAwesome5 
+                <AntDesign 
                   name="star" 
-                  size={20} 
-                  color={focused ? "#FFC043" : "white"} 
+                  size={22} 
+                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
                 />
               </View>
             );
           } 
           
-          // PERFIL: Información del usuario
+          // PERFIL: Usuario 👤
           else if (route.name === "perfil") {
             icon = (
               <View style={[
@@ -189,15 +189,15 @@ export default function TabsLayout() {
                 styles.iconContainer
               ]}>
                 <Ionicons 
-                  name="person-circle-outline" 
+                  name="person" 
                   size={24} 
-                  color={focused ? "#FFC043" : "white"} 
+                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
                 />
               </View>
             );
           } 
           
-          // MATERIAS: Categorías de matemáticas (suma, resta, etc.)
+          // MATERIAS: Libro (si tienes esta pestaña)
           else if (route.name === "materia") {
             icon = (
               <View style={[
@@ -207,7 +207,7 @@ export default function TabsLayout() {
                 <FontAwesome5 
                   name="book" 
                   size={20} 
-                  color={focused ? "#FFC043" : "white"} 
+                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
                 />
               </View>
             );
@@ -218,12 +218,11 @@ export default function TabsLayout() {
       })}
     >
       {/* ========== DEFINICIÓN DE LAS PANTALLAS/PESTAÑAS ========== */}
-      <Tabs.Screen name="perfil" />      {/* Pantalla de perfil */}
-      <Tabs.Screen name="configuracion" /> {/* Pantalla de configuración */}
-      <Tabs.Screen name="home" />        {/* Pantalla principal */}
-      <Tabs.Screen name="favoritos" />   {/* Pantalla de favoritos */}
-      <Tabs.Screen name="estadisticas" /> {/* Pantalla de estadísticas */}
-      <Tabs.Screen name="materia" />     {/* Pantalla de materias */}
+      <Tabs.Screen name="configuracion" /> {/* Check / Settings */}
+      <Tabs.Screen name="estadisticas" />  {/* Gráfico */}
+      <Tabs.Screen name="home" />          {/* Casa (centro) */}
+      <Tabs.Screen name="favoritos" />     {/* Estrella */}
+      <Tabs.Screen name="perfil" />        {/* Persona */}
     </Tabs>
   );
 }
@@ -238,8 +237,8 @@ const styles = {
     paddingHorizontal: 20,                        // Espaciado lateral
     paddingTop: Platform.OS === 'ios' ? 15 : 20, // Espaciado superior (más en Android)
     paddingBottom: 20,                            // Espaciado inferior
-    borderBottomLeftRadius: 20,                   // Esquina inferior izquierda redondeada
-    borderBottomRightRadius: 20,                  // Esquina inferior derecha redondeada
+    borderBottomLeftRadius: 25,                   // Esquina inferior izquierda redondeada
+    borderBottomRightRadius: 25,                  // Esquina inferior derecha redondeada
   },
   
   headerContent: {
@@ -259,7 +258,7 @@ const styles = {
     width: 50,
     height: 50,
     borderRadius: 25,                     // Radio para hacer círculo perfecto
-    backgroundColor: "rgba(255,255,255,0.3)", // Fondo blanco semi-transparente
+    backgroundColor: "rgba(255,255,255,0.25)", // Fondo blanco semi-transparente
     justifyContent: "center" as const,    // Centrar icono horizontalmente
     alignItems: "center" as const,        // Centrar icono verticalmente
     marginRight: 12,                      // Espacio entre avatar y texto
@@ -309,47 +308,47 @@ const styles = {
   iconContainer: {
     justifyContent: 'center' as const,    // Centrar icono horizontalmente
     alignItems: 'center' as const,        // Centrar icono verticalmente
-    minWidth: 40,                         // Ancho mínimo para área táctil
-    minHeight: 40,                        // Alto mínimo para área táctil
+    minWidth: 45,                         // Ancho mínimo para área táctil
+    minHeight: 45,                        // Alto mínimo para área táctil
   },
   
   // Estilo para iconos NO seleccionados
   normalIcon: {
-    padding: 8,                           // Espaciado interno
-    borderRadius: 10,                     // Bordes ligeramente redondeados
-    backgroundColor: "rgba(255,255,255,0.15)", // Fondo sutil semi-transparente
+    padding: 10,                          // Espaciado interno
+    borderRadius: 15,                     // Bordes redondeados
+    backgroundColor: "rgba(255,255,255,0.1)", // Fondo sutil semi-transparente
   },
   
   // Estilo para icono SÍ seleccionado (pestaña actual)
   focusedIcon: {
-    padding: 10,                          // Más espaciado interno
-    borderRadius: 12,                     // Más redondeado
+    padding: 12,                          // Más espaciado interno
+    borderRadius: 18,                     // Más redondeado
     backgroundColor: "white",             // Fondo blanco sólido
     
     // Sombra elegante para destacar
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,                         // Sombra en Android
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 6,                         // Sombra en Android
   },
   
   // Estilo especial para el icono de HOME (siempre destacado)
   homeIcon: {
-    padding: 12,                          // Espaciado generoso
-    borderRadius: 25,                     // Círculo perfecto
+    padding: 15,                          // Espaciado generoso
+    borderRadius: 30,                     // Círculo perfecto
     backgroundColor: "white",             // Fondo blanco
     justifyContent: 'center' as const,    // Centrar horizontalmente
     alignItems: 'center' as const,        // Centrar verticalmente
     
     // Sombra más pronunciada para que sobresalga
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,                         // Sombra en Android
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,                         // Sombra en Android
     
-    minWidth: 50,                         // Tamaño mínimo para que se vea grande
-    minHeight: 50,
+    minWidth: 55,                         // Tamaño mínimo para que se vea grande
+    minHeight: 55,
   },
 };
