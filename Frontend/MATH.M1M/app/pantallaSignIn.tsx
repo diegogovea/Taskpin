@@ -1,107 +1,69 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
 import { useRouter } from "expo-router";
 import axios from "axios";
 
-export default function SignUpScreen() {
+export default function SignInScreen() {
   const router = useRouter();
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [birthdate, setBirthdate] = useState("");
+  
+  // Estados simplificados - solo campos básicos
+  const [nombre, setNombre] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [contraseña, setContraseña] = useState("");
+  const [confirmarContraseña, setConfirmarContraseña] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Función para llenar datos de prueba
   const fillTestData = () => {
-    setName("María Elena González");
-    setEmail("maria.gonzalez@gmail.com");
-    setUsername("marielena123");
-    setPassword("123456");
-    setConfirmPassword("123456");
-    setBirthdate("15/03/1998");
+    setNombre("Juan Pérez");
+    setCorreo("juan@test.com");
+    setContraseña("123456");
+    setConfirmarContraseña("123456");
   };
 
-  // Función para validar formato de fecha
-  const validateDateFormat = (dateStr: string) => {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    return regex.test(dateStr);
-  };
-
-  // Función para convertir DD/MM/AAAA a AAAA-MM-DD
-  const formatDateForAPI = (dateStr: string) => {
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Función para validar que la fecha sea válida
-  const isValidDate = (dateString: string) => {
-    if (!validateDateFormat(dateString)) return false;
-    
-    const [day, month, year] = dateString.split('/');
-    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    
-    return dateObj.getFullYear() == parseInt(year) && 
-           dateObj.getMonth() == parseInt(month) - 1 && 
-           dateObj.getDate() == parseInt(day);
+  // Validaciones simplificadas
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleRegister = async () => {
-    // Validaciones
-    if (!name.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu nombre completo");
+    // Validaciones básicas
+    if (!nombre.trim()) {
+      Alert.alert("Error", "Por favor ingresa tu nombre");
       return;
     }
 
-    if (!email.trim()) {
+    if (!correo.trim()) {
       Alert.alert("Error", "Por favor ingresa tu correo electrónico");
       return;
     }
 
-    if (!username.trim()) {
-      Alert.alert("Error", "Por favor ingresa un nombre de usuario");
+    if (!validateEmail(correo)) {
+      Alert.alert("Error", "Por favor ingresa un correo electrónico válido");
       return;
     }
 
-    if (!password.trim()) {
+    if (!contraseña.trim()) {
       Alert.alert("Error", "Por favor ingresa una contraseña");
       return;
     }
 
-    if (password.length < 6) {
+    if (contraseña.length < 6) {
       Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (contraseña !== confirmarContraseña) {
       Alert.alert("Error", "Las contraseñas no coinciden");
-      return;
-    }
-
-    if (!birthdate.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu fecha de nacimiento");
-      return;
-    }
-
-    if (!validateDateFormat(birthdate)) {
-      Alert.alert("Error", "El formato de fecha debe ser DD/MM/AAAA");
-      return;
-    }
-
-    if (!isValidDate(birthdate)) {
-      Alert.alert("Error", "Por favor ingresa una fecha válida");
-      return;
-    }
-
-    // Validar que el usuario sea mayor de edad (opcional)
-    const [day, month, year] = birthdate.split('/');
-    const birthYear = parseInt(year);
-    const currentYear = new Date().getFullYear();
-    
-    if (currentYear - birthYear < 13) {
-      Alert.alert("Error", "Debes tener al menos 13 años para registrarte");
       return;
     }
 
@@ -109,11 +71,9 @@ export default function SignUpScreen() {
 
     try {
       const userData = {
-        nombre_completo: name.trim(),
-        correo_electronico: email.trim().toLowerCase(),
-        usuario: username.trim(),
-        contraseña: password,
-        fecha_nacimiento: formatDateForAPI(birthdate)
+        nombre: nombre.trim(),
+        correo: correo.trim().toLowerCase(),
+        contraseña: contraseña
       };
 
       const response = await axios.post("http://127.0.0.1:8000/register", userData);
@@ -124,7 +84,7 @@ export default function SignUpScreen() {
         [
           {
             text: "Ir al Login",
-            onPress: () => router.replace("/")
+            onPress: () => router.replace("/inicio")
           }
         ]
       );
@@ -135,7 +95,7 @@ export default function SignUpScreen() {
       let errorMessage = "Error al crear la cuenta";
       
       if (error.response?.status === 400) {
-        errorMessage = "El correo electrónico o nombre de usuario ya están registrados";
+        errorMessage = "El correo electrónico ya está registrado";
       } else if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
           // Si es un array de errores de validación de Pydantic
@@ -167,14 +127,14 @@ export default function SignUpScreen() {
           <Text style={styles.testButtonText}>🧪 Llenar datos de prueba</Text>
         </TouchableOpacity>
 
-        {/* Nombre completo */}
+        {/* Nombre */}
         <Text style={styles.label}>NOMBRE COMPLETO</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ej. Jimena Martinez"
-          placeholderTextColor="#aaa"
-          value={name}
-          onChangeText={setName}
+          placeholder="Ej. Juan Pérez"
+          placeholderTextColor="#9CA3AF" // Placeholder gris original
+          value={nombre}
+          onChangeText={setNombre}
           autoCapitalize="words"
         />
 
@@ -183,22 +143,10 @@ export default function SignUpScreen() {
         <TextInput
           style={styles.input}
           placeholder="ejemplo@correo.com"
-          placeholderTextColor="#aaa"
+          placeholderTextColor="#9CA3AF"
           keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        {/* Usuario */}
-        <Text style={styles.label}>USUARIO</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej. Jimejime"
-          placeholderTextColor="#aaa"
-          value={username}
-          onChangeText={setUsername}
+          value={correo}
+          onChangeText={setCorreo}
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -208,10 +156,10 @@ export default function SignUpScreen() {
         <TextInput
           style={styles.input}
           placeholder="••••••••"
-          placeholderTextColor="#aaa"
+          placeholderTextColor="#9CA3AF"
           secureTextEntry
-          value={password}
-          onChangeText={setPassword}
+          value={contraseña}
+          onChangeText={setContraseña}
           autoCapitalize="none"
         />
 
@@ -220,22 +168,11 @@ export default function SignUpScreen() {
         <TextInput
           style={styles.input}
           placeholder="••••••••"
-          placeholderTextColor="#aaa"
+          placeholderTextColor="#9CA3AF"
           secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          value={confirmarContraseña}
+          onChangeText={setConfirmarContraseña}
           autoCapitalize="none"
-        />
-
-        {/* Fecha de nacimiento */}
-        <Text style={styles.label}>FECHA DE NACIMIENTO</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="DD/MM/AAAA"
-          placeholderTextColor="#aaa"
-          value={birthdate}
-          onChangeText={setBirthdate}
-          keyboardType="numeric"
         />
 
         {/* Botón de registro */}
@@ -245,7 +182,7 @@ export default function SignUpScreen() {
           disabled={loading}
         >
           <Text style={styles.nextButtonText}>
-            {loading ? "Registrando..." : "Registrarme"}
+            {loading ? "Registrando..." : "CREAR CUENTA"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -256,63 +193,82 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "#F9FAFB", // Fondo gris claro original
   },
   container: {
-    paddingHorizontal: 32,
-    paddingTop: 50,
-    paddingBottom: 40,
-    backgroundColor: "#fff",
+    flex: 1,
+    justifyContent: "center",
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "green",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  loginLink: {
-    fontSize: 14,
-    color: "#666",
+    color: "#1F2937", // Gris oscuro original
     textAlign: "center",
     marginBottom: 30,
+    letterSpacing: -0.5,
   },
-  label: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 5,
-    marginTop: 10,
-  },
-  input: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 10,
-  },
-  nextButton: {
-    backgroundColor: "#ffb703",
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 30,
-    alignItems: "center",
-  },
-  nextButtonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  nextButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+  loginLink: {
+    color: "#6B7280", // Gris medio original
+    textAlign: "center",
+    marginBottom: 20,
+    fontSize: 14,
   },
   testButton: {
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#E0E7FF", // Morado claro
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 8,
     marginBottom: 20,
     alignItems: "center",
   },
   testButtonText: {
-    color: "#666",
+    color: "#6366F1", // Morado oscuro
     fontSize: 14,
     fontWeight: "500",
+  },
+  label: {
+    fontSize: 12,
+    color: "#9CA3AF", // Gris medio original
+    marginBottom: 8,
+    marginTop: 16,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  input: {
+    backgroundColor: "#F3F4F6", // Gris muy claro original
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 4,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  nextButton: {
+    backgroundColor: "#8B5CF6", // Morado original
+    padding: 18,
+    borderRadius: 25,
+    alignItems: "center",
+    marginTop: 32,
+    shadowColor: "#8B5CF6",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  nextButtonDisabled: {
+    backgroundColor: "#D1D5DB",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  nextButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });
