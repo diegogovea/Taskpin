@@ -9,7 +9,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      
       {/* Botón de configuración (engranaje) */}
       <TouchableOpacity
         style={styles.settingsButton}
