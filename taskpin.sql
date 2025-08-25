@@ -5,32 +5,32 @@
 
 -- Crear base de datos
 CREATE DATABASE taskpin;
-USE taskpin;
+-- \c taskpin;
 
 -- ============================================
 -- ELIMINACIÓN DE TABLAS (por si ya existen)
 -- ============================================
-DROP TABLE IF EXISTS recordatorios;
-DROP TABLE IF EXISTS tareas_usuario;
-DROP TABLE IF EXISTS progreso_planes;
-DROP TABLE IF EXISTS planes_usuario;
-DROP TABLE IF EXISTS tareas_predeterminadas;
-DROP TABLE IF EXISTS objetivos_intermedios;
-DROP TABLE IF EXISTS planes_predeterminados;
-DROP TABLE IF EXISTS categorias_planes;
-DROP TABLE IF EXISTS seguimiento_habitos;
-DROP TABLE IF EXISTS habitos_usuario;
-DROP TABLE IF EXISTS habitos_predeterminados;
-DROP TABLE IF EXISTS categorias_habitos;
-DROP TABLE IF EXISTS control;
-DROP TABLE IF EXISTS registros;
-DROP TABLE IF EXISTS usuarios;
+DROP TABLE IF EXISTS recordatorios CASCADE;
+DROP TABLE IF EXISTS tareas_usuario CASCADE;
+DROP TABLE IF EXISTS progreso_planes CASCADE;
+DROP TABLE IF EXISTS planes_usuario CASCADE;
+DROP TABLE IF EXISTS tareas_predeterminadas CASCADE;
+DROP TABLE IF EXISTS objetivos_intermedios CASCADE;
+DROP TABLE IF EXISTS planes_predeterminados CASCADE;
+DROP TABLE IF EXISTS categorias_planes CASCADE;
+DROP TABLE IF EXISTS seguimiento_habitos CASCADE;
+DROP TABLE IF EXISTS habitos_usuario CASCADE;
+DROP TABLE IF EXISTS habitos_predeterminados CASCADE;
+DROP TABLE IF EXISTS categorias_habitos CASCADE;
+DROP TABLE IF EXISTS control CASCADE;
+DROP TABLE IF EXISTS registros CASCADE;
+DROP TABLE IF EXISTS usuarios CASCADE;
 
 -- ============================================
 -- 1. TABLA USUARIOS
 -- ============================================
 CREATE TABLE usuarios (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     correo VARCHAR(150) UNIQUE NOT NULL,
     contraseña VARCHAR(255) NOT NULL,
@@ -46,10 +46,10 @@ CREATE TABLE usuarios (
 -- 2. TABLA REGISTROS (Información adicional del usuario)
 -- ============================================
 CREATE TABLE registros (
-    registro_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    registro_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
     nickname VARCHAR(50) UNIQUE NOT NULL,
-    edad INT,
+    edad INTEGER,
     fecha_nac DATE,
     activo BOOLEAN DEFAULT TRUE,
     
@@ -65,8 +65,8 @@ CREATE TABLE registros (
 -- 3. TABLA CONTROL (Sesiones y accesos)
 -- ============================================
 CREATE TABLE control (
-    id_control INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    id_control SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
     creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_access TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
@@ -78,11 +78,11 @@ CREATE TABLE control (
 -- 4. TABLA CATEGORÍAS DE HÁBITOS
 -- ============================================
 CREATE TABLE categorias_habitos (
-    categoria_id INT AUTO_INCREMENT PRIMARY KEY,
+    categoria_id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT,
     icono VARCHAR(100),
-    orden INT NOT NULL UNIQUE,
+    orden INTEGER NOT NULL UNIQUE,
     
     -- Validaciones
     CONSTRAINT chk_orden_positivo CHECK (orden > 0)
@@ -92,12 +92,12 @@ CREATE TABLE categorias_habitos (
 -- 5. TABLA HÁBITOS PREDETERMINADOS
 -- ============================================
 CREATE TABLE habitos_predeterminados (
-    habito_id INT AUTO_INCREMENT PRIMARY KEY,
-    categoria_id INT NOT NULL,
+    habito_id SERIAL PRIMARY KEY,
+    categoria_id INTEGER NOT NULL,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
-    frecuencia_recomendada ENUM('diario', 'semanal', 'personalizado') DEFAULT 'diario',
-    puntos_base INT DEFAULT 10,
+    frecuencia_recomendada VARCHAR(20) DEFAULT 'diario' CHECK (frecuencia_recomendada IN ('diario', 'semanal', 'personalizado')),
+    puntos_base INTEGER DEFAULT 10,
     
     -- Relaciones
     FOREIGN KEY (categoria_id) REFERENCES categorias_habitos(categoria_id) ON DELETE CASCADE,
@@ -110,12 +110,12 @@ CREATE TABLE habitos_predeterminados (
 -- 6. TABLA HÁBITOS DEL USUARIO
 -- ============================================
 CREATE TABLE habitos_usuario (
-    habito_usuario_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    habito_id INT NOT NULL,
-    fecha_agregado DATE DEFAULT (CURRENT_DATE),
+    habito_usuario_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    habito_id INTEGER NOT NULL,
+    fecha_agregado DATE DEFAULT CURRENT_DATE,
     activo BOOLEAN DEFAULT TRUE,
-    frecuencia_personal ENUM('diario', 'semanal', 'personalizado') DEFAULT 'diario',
+    frecuencia_personal VARCHAR(20) DEFAULT 'diario' CHECK (frecuencia_personal IN ('diario', 'semanal', 'personalizado')),
     
     -- Relaciones
     FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE,
@@ -129,8 +129,8 @@ CREATE TABLE habitos_usuario (
 -- 7. TABLA SEGUIMIENTO DE HÁBITOS
 -- ============================================
 CREATE TABLE seguimiento_habitos (
-    seguimiento_id INT AUTO_INCREMENT PRIMARY KEY,
-    habito_usuario_id INT NOT NULL,
+    seguimiento_id SERIAL PRIMARY KEY,
+    habito_usuario_id INTEGER NOT NULL,
     fecha DATE NOT NULL,
     completado BOOLEAN DEFAULT FALSE,
     hora_completado TIME,
@@ -147,11 +147,11 @@ CREATE TABLE seguimiento_habitos (
 -- 8. TABLA CATEGORÍAS DE PLANES
 -- ============================================
 CREATE TABLE categorias_planes (
-    categoria_plan_id INT AUTO_INCREMENT PRIMARY KEY,
+    categoria_plan_id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT,
     icono VARCHAR(100),
-    orden INT NOT NULL UNIQUE,
+    orden INTEGER NOT NULL UNIQUE,
     
     -- Validaciones
     CONSTRAINT chk_orden_plan_positivo CHECK (orden > 0)
@@ -161,12 +161,12 @@ CREATE TABLE categorias_planes (
 -- 9. TABLA PLANES PREDETERMINADOS
 -- ============================================
 CREATE TABLE planes_predeterminados (
-    plan_id INT AUTO_INCREMENT PRIMARY KEY,
-    categoria_plan_id INT NOT NULL,
+    plan_id SERIAL PRIMARY KEY,
+    categoria_plan_id INTEGER NOT NULL,
     meta_principal VARCHAR(150) NOT NULL,
     descripcion TEXT,
-    plazo_dias_estimado INT NOT NULL,
-    dificultad ENUM('fácil', 'intermedio', 'difícil') DEFAULT 'intermedio',
+    plazo_dias_estimado INTEGER NOT NULL,
+    dificultad VARCHAR(20) DEFAULT 'intermedio' CHECK (dificultad IN ('fácil', 'intermedio', 'difícil')),
     imagen VARCHAR(200),
     
     -- Relaciones
@@ -180,12 +180,12 @@ CREATE TABLE planes_predeterminados (
 -- 10. TABLA OBJETIVOS INTERMEDIOS (Fases del plan)
 -- ============================================
 CREATE TABLE objetivos_intermedios (
-    objetivo_id INT AUTO_INCREMENT PRIMARY KEY,
-    plan_id INT NOT NULL,
+    objetivo_id SERIAL PRIMARY KEY,
+    plan_id INTEGER NOT NULL,
     titulo VARCHAR(150) NOT NULL,
     descripcion TEXT,
-    orden_fase INT NOT NULL,
-    duracion_dias INT,
+    orden_fase INTEGER NOT NULL,
+    duracion_dias INTEGER,
     
     -- Relaciones
     FOREIGN KEY (plan_id) REFERENCES planes_predeterminados(plan_id) ON DELETE CASCADE,
@@ -202,12 +202,12 @@ CREATE TABLE objetivos_intermedios (
 -- 11. TABLA TAREAS PREDETERMINADAS
 -- ============================================
 CREATE TABLE tareas_predeterminadas (
-    tarea_id INT AUTO_INCREMENT PRIMARY KEY,
-    objetivo_id INT NOT NULL,
+    tarea_id SERIAL PRIMARY KEY,
+    objetivo_id INTEGER NOT NULL,
     titulo VARCHAR(150) NOT NULL,
     descripcion TEXT,
-    tipo ENUM('diaria', 'semanal', 'única') DEFAULT 'diaria',
-    orden INT,
+    tipo VARCHAR(20) DEFAULT 'diaria' CHECK (tipo IN ('diaria', 'semanal', 'única')),
+    orden INTEGER,
     es_diaria BOOLEAN DEFAULT TRUE,
     
     -- Relaciones
@@ -218,13 +218,13 @@ CREATE TABLE tareas_predeterminadas (
 -- 12. TABLA PLANES DEL USUARIO
 -- ============================================
 CREATE TABLE planes_usuario (
-    plan_usuario_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    plan_id INT NOT NULL,
-    fecha_inicio DATE DEFAULT (CURRENT_DATE),
+    plan_usuario_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+    fecha_inicio DATE DEFAULT CURRENT_DATE,
     fecha_objetivo DATE,
-    estado ENUM('activo', 'pausado', 'completado', 'cancelado') DEFAULT 'activo',
-    progreso_porcentaje INT DEFAULT 0,
+    estado VARCHAR(20) DEFAULT 'activo' CHECK (estado IN ('activo', 'pausado', 'completado', 'cancelado')),
+    progreso_porcentaje INTEGER DEFAULT 0,
     fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Relaciones
@@ -240,13 +240,13 @@ CREATE TABLE planes_usuario (
 -- 13. TABLA PROGRESO DE PLANES
 -- ============================================
 CREATE TABLE progreso_planes (
-    progreso_id INT AUTO_INCREMENT PRIMARY KEY,
-    plan_usuario_id INT NOT NULL,
-    objetivo_id INT NOT NULL,
+    progreso_id SERIAL PRIMARY KEY,
+    plan_usuario_id INTEGER NOT NULL,
+    objetivo_id INTEGER NOT NULL,
     completado BOOLEAN DEFAULT FALSE,
     fecha_completado DATE,
     notas TEXT,
-    progreso_objetivo_porcentaje INT DEFAULT 0,
+    progreso_objetivo_porcentaje INTEGER DEFAULT 0,
     
     -- Relaciones
     FOREIGN KEY (plan_usuario_id) REFERENCES planes_usuario(plan_usuario_id) ON DELETE CASCADE,
@@ -263,10 +263,10 @@ CREATE TABLE progreso_planes (
 -- 14. TABLA TAREAS DEL USUARIO
 -- ============================================
 CREATE TABLE tareas_usuario (
-    tarea_usuario_id INT AUTO_INCREMENT PRIMARY KEY,
-    plan_usuario_id INT NOT NULL,
-    tarea_id INT NOT NULL,
-    fecha_asignada DATE DEFAULT (CURRENT_DATE),
+    tarea_usuario_id SERIAL PRIMARY KEY,
+    plan_usuario_id INTEGER NOT NULL,
+    tarea_id INTEGER NOT NULL,
+    fecha_asignada DATE DEFAULT CURRENT_DATE,
     completada BOOLEAN DEFAULT FALSE,
     hora_completada TIME,
     notas TEXT,
@@ -280,8 +280,8 @@ CREATE TABLE tareas_usuario (
 -- 15. TABLA RECORDATORIOS
 -- ============================================
 CREATE TABLE recordatorios (
-    recordatorio_id INT AUTO_INCREMENT PRIMARY KEY,
-    plan_usuario_id INT NOT NULL,
+    recordatorio_id SERIAL PRIMARY KEY,
+    plan_usuario_id INTEGER NOT NULL,
     titulo VARCHAR(100) NOT NULL,
     mensaje TEXT,
     hora TIME NOT NULL,
@@ -305,32 +305,42 @@ CREATE INDEX idx_planes_usuario ON planes_usuario(user_id);
 CREATE INDEX idx_progreso_plan ON progreso_planes(plan_usuario_id);
 
 -- ============================================
--- TRIGGERS AUTOMÁTICOS
+-- FUNCIONES Y TRIGGERS PARA POSTGRESQL
 -- ============================================
 
--- Trigger para actualizar último acceso
-DELIMITER //
-CREATE TRIGGER actualizar_ultimo_acceso
-    AFTER UPDATE ON usuarios
-    FOR EACH ROW
+-- Función para actualizar último acceso
+CREATE OR REPLACE FUNCTION actualizar_ultimo_acceso()
+RETURNS TRIGGER AS $$
 BEGIN
     UPDATE control 
     SET last_access = CURRENT_TIMESTAMP 
     WHERE user_id = NEW.user_id;
-END//
-DELIMITER ;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Trigger para calcular edad automáticamente
-DELIMITER //
-CREATE TRIGGER calcular_edad
-    BEFORE INSERT ON registros
+-- Trigger para actualizar último acceso
+CREATE TRIGGER trigger_actualizar_ultimo_acceso
+    AFTER UPDATE ON usuarios
     FOR EACH ROW
+    EXECUTE FUNCTION actualizar_ultimo_acceso();
+
+-- Función para calcular edad automáticamente
+CREATE OR REPLACE FUNCTION calcular_edad()
+RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.fecha_nac IS NOT NULL THEN
-        SET NEW.edad = TIMESTAMPDIFF(YEAR, NEW.fecha_nac, CURDATE());
+        NEW.edad := EXTRACT(YEAR FROM AGE(NEW.fecha_nac));
     END IF;
-END//
-DELIMITER ;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger para calcular edad
+CREATE TRIGGER trigger_calcular_edad
+    BEFORE INSERT ON registros
+    FOR EACH ROW
+    EXECUTE FUNCTION calcular_edad();
 
 -- ============================================
 -- DATOS INICIALES
@@ -415,34 +425,25 @@ INSERT INTO planes_predeterminados (categoria_plan_id, meta_principal, descripci
 -- ============================================
 
 /*
-CARACTERÍSTICAS DE LA BASE DE DATOS TASKPIN:
+CARACTERÍSTICAS DE LA BASE DE DATOS TASKPIN PARA POSTGRESQL:
 
-✅ ESTRUCTURA MODULAR:
-   - Usuarios con información básica y extendida
-   - Sistema de hábitos predeterminados por categorías
-   - Sistema de planes con objetivos y tareas estructuradas
+✅ ESTRUCTURA OPTIMIZADA PARA POSTGRESQL:
+   - SERIAL en lugar de AUTO_INCREMENT
+   - VARCHAR con CHECK constraints en lugar de ENUM
+   - Funciones y triggers en PL/pgSQL
+   - Sintaxis nativa de PostgreSQL
 
 ✅ FUNCIONALIDADES CLAVE:
-   - Seguimiento diario de hábitos
-   - Progreso de planes por fases
-   - Sistema de recordatorios personalizable
-   - Puntuación por completar hábitos
-
-✅ ESCALABILIDAD:
-   - Fácil agregar nuevos hábitos y planes
-   - Sistema flexible de categorías
-   - Estructura preparada para múltiples usuarios
-
-✅ INTEGRIDAD DE DATOS:
-   - Validaciones automáticas
-   - Triggers para cálculos automáticos
-   - Relaciones bien definidas
-   - Índices para rendimiento óptimo
-
-✅ DATOS INICIALES:
    - 5 categorías de hábitos con 25 hábitos predeterminados
    - 3 categorías de planes con 15 planes predeterminados
-   - Listos para usar inmediatamente
+   - Sistema de seguimiento diario y progreso por fases
+   - Triggers automáticos para edad y último acceso
 
-La base está lista para soportar una app completa de hábitos y planes de vida! 🚀
+✅ PREPARADA PARA PRODUCCIÓN:
+   - Índices para optimización de consultas
+   - Validaciones de datos robustas
+   - Relaciones bien definidas con CASCADE
+   - Estructura escalable para crecimiento futuro
+
+La base está 100% lista para PostgreSQL! 🚀
 */
