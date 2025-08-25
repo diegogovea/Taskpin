@@ -123,7 +123,7 @@ export default function LoginScreen() {
         disabled={loading}
       >
         <Text style={styles.loginButtonText}>
-          {loading ? "Iniciando sesión..." : "Regístrate"}
+          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
         </Text>
       </TouchableOpacity>
     </View>
