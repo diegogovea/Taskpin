@@ -33,23 +33,7 @@ function GlobalHeader({ title }: { title: string }) {
               {/* Este texto cambia según la sección actual */}
               <Text style={styles.sectionTitle}>{title}</Text>
             </View>
-          </View>
-          
-          {/* ========== LADO DERECHO: ESTADÍSTICAS ========== */}
-          <View style={styles.statsContainer}>
-            {/* Racha de días consecutivos */}
-            <View style={styles.statItem}>
-              <Ionicons name="flame" size={20} color="#F59E0B" />
-              <Text style={styles.statText}>5</Text>
-            </View>
-            
-            {/* Gemas/Puntos del usuario */}
-            <View style={styles.statItem}>
-              <Ionicons name="diamond" size={20} color="#06B6D4" />
-              <Text style={styles.statText}>250</Text>
-            </View>
-          </View>
-          
+          </View>          
         </View>
       </LinearGradient>
     </>
