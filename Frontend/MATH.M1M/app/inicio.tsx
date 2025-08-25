@@ -14,13 +14,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [correo_electronico, setCorreoElectronico] = useState("");
+  const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     // Validaciones básicas
-    if (!correo_electronico.trim()) {
+    if (!correo.trim()) {
       Alert.alert("Error", "Por favor ingresa tu correo electrónico");
       return;
     }
@@ -34,14 +34,16 @@ export default function LoginScreen() {
     
     try {
       const res = await axios.post("http://127.0.0.1:8000/login", {
-        correo_electronico,
+        correo: correo.trim().toLowerCase(),
         contraseña,
       });
       
-      const { access_token, username } = res.data;
+      const { access_token, user_id, nombre } = res.data;
       
-      // Guardar solo el username
-      await AsyncStorage.setItem('username', username);
+      // Guardar información del usuario en AsyncStorage
+      await AsyncStorage.setItem('access_token', access_token);
+      await AsyncStorage.setItem('user_id', user_id.toString());
+      await AsyncStorage.setItem('nombre', nombre);
       
       Alert.alert("Éxito", "Login correcto. Token: " + access_token);
       router.replace("/bienvenida");
@@ -72,24 +74,20 @@ export default function LoginScreen() {
       <Text style={styles.title}>Iniciar Sesión</Text>
       
       {/* Logo */}
-      {/* 🔽 LOGO LOCAL - Cambia por tu ruta 🔽 */}
       <Image
         source={require("../components/images/logo.png")} // Ajusta el nombre de tu archivo
         style={styles.logo}
         resizeMode="contain"
       />
-      {/* 🔼 LOGO LOCAL 🔼 */}
-      
-    
       
       {/* Formulario */}
-      <Text style={styles.label}>NICKNAME</Text>
+      <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
       <TextInput
         style={styles.input}
         placeholder="hola@taskpineresawesome.co"
-        placeholderTextColor="#9CA3AF"
-        value={correo_electronico}
-        onChangeText={setCorreoElectronico}
+        placeholderTextColor="#9CA3AF" // Placeholder gris original
+        value={correo}
+        onChangeText={setCorreo}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -99,7 +97,7 @@ export default function LoginScreen() {
       <TextInput
         style={styles.input}
         placeholder="••••••"
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor="#9CA3AF" // Placeholder gris original
         secureTextEntry
         value={contraseña}
         onChangeText={setContraseña}
@@ -123,7 +121,7 @@ export default function LoginScreen() {
         disabled={loading}
       >
         <Text style={styles.loginButtonText}>
-          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+          {loading ? "Iniciando..." : "INICIAR SESIÓN"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -135,12 +133,12 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 32,
     justifyContent: "center",
-    backgroundColor: "#F9FAFB", // Fondo gris claro
+    backgroundColor: "#F9FAFB", // Fondo gris claro original
   },
   title: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#10B981", // Verde como en la imagen
+    color: "#10B981", // Verde original
     textAlign: "center",
     marginBottom: 24,
   },
@@ -150,17 +148,9 @@ const styles = StyleSheet.create({
     alignSelf: "center", 
     marginBottom: 40,
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#1F2937", // Gris oscuro
-    textAlign: "center",
-    marginBottom: 32,
-    letterSpacing: -0.5,
-  },
   label: { 
     fontSize: 12, 
-    color: "#9CA3AF", // Gris medio
+    color: "#9CA3AF", // Gris medio original
     marginBottom: 8, 
     marginTop: 16,
     fontWeight: "500",
@@ -168,7 +158,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   input: {
-    backgroundColor: "#F3F4F6", // Gris muy claro
+    backgroundColor: "#F3F4F6", // Gris muy claro original
     borderRadius: 8,
     padding: 16,
     marginBottom: 4,
@@ -182,12 +172,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   registerLinkText: {
-    color: "#6B7280", // Gris medio
+    color: "#6B7280", // Gris medio original
     fontSize: 14,
     textAlign: "center",
   },
   loginButton: {
-    backgroundColor: "#8B5CF6", // Morado como en la imagen
+    backgroundColor: "#8B5CF6", // Morado original
     padding: 18,
     borderRadius: 25,
     marginTop: 32,
@@ -202,7 +192,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   loginButtonDisabled: {
-    backgroundColor: "#D1D5DB",
+    backgroundColor: "#D1D5DB", // Gris claro cuando está deshabilitado
     shadowOpacity: 0,
     elevation: 0,
   },
