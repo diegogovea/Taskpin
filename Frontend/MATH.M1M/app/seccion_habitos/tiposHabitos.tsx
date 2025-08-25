@@ -25,6 +25,32 @@ export default function HomeScreen() {
       router.push('/(tabs)/home');
     }
   };
+
+  // Funciones de navegación para cada categoría
+  const navigateToCategory1 = () => {
+    router.push('/seccion_habitos/catH1');
+  };
+
+  const navigateToCategory2 = () => {
+    router.push('/seccion_habitos/catH2');
+  };
+
+  const navigateToCategory3 = () => {
+    router.push('/seccion_habitos/catH3');
+  };
+
+  const navigateToCategory4 = () => {
+    router.push('/seccion_habitos/catH4');
+  };
+
+  const navigateToCategory5 = () => {
+    router.push('/seccion_habitos/catH5');
+  };
+
+  const navigateToCustom = () => {
+    // Puedes crear un archivo catHCustom.tsx o dirigir a donde necesites
+    router.push('/seccion_habitos/catHCustom');
+  };
   
   // RENDERIZADO PRINCIPAL DEL COMPONENTE
   return (
@@ -45,67 +71,87 @@ export default function HomeScreen() {
         {/* LISTA DE CATEGORÍAS CON GRADIENTES */}
         <View style={styles.categoriesContainer}>
           
-          {/* Hábitos comunes - Morado clarito */}
-          <TouchableOpacity style={styles.categoryButton} activeOpacity={0.8}>
+          {/* CATEGORÍA 1: Bienestar Diario - catH1.tsx */}
+          <TouchableOpacity 
+            style={styles.categoryButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCategory1}
+          >
             <LinearGradient
               colors={['#DDD6FE', '#C4B5FD']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <Text style={styles.categoryText}>Hábitos comunes</Text>
+              <Text style={styles.categoryText}>Bienestar Diario</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B46C1" />
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Categoría 2 - Morado clarito */}
-          <TouchableOpacity style={styles.categoryButton} activeOpacity={0.8}>
+          {/* CATEGORÍA 2: Energía y Movimiento - catH2.tsx */}
+          <TouchableOpacity 
+            style={styles.categoryButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCategory2}
+          >
             <LinearGradient
               colors={['#DDD6FE', '#C4B5FD']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <Text style={styles.categoryText}>Categoría 2</Text>
+              <Text style={styles.categoryText}>Energía y Movimiento</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B46C1" />
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Categoría 3 - Morado clarito */}
-          <TouchableOpacity style={styles.categoryButton} activeOpacity={0.8}>
+          {/* CATEGORÍA 3: Mente y Enfoque - catH3.tsx */}
+          <TouchableOpacity 
+            style={styles.categoryButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCategory3}
+          >
             <LinearGradient
               colors={['#DDD6FE', '#C4B5FD']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <Text style={styles.categoryText}>Categoría 3</Text>
+              <Text style={styles.categoryText}>Mente y Enfoque</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B46C1" />
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Categoría 4 - Morado clarito */}
-          <TouchableOpacity style={styles.categoryButton} activeOpacity={0.8}>
+          {/* CATEGORÍA 4: Ordenar Hogar - catH4.tsx */}
+          <TouchableOpacity 
+            style={styles.categoryButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCategory4}
+          >
             <LinearGradient
               colors={['#DDD6FE', '#C4B5FD']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <Text style={styles.categoryText}>Categoría 4</Text>
+              <Text style={styles.categoryText}>Ordenar Hogar</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B46C1" />
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Categoría 5 - Morado clarito */}
-          <TouchableOpacity style={styles.categoryButton} activeOpacity={0.8}>
+          {/* CATEGORÍA 5: Finanzas y Control Personal - catH5.tsx */}
+          <TouchableOpacity 
+            style={styles.categoryButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCategory5}
+          >
             <LinearGradient
               colors={['#DDD6FE', '#C4B5FD']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <Text style={styles.categoryText}>Categoría 5</Text>
+              <Text style={styles.categoryText}>Finanzas y Control Personal</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B46C1" />
             </LinearGradient>
           </TouchableOpacity>
@@ -114,7 +160,11 @@ export default function HomeScreen() {
 
         {/* BOTÓN PERSONALIZAR CON GRADIENTE ESPECIAL */}
         <View style={styles.customButtonContainer}>
-          <TouchableOpacity style={styles.customButton} activeOpacity={0.8}>
+          <TouchableOpacity 
+            style={styles.customButton} 
+            activeOpacity={0.8}
+            onPress={navigateToCustom}
+          >
             <LinearGradient
               colors={['#8B5CF6', '#10B981', '#059669']}
               start={{ x: 0, y: 0 }}
