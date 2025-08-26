@@ -127,3 +127,38 @@ class userConnection():
         if self.verify_password(contraseña, user[3]):  # user[3] es la contraseña hasheada
             return user
         return None
+
+    def create_session(self, user_id):
+        """Crea una nueva sesión en la tabla control"""
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO control (user_id) 
+                VALUES (%s)
+                RETURNING id_control;
+            """, (user_id,))
+            
+            control_id = cur.fetchone()[0]
+            self.conn.commit()
+            return control_id
+
+    def get_active_session(self, user_id):
+        """Obtiene la sesión activa más reciente del usuario"""
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT id_control, user_id, creacion, last_access 
+                FROM control 
+                WHERE user_id = %s 
+                ORDER BY last_access DESC 
+                LIMIT 1;
+            """, (user_id,))
+            return cur.fetchone()
+
+    def update_last_access(self, user_id):
+        """Actualiza el último acceso del usuario"""
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                UPDATE control 
+                SET last_access = CURRENT_TIMESTAMP 
+                WHERE user_id = %s;
+            """, (user_id,))
+            self.conn.commit()
