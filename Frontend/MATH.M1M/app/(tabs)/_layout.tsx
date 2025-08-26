@@ -64,14 +64,8 @@ export default function TabsLayout() {
             case "habitos":
               sectionName = "Mis Hábitos";        // Para ajustes
               break;
-            case "favoritos":
-              sectionName = "Favoritos";            // Para ejercicios favoritos
-              break;
             case "planes":
               sectionName = "Mis Planes";         // Para progreso y datos
-              break;
-            case "materia":
-              sectionName = "Materias";             // Para categorías de matemáticas
               break;
             default:
               sectionName = "Taskpin";             // Texto por defecto
@@ -149,22 +143,6 @@ export default function TabsLayout() {
             );
           } 
           
-          // FAVORITOS: Estrella ⭐
-          else if (route.name === "favoritos") {
-            icon = (
-              <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon,
-                styles.iconContainer
-              ]}>
-                <AntDesign 
-                  name="star" 
-                  size={22} 
-                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
-                />
-              </View>
-            );
-          } 
-          
           // PERFIL: Usuario 👤
           else if (route.name === "perfil") {
             icon = (
@@ -181,21 +159,6 @@ export default function TabsLayout() {
             );
           } 
           
-          // MATERIAS: Libro (si tienes esta pestaña)
-          else if (route.name === "materia") {
-            icon = (
-              <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon,
-                styles.iconContainer
-              ]}>
-                <FontAwesome5 
-                  name="book" 
-                  size={20} 
-                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
-                />
-              </View>
-            );
-          }
 
           return icon;
         },
@@ -205,7 +168,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="habitos" /> {/* Check / Settings */}
       <Tabs.Screen name="planes" />  {/* Gráfico */}
       <Tabs.Screen name="home" />          {/* Casa (centro) */}
-      <Tabs.Screen name="favoritos" />     {/* Estrella */}
       <Tabs.Screen name="perfil" />        {/* Persona */}
     </Tabs>
   );
