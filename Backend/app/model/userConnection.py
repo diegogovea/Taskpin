@@ -10,7 +10,7 @@ class userConnection():
     def __init__(self):
         try:
             # IMPORTANTE: Asegúrate de que apunte a la base de datos 'taskpin'
-            self.conn = psycopg.connect("dbname=taskpin user=postgres password=210315142320 host=localhost port=5432")
+            self.conn = psycopg.connect("dbname=taskpin user=postgres password=123456 host=localhost port=5432")
         except psycopg.OperationalError as err:
             print(f"Error de conexión a la base de datos: {err}")
 
