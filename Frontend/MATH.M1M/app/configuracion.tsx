@@ -291,7 +291,6 @@ export default function ConfiguracionScreen() {
               <Text style={styles.logoutModalTitle}>¿Cerrar Sesión?</Text>
               <Text style={styles.logoutModalMessage}>
                 ¿Estás seguro que deseas cerrar sesión?{'\n'}
-                Se limpiarán todos tus datos de la aplicación.
               </Text>
             </View>
 
