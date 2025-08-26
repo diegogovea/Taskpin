@@ -47,8 +47,7 @@ export default function BienvenidaScreen() {
           resizeMode="contain"
         />
 
-        {/* Título de la app */}
-        <Text style={styles.appTitle}>TASKPIN</Text>
+
 
         {/* Mensaje de bienvenida personalizado */}
         <View style={styles.welcomeContainer}>
