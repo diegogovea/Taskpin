@@ -8,3 +8,6 @@ npx expo install @react-navigation/native @react-navigation/stack react-native-g
 
 npm install expo-router@latest
 
+expo install react-native-calendars
+
+expo install react-native-chart-kit react-native-svg
