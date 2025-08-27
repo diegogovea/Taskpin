@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   addMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center', 
     marginTop: 20,
     paddingVertical: 12,
     paddingHorizontal: 20,
