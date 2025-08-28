@@ -87,9 +87,33 @@ export default function DetallePlanScreen() {
     
     try {
       setAgregandoPlan(true);
+
+          // Obtener user_id del usuario actual
+
+      const getCurrentUser = async () => {
+        try {
+          const response = await fetch('http://localhost:8000/api/current-user');
+          const data = await response.json();
+          console.log('Current user response in agregar plan:', data); // DEBUG
+          if (data.success) {
+            return data.data.user_id;
+          }
+          return null;
+        } catch (error) {
+          console.error('Error getting current user:', error);
+          return null;
+        }
+      };
+
+      const userId = await getCurrentUser();
+      if (!userId) {
+        Alert.alert('Error', 'No se pudo obtener el usuario actual');
+        return;
+      }
+      
       
       const payload = {
-        user_id: 1, // TODO: Obtener del contexto de usuario real
+        user_id: userId, // TODO: Obtener del contexto de usuario real
         plan_id: plan.plan_id,
         dias_personalizados: parseInt(diasPersonalizados) || plan.plazo_dias_estimado
       };

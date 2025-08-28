@@ -10,10 +10,10 @@ class PlanesConnection:
             print(f"Error de conexión a la base de datos: {err}")
             self.conn = None
 
-    def agregar_plan_usuario(self, user_id, plan_id, fecha_objetivo=None):
-        """Agregar plan a usuario - VERSIÓN SIMPLE"""
+    def agregar_plan_usuario(self, user_id, plan_id, dias_personalizados=None):
+        """Agregar plan a usuario - VERSIÓN CORREGIDA"""
         print(f"DEBUG PlanesConnection: Iniciando agregar_plan_usuario")
-        print(f"DEBUG PlanesConnection: user_id={user_id}, plan_id={plan_id}")
+        print(f"DEBUG PlanesConnection: user_id={user_id}, plan_id={plan_id}, dias={dias_personalizados}")
         
         if not self.conn:
             print("DEBUG PlanesConnection: Sin conexión a BD")
@@ -34,6 +34,13 @@ class PlanesConnection:
                     return {'success': False, 'message': 'Ya tienes este plan agregado'}
                 
                 print("DEBUG PlanesConnection: No hay duplicado, insertando...")
+                
+                # Calcular fecha_objetivo si se proporcionan días personalizados
+                fecha_objetivo = None
+                if dias_personalizados:
+                    from datetime import date, timedelta
+                    fecha_objetivo = date.today() + timedelta(days=dias_personalizados)
+                    print(f"DEBUG PlanesConnection: fecha_objetivo calculada: {fecha_objetivo}")
                 
                 # Insertar plan_usuario
                 cur.execute("""

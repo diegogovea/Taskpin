@@ -40,8 +40,29 @@ export default function PlanesScreen() {
     try {
       setError(null);
       
-      // TODO: Obtener user_id real del contexto de autenticación
-      const userId = 1; // Hardcoded por ahora
+      // Obtener user_id del usuario actual
+      const getCurrentUser = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/api/current-user`);
+          const data = await response.json();
+          
+          console.log('Current user response in planes:', data); // DEBUG
+          
+          if (data.success) {
+            return data.data.user_id;
+          }
+          return null;
+        } catch (error) {
+          console.error('Error getting current user:', error);
+          return null;
+        }
+      };
+
+      const userId = await getCurrentUser();
+      if (!userId) {
+        setError('No se pudo obtener el usuario actual');
+        return;
+      }
       
       const response = await fetch(`http://localhost:8000/api/planes/mis-planes/${userId}`);
       const data = await response.json();
@@ -92,6 +113,8 @@ export default function PlanesScreen() {
       default: return '#6B7280';
     }
   };
+
+
 
   // Obtener color por dificultad
   const getDifficultyColor = (dificultad: string) => {
