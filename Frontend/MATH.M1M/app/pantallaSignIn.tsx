@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,63 +7,83 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import axios from "axios";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 
 export default function SignInScreen() {
   const router = useRouter();
-  
-  // Estados simplificados - solo campos básicos
+
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
   const [confirmarContraseña, setConfirmarContraseña] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Función para llenar datos de prueba
-  const fillTestData = () => {
-    setNombre("Juan Pérez");
-    setCorreo("juan@test.com");
-    setContraseña("123456");
-    setConfirmarContraseña("123456");
-  };
+  // Focus states
+  const [nameFocused, setNameFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmFocused, setConfirmFocused] = useState(false);
 
-  // Validaciones simplificadas
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
   const handleRegister = async () => {
-    // Validaciones básicas
     if (!nombre.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu nombre");
+      Alert.alert("Error", "Please enter your name");
       return;
     }
 
     if (!correo.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu correo electrónico");
+      Alert.alert("Error", "Please enter your email");
       return;
     }
 
     if (!validateEmail(correo)) {
-      Alert.alert("Error", "Por favor ingresa un correo electrónico válido");
+      Alert.alert("Error", "Please enter a valid email");
       return;
     }
 
     if (!contraseña.trim()) {
-      Alert.alert("Error", "Por favor ingresa una contraseña");
+      Alert.alert("Error", "Please enter a password");
       return;
     }
 
     if (contraseña.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
+      Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
 
     if (contraseña !== confirmarContraseña) {
-      Alert.alert("Error", "Las contraseñas no coinciden");
+      Alert.alert("Error", "Passwords don't match");
       return;
     }
 
@@ -73,202 +93,416 @@ export default function SignInScreen() {
       const userData = {
         nombre: nombre.trim(),
         correo: correo.trim().toLowerCase(),
-        contraseña: contraseña
+        contraseña: contraseña,
       };
 
-      const response = await axios.post("http://127.0.0.1:8000/register", userData);
+      await axios.post("http://127.0.0.1:8000/register", userData);
 
       Alert.alert(
-        "¡Registro exitoso!", 
-        "Tu cuenta ha sido creada correctamente. Ahora puedes iniciar sesión.",
+        "Account created!",
+        "Your account has been created successfully. Please sign in.",
         [
           {
-            text: "Ir al Login",
-            onPress: () => router.replace("/inicio")
-          }
+            text: "Sign In",
+            onPress: () => router.replace("/inicio"),
+          },
         ]
       );
-
     } catch (error: any) {
-      console.error("Error de registro:", error);
-      
-      let errorMessage = "Error al crear la cuenta";
-      
+      let errorMessage = "Error creating account";
+
       if (error.response?.status === 400) {
-        errorMessage = "El correo electrónico ya está registrado";
+        errorMessage = "This email is already registered";
       } else if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
-          // Si es un array de errores de validación de Pydantic
-          errorMessage = error.response.data.detail.map((err: any) => err.msg).join('\n');
+          errorMessage = error.response.data.detail.map((err: any) => err.msg).join("\n");
         } else {
           errorMessage = error.response.data.detail;
         }
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  // Password strength indicator
+  const getPasswordStrength = () => {
+    if (!contraseña) return { level: 0, text: "", color: colors.neutral[300] };
+    if (contraseña.length < 6) return { level: 1, text: "Weak", color: colors.semantic.error };
+    if (contraseña.length < 10) return { level: 2, text: "Fair", color: colors.semantic.warning };
+    return { level: 3, text: "Strong", color: colors.semantic.success };
+  };
+
+  const passwordStrength = getPasswordStrength();
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Crea tu cuenta</Text>
-
-        <TouchableOpacity onPress={() => router.replace("/inicio")}>
-          <Text style={styles.loginLink}>¿Ya tienes cuenta? Inicia sesión aquí.</Text>
-        </TouchableOpacity>
-
-        {/* Botón para datos de prueba */}
-        <TouchableOpacity style={styles.testButton} onPress={fillTestData}>
-          <Text style={styles.testButtonText}>🧪 Llenar datos de prueba</Text>
-        </TouchableOpacity>
-
-        {/* Nombre */}
-        <Text style={styles.label}>NOMBRE COMPLETO</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej. Juan Pérez"
-          placeholderTextColor="#9CA3AF" // Placeholder gris original
-          value={nombre}
-          onChangeText={setNombre}
-          autoCapitalize="words"
-        />
-
-        {/* Correo electrónico */}
-        <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="ejemplo@correo.com"
-          placeholderTextColor="#9CA3AF"
-          keyboardType="email-address"
-          value={correo}
-          onChangeText={setCorreo}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        {/* Contraseña */}
-        <Text style={styles.label}>CONTRASEÑA</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          placeholderTextColor="#9CA3AF"
-          secureTextEntry
-          value={contraseña}
-          onChangeText={setContraseña}
-          autoCapitalize="none"
-        />
-
-        {/* Confirmar contraseña */}
-        <Text style={styles.label}>CONFIRMAR CONTRASEÑA</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          placeholderTextColor="#9CA3AF"
-          secureTextEntry
-          value={confirmarContraseña}
-          onChangeText={setConfirmarContraseña}
-          autoCapitalize="none"
-        />
-
-        {/* Botón de registro */}
-        <TouchableOpacity 
-          style={[styles.nextButton, loading && styles.nextButtonDisabled]} 
-          onPress={handleRegister}
-          disabled={loading}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
         >
-          <Text style={styles.nextButtonText}>
-            {loading ? "Registrando..." : "CREAR CUENTA"}
-          </Text>
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.subtitle}>
+              Start your journey to better habits today
+            </Text>
+          </View>
+
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Name Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Full name</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  nameFocused && styles.inputContainerFocused,
+                ]}
+              >
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={nameFocused ? colors.primary[600] : colors.neutral[400]}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="John Doe"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={nombre}
+                  onChangeText={setNombre}
+                  autoCapitalize="words"
+                  onFocus={() => setNameFocused(true)}
+                  onBlur={() => setNameFocused(false)}
+                />
+              </View>
+            </View>
+
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  emailFocused && styles.inputContainerFocused,
+                ]}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={emailFocused ? colors.primary[600] : colors.neutral[400]}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="your@email.com"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="email-address"
+                  value={correo}
+                  onChangeText={setCorreo}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  passwordFocused && styles.inputContainerFocused,
+                ]}
+              >
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={passwordFocused ? colors.primary[600] : colors.neutral[400]}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.neutral[400]}
+                  secureTextEntry={!showPassword}
+                  value={contraseña}
+                  onChangeText={setContraseña}
+                  autoCapitalize="none"
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color={colors.neutral[400]}
+                  />
+                </TouchableOpacity>
+              </View>
+              {/* Password Strength */}
+              {contraseña.length > 0 && (
+                <View style={styles.strengthContainer}>
+                  <View style={styles.strengthBars}>
+                    {[1, 2, 3].map((level) => (
+                      <View
+                        key={level}
+                        style={[
+                          styles.strengthBar,
+                          {
+                            backgroundColor:
+                              level <= passwordStrength.level
+                                ? passwordStrength.color
+                                : colors.neutral[200],
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text
+                    style={[styles.strengthText, { color: passwordStrength.color }]}
+                  >
+                    {passwordStrength.text}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirm password</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  confirmFocused && styles.inputContainerFocused,
+                  confirmarContraseña.length > 0 &&
+                    contraseña !== confirmarContraseña &&
+                    styles.inputContainerError,
+                ]}
+              >
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={confirmFocused ? colors.primary[600] : colors.neutral[400]}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.neutral[400]}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmarContraseña}
+                  onChangeText={setConfirmarContraseña}
+                  autoCapitalize="none"
+                  onFocus={() => setConfirmFocused(true)}
+                  onBlur={() => setConfirmFocused(false)}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeButton}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color={colors.neutral[400]}
+                  />
+                </TouchableOpacity>
+              </View>
+              {confirmarContraseña.length > 0 && contraseña !== confirmarContraseña && (
+                <Text style={styles.errorText}>Passwords don't match</Text>
+              )}
+            </View>
+
+            {/* Register Button */}
+            <TouchableOpacity
+              style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+              onPress={handleRegister}
+              disabled={loading}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.registerButtonText}>
+                {loading ? "Creating account..." : "Create Account"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Login Link */}
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => router.replace("/inicio")}>
+              <Text style={styles.loginLink}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#F9FAFB", // Fondo gris claro original
-  },
   container: {
     flex: 1,
+    backgroundColor: colors.neutral[0],
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[16],
+    paddingBottom: spacing[8],
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
     justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[6],
+  },
+  content: {
+    flex: 1,
+  },
+  header: {
+    marginBottom: spacing[8],
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#1F2937", // Gris oscuro original
-    textAlign: "center",
-    marginBottom: 30,
+    fontSize: typography.size["3xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[2],
     letterSpacing: -0.5,
   },
-  loginLink: {
-    color: "#6B7280", // Gris medio original
-    textAlign: "center",
-    marginBottom: 20,
-    fontSize: 14,
+  subtitle: {
+    fontSize: typography.size.md,
+    color: colors.neutral[500],
+    lineHeight: 24,
   },
-  testButton: {
-    backgroundColor: "#E0E7FF", // Morado claro
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 20,
-    alignItems: "center",
+  form: {
+    flex: 1,
   },
-  testButtonText: {
-    color: "#6366F1", // Morado oscuro
-    fontSize: 14,
-    fontWeight: "500",
+  inputGroup: {
+    marginBottom: spacing[5],
   },
   label: {
-    fontSize: 12,
-    color: "#9CA3AF", // Gris medio original
-    marginBottom: 8,
-    marginTop: 16,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.neutral[200],
+    paddingHorizontal: spacing[4],
+  },
+  inputContainerFocused: {
+    borderColor: colors.primary[500],
+    backgroundColor: colors.neutral[0],
+  },
+  inputContainerError: {
+    borderColor: colors.semantic.error,
+  },
+  inputIcon: {
+    marginRight: spacing[3],
   },
   input: {
-    backgroundColor: "#F3F4F6", // Gris muy claro original
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 4,
-    fontSize: 16,
-    color: "#1F2937",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    flex: 1,
+    paddingVertical: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[900],
   },
-  nextButton: {
-    backgroundColor: "#8B5CF6", // Morado original
-    padding: 18,
-    borderRadius: 25,
+  eyeButton: {
+    padding: spacing[2],
+  },
+  strengthContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 32,
-    shadowColor: "#8B5CF6",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginTop: spacing[2],
+    gap: spacing[3],
   },
-  nextButtonDisabled: {
-    backgroundColor: "#D1D5DB",
+  strengthBars: {
+    flexDirection: "row",
+    gap: spacing[1],
+  },
+  strengthBar: {
+    width: 32,
+    height: 4,
+    borderRadius: 2,
+  },
+  strengthText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  errorText: {
+    fontSize: typography.size.sm,
+    color: colors.semantic.error,
+    marginTop: spacing[1],
+  },
+  registerButton: {
+    backgroundColor: colors.primary[600],
+    paddingVertical: spacing[5],
+    borderRadius: radius.xl,
+    alignItems: "center",
+    marginTop: spacing[4],
+    ...shadows.md,
+    shadowColor: colors.primary[600],
+  },
+  registerButtonDisabled: {
+    backgroundColor: colors.neutral[300],
     shadowOpacity: 0,
-    elevation: 0,
   },
-  nextButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 16,
+  registerButtonText: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+  },
+  loginContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: spacing[8],
+  },
+  loginText: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+  },
+  loginLink: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
 });

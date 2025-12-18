@@ -1,5 +1,3 @@
-// Frontend/MATH.M1M/app/(tabs)/home.tsx
-
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -15,13 +13,11 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
-// ============================================
-// INTERFACES
-// ============================================
-
+// Interfaces
 interface HabitoHoy {
   habito_usuario_id: number;
   nombre: string;
@@ -41,11 +37,11 @@ interface MiPlan {
   plan_usuario_id: number;
   fecha_inicio: string;
   fecha_objetivo: string | null;
-  estado: 'activo' | 'pausado' | 'completado' | 'cancelado';
+  estado: "activo" | "pausado" | "completado" | "cancelado";
   progreso_porcentaje: number;
   meta_principal: string;
   descripcion: string;
-  dificultad: 'fácil' | 'intermedio' | 'difícil';
+  dificultad: "fácil" | "intermedio" | "difícil";
 }
 
 interface ResumenUsuario {
@@ -54,131 +50,101 @@ interface ResumenUsuario {
   nivel_actual: number;
 }
 
-// ============================================
-// COMPONENTE PRINCIPAL
-// ============================================
-
 export default function HomeScreen() {
   const router = useRouter();
 
-  // Estados
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [userName, setUserName] = useState<string>("Usuario");
-  
-  // Estados para dashboards
+  const [userName, setUserName] = useState<string>("User");
   const [habitosHoy, setHabitosHoy] = useState<HabitoHoy[]>([]);
   const [estadisticasHabitos, setEstadisticasHabitos] = useState<EstadisticasHabitos>({
-    total: 0, completados: 0, pendientes: 0, fecha: 'today'
+    total: 0,
+    completados: 0,
+    pendientes: 0,
+    fecha: "today",
   });
   const [misPlanes, setMisPlanes] = useState<MiPlan[]>([]);
   const [resumenUsuario, setResumenUsuario] = useState<ResumenUsuario>({
-    racha_actual: 0, gemas_totales: 0, nivel_actual: 1
+    racha_actual: 0,
+    gemas_totales: 0,
+    nivel_actual: 1,
   });
 
-  const API_BASE_URL = 'http://localhost:8000';
+  const API_BASE_URL = "http://localhost:8000";
 
-  // ============================================
-  // FUNCIONES DE CARGA DE DATOS
-  // ============================================
-
-  // Obtener usuario actual
   const getCurrentUser = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/current-user`);
       const data = await response.json();
-      
       if (data.success) {
         setCurrentUserId(data.data.user_id);
-        setUserName(data.data.nombre || "Usuario");
+        setUserName(data.data.nombre || "User");
         return data.data.user_id;
       }
       return null;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error("Error getting current user:", error);
       return null;
     }
   };
 
-  // Cargar hábitos de hoy
   const loadHabitosHoy = async (userId: number) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/usuario/${userId}/habitos/hoy`);
       const data = await response.json();
-
       if (data.success) {
         setHabitosHoy(data.data.habitos || []);
-        setEstadisticasHabitos(data.data.estadisticas || {
-          total: 0, completados: 0, pendientes: 0, fecha: 'today'
-        });
+        setEstadisticasHabitos(
+          data.data.estadisticas || { total: 0, completados: 0, pendientes: 0, fecha: "today" }
+        );
       }
     } catch (error) {
-      console.error('Error loading habitos:', error);
+      console.error("Error loading habitos:", error);
       setHabitosHoy([]);
     }
   };
 
-  // Cargar mis planes
-// Cargar mis planes
-const loadMisPlanes = async (userId: number) => {
-  try {
-    console.log('Loading planes for userId:', userId); // NUEVO DEBUG
-    const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
-    console.log('Response status:', response.status); // NUEVO DEBUG
-    const data = await response.json();
-    
-    console.log('Planes response:', data); // NUEVO DEBUG
-
-    if (data.success) {
-      setMisPlanes(data.planes || []);
+  const loadMisPlanes = async (userId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
+      const data = await response.json();
+      if (data.success) {
+        setMisPlanes(data.planes || []);
+      }
+    } catch (error) {
+      console.error("Error loading planes:", error);
+      setMisPlanes([]);
     }
-  } catch (error) {
-    console.error('Error loading planes:', error);
-    setMisPlanes([]);
-  }
-};
+  };
 
-  // Cargar datos de resumen del usuario (mock por ahora)
   const loadResumenUsuario = async () => {
-    // Por ahora datos mock, después conectar con backend
     setResumenUsuario({
       racha_actual: 7,
       gemas_totales: 156,
-      nivel_actual: 3
+      nivel_actual: 3,
     });
   };
 
-  // Función principal de carga
   const loadAllData = async () => {
     try {
       setLoading(true);
-      
       const userId = await getCurrentUser();
       if (!userId) return;
-
-      // Cargar todos los datos en paralelo
-      await Promise.all([
-        loadHabitosHoy(userId),
-        loadMisPlanes(userId),
-        loadResumenUsuario()
-      ]);
-
+      await Promise.all([loadHabitosHoy(userId), loadMisPlanes(userId), loadResumenUsuario()]);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error("Error loading dashboard data:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Refresh handler
   const onRefresh = () => {
     setRefreshing(true);
     loadAllData();
   };
 
-  // Cargar datos al montar y al enfocar
   useEffect(() => {
     loadAllData();
   }, []);
@@ -191,735 +157,679 @@ const loadMisPlanes = async (userId: number) => {
     }, [currentUserId])
   );
 
-  // ============================================
-  // FUNCIONES DE UTILIDAD
-  // ============================================
-
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "¡Buenos días";
-    if (hour < 18) return "¡Buenas tardes";
-    return "¡Buenas noches";
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
 
   const getCurrentDate = () => {
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    return now.toLocaleDateString('es-ES', options);
+    return new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   const getDifficultyColor = (dificultad: string) => {
     switch (dificultad) {
-      case 'fácil': return '#10B981';
-      case 'intermedio': return '#F59E0B'; 
-      case 'difícil': return '#EF4444';
-      default: return '#6B7280';
+      case "fácil":
+        return colors.secondary[500];
+      case "intermedio":
+        return colors.accent.amber;
+      case "difícil":
+        return colors.semantic.error;
+      default:
+        return colors.neutral[500];
     }
   };
 
-  // ============================================
-  // COMPONENTES DE DASHBOARD
-  // ============================================
-
-  // Card de estadísticas principales
-  const StatsCard = ({ title, value, subtitle, icon, colors }: {
-    title: string;
-    value: string | number;
-    subtitle: string;
+  // Stats Card Component
+  const StatCard = ({
+    icon,
+    value,
+    label,
+    gradient,
+  }: {
     icon: string;
-    colors: string[];
+    value: string | number;
+    label: string;
+    gradient: string[];
   }) => (
-    <LinearGradient colors={colors} style={styles.statsCard}>
-      <View style={styles.statsCardContent}>
-        <View style={styles.statsCardHeader}>
-          <Ionicons name={icon as any} size={24} color="white" />
-          <Text style={styles.statsCardValue}>{value}</Text>
-        </View>
-        <Text style={styles.statsCardTitle}>{title}</Text>
-        <Text style={styles.statsCardSubtitle}>{subtitle}</Text>
-      </View>
-    </LinearGradient>
-  );
-
-  // Dashboard de resumen personal
-  const ResumenPersonal = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Tu progreso</Text>
-      <View style={styles.statsRow}>
-        <StatsCard
-          title="Racha"
-          value={`${resumenUsuario.racha_actual}`}
-          subtitle="días consecutivos"
-          icon="flame"
-          colors={['#F97316', '#EA580C']}
-        />
-        <StatsCard
-          title="Gemas"
-          value={resumenUsuario.gemas_totales}
-          subtitle="puntos ganados"
-          icon="diamond"
-          colors={['#8B5CF6', '#7C3AED']}
-        />
-        <StatsCard
-          title="Nivel"
-          value={resumenUsuario.nivel_actual}
-          subtitle="experiencia"
-          icon="trophy"
-          colors={['#10B981', '#059669']}
-        />
-      </View>
+    <View style={styles.statCard}>
+      <LinearGradient colors={gradient} style={styles.statCardGradient}>
+        <Ionicons name={icon as any} size={24} color={colors.neutral[0]} />
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </LinearGradient>
     </View>
   );
 
-  // Dashboard de hábitos
-  const HabitosDashboard = () => {
-    const progresoHoy = estadisticasHabitos.total > 0 
-      ? (estadisticasHabitos.completados / estadisticasHabitos.total) * 100 
-      : 0;
+  // Progress Ring Component
+  const ProgressRing = ({ progress, size = 60 }: { progress: number; size?: number }) => {
+    const strokeWidth = 6;
+    const center = size / 2;
+    const r = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * r;
+    const strokeDashoffset = circumference * (1 - progress / 100);
 
     return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Hábitos de hoy</Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/habitos")}
-            style={styles.viewAllButton}
-          >
-            <Text style={styles.viewAllText}>Ver todos</Text>
-            <Ionicons name="chevron-forward" size={16} color="#8B5CF6" />
-          </TouchableOpacity>
+      <View style={{ width: size, height: size }}>
+        <View style={[styles.progressRingBg, { width: size, height: size, borderRadius: size / 2 }]}>
+          <View style={[styles.progressRingInner, { width: size - 12, height: size - 12, borderRadius: (size - 12) / 2 }]}>
+            <Text style={styles.progressRingText}>{progress}%</Text>
+          </View>
         </View>
-
-        {habitosHoy.length === 0 ? (
-          // Estado vacío
-          <TouchableOpacity 
-            style={styles.emptyCard}
-            onPress={() => router.push("/seccion_habitos/tiposHabitos")}
-          >
-            <Ionicons name="add-circle-outline" size={32} color="#8B5CF6" />
-            <Text style={styles.emptyCardTitle}>No tienes hábitos</Text>
-            <Text style={styles.emptyCardSubtitle}>Toca para agregar tu primer hábito</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            {/* Barra de progreso del día */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>
-                  Progreso de hoy: {estadisticasHabitos.completados}/{estadisticasHabitos.total}
-                </Text>
-                <Text style={styles.progressPercentage}>{Math.round(progresoHoy)}%</Text>
-              </View>
-              <View style={styles.progressBarContainer}>
-                <View 
-                  style={[styles.progressBarFill, { width: `${progresoHoy}%` }]}
-                />
-              </View>
-            </View>
-
-            {/* Lista compacta de hábitos */}
-            <View style={styles.habitsPreview}>
-              {habitosHoy.slice(0, 3).map((habito) => (
-                <View key={habito.habito_usuario_id} style={styles.habitPreviewItem}>
-                  <View style={[
-                    styles.habitPreviewCheck,
-                    habito.completado_hoy && styles.habitPreviewCheckCompleted
-                  ]}>
-                    {habito.completado_hoy && (
-                      <Ionicons name="checkmark" size={14} color="white" />
-                    )}
-                  </View>
-                  <View style={styles.habitPreviewInfo}>
-                    <Text style={styles.habitPreviewName}>{habito.nombre}</Text>
-                    <Text style={styles.habitPreviewCategory}>{habito.categoria_nombre}</Text>
-                  </View>
-                  <Text style={styles.habitPreviewPoints}>+{habito.puntos_base}</Text>
-                </View>
-              ))}
-              
-              {habitosHoy.length > 3 && (
-                <TouchableOpacity
-                  style={styles.habitPreviewMore}
-                  onPress={() => router.push("/(tabs)/habitos")}
-                >
-                  <Text style={styles.habitPreviewMoreText}>
-                    +{habitosHoy.length - 3} más
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </>
-        )}
       </View>
     );
   };
-
-  // Dashboard de planes
-  const PlanesDashboard = () => {
-    const planesActivos = misPlanes.filter(plan => plan.estado === 'activo');
-    const progresoPromedio = planesActivos.length > 0 
-      ? planesActivos.reduce((sum, plan) => sum + plan.progreso_porcentaje, 0) / planesActivos.length
-      : 0;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mis planes</Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/planes")}
-            style={styles.viewAllButton}
-          >
-            <Text style={styles.viewAllText}>Ver todos</Text>
-            <Ionicons name="chevron-forward" size={16} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
-
-        {misPlanes.length === 0 ? (
-          // Estado vacío
-          <TouchableOpacity 
-            style={styles.emptyCard}
-            onPress={() => router.push("/seccion_planes/tiposPlanes")}
-          >
-            <Ionicons name="document-text-outline" size={32} color="#8B5CF6" />
-            <Text style={styles.emptyCardTitle}>No tienes planes</Text>
-            <Text style={styles.emptyCardSubtitle}>Toca para crear tu primer plan</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            {/* Estadísticas de planes */}
-            <View style={styles.planesStatsContainer}>
-              <View style={styles.planesStatCard}>
-                <Text style={styles.planesStatNumber}>{planesActivos.length}</Text>
-                <Text style={styles.planesStatLabel}>Activos</Text>
-              </View>
-              <View style={styles.planesStatCard}>
-                <Text style={styles.planesStatNumber}>{Math.round(progresoPromedio)}%</Text>
-                <Text style={styles.planesStatLabel}>Progreso</Text>
-              </View>
-              <View style={styles.planesStatCard}>
-                <Text style={styles.planesStatNumber}>
-                  {misPlanes.filter(plan => plan.estado === 'completado').length}
-                </Text>
-                <Text style={styles.planesStatLabel}>Completados</Text>
-              </View>
-            </View>
-
-            {/* Lista de planes activos */}
-            <View style={styles.planesPreview}>
-              {planesActivos.slice(0, 2).map((plan) => (
-                <TouchableOpacity
-                  key={plan.plan_usuario_id}
-                  style={styles.planPreviewCard}
-                  onPress={() => router.push(`/seccion_planes/seguimientoPlan?planUsuarioId=${plan.plan_usuario_id}` as any)}
-                >
-                  <View style={styles.planPreviewHeader}>
-                    <Text style={styles.planPreviewTitle}>{plan.meta_principal}</Text>
-                    <View style={[
-                      styles.difficultyBadge,
-                      { backgroundColor: getDifficultyColor(plan.dificultad) + '20' }
-                    ]}>
-                      <Text style={[
-                        styles.difficultyText,
-                        { color: getDifficultyColor(plan.dificultad) }
-                      ]}>
-                        {plan.dificultad}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.planPreviewDescription} numberOfLines={2}>
-                    {plan.descripcion}
-                  </Text>
-                  
-                  {/* Barra de progreso del plan */}
-                  <View style={styles.planProgressContainer}>
-                    <View style={styles.planProgressBar}>
-                      <View 
-                        style={[
-                          styles.planProgressFill,
-                          { width: `${plan.progreso_porcentaje}%` }
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.planProgressText}>
-                      {plan.progreso_porcentaje}%
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-      </View>
-    );
-  };
-
-  // ============================================
-  // RENDER PRINCIPAL
-  // ============================================
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando dashboard...</Text>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading your dashboard...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const progresoHoy =
+    estadisticasHabitos.total > 0
+      ? Math.round((estadisticasHabitos.completados / estadisticasHabitos.total) * 100)
+      : 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* HEADER DE BIENVENIDA */}
-        <View style={styles.welcomeHeader}>
+        {/* Header */}
+        <View style={styles.header}>
           <View>
-            <Text style={styles.greetingText}>{getGreeting()}!</Text>
-            <Text style={styles.userNameText}>{userName}</Text>
-            <Text style={styles.dateText}>{getCurrentDate()}</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.userName}>{userName.split(" ")[0]}</Text>
+            <Text style={styles.date}>{getCurrentDate()}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={() => {/* TODO: Navegar a notificaciones */}}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#374151" />
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color={colors.neutral[700]} />
+            <View style={styles.notificationBadge} />
           </TouchableOpacity>
         </View>
 
-        {/* RESUMEN PERSONAL */}
-        <ResumenPersonal />
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <StatCard
+            icon="flame"
+            value={resumenUsuario.racha_actual}
+            label="Day streak"
+            gradient={["#F97316", "#EA580C"]}
+          />
+          <StatCard
+            icon="diamond"
+            value={resumenUsuario.gemas_totales}
+            label="Points"
+            gradient={colors.gradients.primary}
+          />
+          <StatCard
+            icon="trophy"
+            value={`Lv.${resumenUsuario.nivel_actual}`}
+            label="Level"
+            gradient={colors.gradients.secondary}
+          />
+        </View>
 
-        {/* DASHBOARD DE HÁBITOS */}
-        <HabitosDashboard />
+        {/* Today's Progress Card */}
+        <View style={styles.progressCard}>
+          <View style={styles.progressCardHeader}>
+            <View>
+              <Text style={styles.progressCardTitle}>Today's Progress</Text>
+              <Text style={styles.progressCardSubtitle}>
+                {estadisticasHabitos.completados} of {estadisticasHabitos.total} habits completed
+              </Text>
+            </View>
+            <ProgressRing progress={progresoHoy} />
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarBg}>
+              <LinearGradient
+                colors={colors.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBarFill, { width: `${progresoHoy}%` }]}
+              />
+            </View>
+          </View>
+        </View>
 
-        {/* DASHBOARD DE PLANES */}
-        <PlanesDashboard />
-
-        {/* ACCIONES RÁPIDAS */}
+        {/* Habits Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Acciones rápidas</Text>
-          <View style={styles.quickActionsContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Habits</Text>
+            <TouchableOpacity
+              style={styles.seeAllButton}
+              onPress={() => router.push("/(tabs)/habitos")}
+            >
+              <Text style={styles.seeAllText}>See all</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
+            </TouchableOpacity>
+          </View>
+
+          {habitosHoy.length === 0 ? (
+            <TouchableOpacity
+              style={styles.emptyCard}
+              onPress={() => router.push("/seccion_habitos/tiposHabitos")}
+            >
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="add-circle-outline" size={32} color={colors.primary[600]} />
+              </View>
+              <Text style={styles.emptyCardTitle}>No habits yet</Text>
+              <Text style={styles.emptyCardSubtitle}>Tap to add your first habit</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.habitsList}>
+              {habitosHoy.slice(0, 3).map((habito) => (
+                <View key={habito.habito_usuario_id} style={styles.habitItem}>
+                  <View
+                    style={[
+                      styles.habitCheckbox,
+                      habito.completado_hoy && styles.habitCheckboxCompleted,
+                    ]}
+                  >
+                    {habito.completado_hoy && (
+                      <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
+                    )}
+                  </View>
+                  <View style={styles.habitInfo}>
+                    <Text
+                      style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
+                    >
+                      {habito.nombre}
+                    </Text>
+                    <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
+                  </View>
+                  <View style={styles.habitPoints}>
+                    <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
+                    <Text style={styles.habitPointsText}>+{habito.puntos_base}</Text>
+                  </View>
+                </View>
+              ))}
+              {habitosHoy.length > 3 && (
+                <TouchableOpacity
+                  style={styles.moreHabitsButton}
+                  onPress={() => router.push("/(tabs)/habitos")}
+                >
+                  <Text style={styles.moreHabitsText}>+{habitosHoy.length - 3} more habits</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Plans Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Active Plans</Text>
+            <TouchableOpacity
+              style={styles.seeAllButton}
+              onPress={() => router.push("/(tabs)/planes")}
+            >
+              <Text style={styles.seeAllText}>See all</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
+            </TouchableOpacity>
+          </View>
+
+          {misPlanes.length === 0 ? (
+            <TouchableOpacity
+              style={styles.emptyCard}
+              onPress={() => router.push("/seccion_planes/tiposPlanes")}
+            >
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="document-text-outline" size={32} color={colors.primary[600]} />
+              </View>
+              <Text style={styles.emptyCardTitle}>No plans yet</Text>
+              <Text style={styles.emptyCardSubtitle}>Tap to create your first plan</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.plansList}>
+              {misPlanes
+                .filter((p) => p.estado === "activo")
+                .slice(0, 2)
+                .map((plan) => (
+                  <TouchableOpacity
+                    key={plan.plan_usuario_id}
+                    style={styles.planCard}
+                    onPress={() =>
+                      router.push(
+                        `/seccion_planes/seguimientoPlan?planUsuarioId=${plan.plan_usuario_id}` as any
+                      )
+                    }
+                  >
+                    <View style={styles.planCardHeader}>
+                      <Text style={styles.planTitle} numberOfLines={1}>
+                        {plan.meta_principal}
+                      </Text>
+                      <View
+                        style={[
+                          styles.difficultyBadge,
+                          { backgroundColor: getDifficultyColor(plan.dificultad) + "20" },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.difficultyText, { color: getDifficultyColor(plan.dificultad) }]}
+                        >
+                          {plan.dificultad}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.planDescription} numberOfLines={2}>
+                      {plan.descripcion}
+                    </Text>
+                    <View style={styles.planProgress}>
+                      <View style={styles.planProgressBar}>
+                        <View
+                          style={[styles.planProgressFill, { width: `${plan.progreso_porcentaje}%` }]}
+                        />
+                      </View>
+                      <Text style={styles.planProgressText}>{plan.progreso_porcentaje}%</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          )}
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.quickActionsSection}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
-              <Ionicons name="add-circle" size={20} color="#8B5CF6" />
-              <Text style={styles.quickActionText}>Nuevo hábito</Text>
+              <View style={[styles.quickActionIcon, { backgroundColor: colors.primary[100] }]}>
+                <Ionicons name="add" size={22} color={colors.primary[600]} />
+              </View>
+              <Text style={styles.quickActionText}>New Habit</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => router.push("/seccion_planes/tiposPlanes")}
             >
-              <Ionicons name="document-text" size={20} color="#8B5CF6" />
-              <Text style={styles.quickActionText}>Nuevo plan</Text>
+              <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
+                <Ionicons name="document-text" size={20} color={colors.secondary[600]} />
+              </View>
+              <Text style={styles.quickActionText}>New Plan</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => router.push("/(tabs)/perfil")}
             >
-              <Ionicons name="person" size={20} color="#8B5CF6" />
-              <Text style={styles.quickActionText}>Mi perfil</Text>
+              <View style={[styles.quickActionIcon, { backgroundColor: colors.accent.amber + "20" }]}>
+                <Ionicons name="stats-chart" size={20} color={colors.accent.amber} />
+              </View>
+              <Text style={styles.quickActionText}>Stats</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Espaciado final */}
-        <View style={{ height: 80 }} />
+        {/* Bottom Padding for Tab Bar */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ============================================
-// ESTILOS
-// ============================================
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.neutral[50],
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
-    fontSize: 16,
-    color: "#6B7280",
-    marginTop: 12,
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    marginTop: spacing[4],
   },
   scrollView: {
     flex: 1,
   },
-
-  // ========== HEADER DE BIENVENIDA ==========
-  welcomeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+  scrollContent: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[4],
   },
-  greetingText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: "#1F2937",
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing[6],
   },
-  userNameText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: "#8B5CF6",
-    marginTop: 2,
+  greeting: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    marginBottom: spacing[1],
   },
-  dateText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 4,
-    textTransform: 'capitalize',
+  userName: {
+    fontSize: typography.size["2xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
+  },
+  date: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[400],
   },
   notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[0],
+    justifyContent: "center",
+    alignItems: "center",
+    ...shadows.sm,
   },
-
-  // ========== SECCIONES ==========
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 20,
+  notificationBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.semantic.error,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: "#1F2937",
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: "#8B5CF6",
-    fontWeight: '500',
-    marginRight: 4,
-  },
-
-  // ========== CARDS DE ESTADÍSTICAS ==========
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: "row",
+    gap: spacing[3],
+    marginBottom: spacing[6],
   },
-  statsCard: {
+  statCard: {
     flex: 1,
-    borderRadius: 16,
-    padding: 16,
-    minHeight: 100,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.sm,
   },
-  statsCardContent: {
-    flex: 1,
+  statCardGradient: {
+    padding: spacing[4],
+    alignItems: "center",
   },
-  statsCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  statValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    marginTop: spacing[2],
   },
-  statsCardValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+  statLabel: {
+    fontSize: typography.size.xs,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: spacing[1],
   },
-  statsCardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 2,
+  progressCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[5],
+    marginBottom: spacing[6],
+    ...shadows.sm,
   },
-  statsCardSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+  progressCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[4],
   },
-
-  // ========== DASHBOARD DE HÁBITOS ==========
-  progressContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  progressCardTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
   },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  progressCardSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
   },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: "#374151",
+  progressRingBg: {
+    backgroundColor: colors.primary[100],
+    justifyContent: "center",
+    alignItems: "center",
   },
-  progressPercentage: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: "#8B5CF6",
+  progressRingInner: {
+    backgroundColor: colors.neutral[0],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  progressRingText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    color: colors.primary[600],
   },
   progressBarContainer: {
+    marginTop: spacing[2],
+  },
+  progressBarBg: {
     height: 8,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.neutral[100],
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarFill: {
-    height: '100%',
-    backgroundColor: '#8B5CF6',
+    height: "100%",
     borderRadius: 4,
   },
-
-  habitsPreview: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  section: {
+    marginBottom: spacing[6],
   },
-  habitPreviewItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[4],
+  },
+  sectionTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  seeAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  seeAllText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
+    marginRight: spacing[1],
+  },
+  emptyCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[8],
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderStyle: "dashed",
+  },
+  emptyIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primary[50],
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  emptyCardTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[1],
+  },
+  emptyCardSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+  },
+  habitsList: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.sm,
+  },
+  habitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing[4],
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: colors.neutral[100],
   },
-  habitPreviewCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  habitCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: colors.neutral[300],
+    marginRight: spacing[3],
+    justifyContent: "center",
+    alignItems: "center",
   },
-  habitPreviewCheckCompleted: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+  habitCheckboxCompleted: {
+    backgroundColor: colors.secondary[500],
+    borderColor: colors.secondary[500],
   },
-  habitPreviewInfo: {
+  habitInfo: {
     flex: 1,
   },
-  habitPreviewName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: "#374151",
+  habitName: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[800],
+    marginBottom: 2,
   },
-  habitPreviewCategory: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
+  habitNameCompleted: {
+    color: colors.neutral[500],
+    textDecorationLine: "line-through",
   },
-  habitPreviewPoints: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: "#8B5CF6",
+  habitCategory: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
   },
-  habitPreviewMore: {
-    paddingVertical: 8,
-    alignItems: 'center',
+  habitPoints: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primary[50],
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
+    gap: 4,
   },
-  habitPreviewMoreText: {
-    fontSize: 14,
-    color: "#8B5CF6",
-    fontWeight: '500',
+  habitPointsText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
-
-  // ========== DASHBOARD DE PLANES ==========
-  planesStatsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingVertical: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  moreHabitsButton: {
+    padding: spacing[3],
+    alignItems: "center",
   },
-  planesStatCard: {
-    alignItems: 'center',
+  moreHabitsText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
   },
-  planesStatNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: "#8B5CF6",
+  plansList: {
+    gap: spacing[3],
   },
-  planesStatLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
+  planCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    ...shadows.sm,
   },
-
-  planesPreview: {
-    gap: 12,
+  planCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing[2],
   },
-  planPreviewCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  planPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  planPreviewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: "#374151",
+  planTitle: {
     flex: 1,
-    marginRight: 8,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginRight: spacing[2],
   },
   difficultyBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
   },
   difficultyText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
   },
-  planPreviewDescription: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 12,
+  planDescription: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
     lineHeight: 20,
+    marginBottom: spacing[3],
   },
-  planProgressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  planProgress: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[3],
   },
   planProgressBar: {
     flex: 1,
     height: 6,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.neutral[100],
     borderRadius: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   planProgressFill: {
-    height: '100%',
-    backgroundColor: '#8B5CF6',
+    height: "100%",
+    backgroundColor: colors.primary[500],
     borderRadius: 3,
   },
   planProgressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: "#374151",
-    minWidth: 35,
-    textAlign: 'right',
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    minWidth: 36,
+    textAlign: "right",
   },
-
-  // ========== ESTADO VACÍO ==========
-  emptyCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  quickActionsSection: {
+    marginBottom: spacing[6],
   },
-  emptyCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: "#374151",
-    marginTop: 8,
-  },
-  emptyCardSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    textAlign: 'center',
-    marginTop: 4,
-  },
-
-  // ========== ACCIONES RÁPIDAS ==========
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  quickActionsGrid: {
+    flexDirection: "row",
+    gap: spacing[3],
+    marginTop: spacing[4],
   },
   quickActionButton: {
     flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    alignItems: "center",
+    ...shadows.sm,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[2],
   },
   quickActionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: "#374151",
-    marginTop: 8,
-    textAlign: 'center',
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[700],
   },
 });

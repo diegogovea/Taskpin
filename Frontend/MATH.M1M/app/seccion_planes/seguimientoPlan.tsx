@@ -1,124 +1,103 @@
-// Frontend/MATH.M1M/app/seccion_planes/seguimientoPlan.tsx
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  ScrollView,
+  StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  StyleSheet,
+  ScrollView,
   ActivityIndicator,
   Alert,
-  Animated,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-// Interfaces
-interface Tarea {
-  tarea_id: number;
-  titulo: string;
+interface TareaDiaria {
+  tarea_usuario_id: number;
   descripcion: string;
-  tipo: 'diaria' | 'semanal' | 'única';
-  es_diaria: boolean;
+  dia_relativo: number;
   completada: boolean;
-  hora_completada: string | null;
-  tarea_usuario_id: number | null;
+  fecha_completado: string | null;
+  fase_nombre: string;
+  fase_descripcion: string;
 }
 
-interface FaseActual {
-  objetivo_id: number;
-  titulo: string;
-  descripcion: string;
-  orden_fase: number;
-  duracion_dias: number;
-}
-
-interface TareasDiarias {
-  plan_usuario_id: number;
-  meta_principal: string;
-  dificultad: 'fácil' | 'intermedio' | 'difícil';
-  fecha: string;
-  dias_transcurridos: number;
-  fase_actual: FaseActual;
-  tareas: Tarea[];
+interface DailyProgress {
+  dia_actual: number;
+  total_dias: number;
+  progreso_general: number;
+  tareas_hoy: TareaDiaria[];
+  fase_actual: string;
+  fase_descripcion: string;
 }
 
 export default function SeguimientoPlanScreen() {
   const router = useRouter();
   const { planUsuarioId, titulo } = useLocalSearchParams();
-  
-  const [tareasDiarias, setTareasDiarias] = useState<TareasDiarias | null>(null);
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [marcandoTarea, setMarcandoTarea] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [togglingTask, setTogglingTask] = useState<number | null>(null);
 
-  // Cargar tareas del día
+  const API_BASE_URL = "http://localhost:8000";
+
   const fetchTareasDiarias = async () => {
     try {
-      setError(null);
-      
-      const response = await fetch(`http://localhost:8000/api/planes/tareas-diarias/${planUsuarioId}`);
+      const response = await fetch(`${API_BASE_URL}/api/planes/tareas-diarias/${planUsuarioId}`);
       const data = await response.json();
-      
       if (data.success) {
-        setTareasDiarias(data.tareas_diarias);
-      } else {
-        setError('Error al cargar las tareas del día');
+        setDailyProgress(data.data);
       }
     } catch (error) {
-      console.error('Error fetching tareas diarias:', error);
-      setError('Error de conexión');
+      console.error("Error fetching tareas:", error);
+      Alert.alert("Error", "Could not load tasks");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Marcar/desmarcar tarea
-  const toggleTarea = async (tareaId: number) => {
-    if (marcandoTarea === tareaId) return;
-    
+  const toggleTarea = async (tareaUsuarioId: number) => {
+    if (togglingTask) return;
+    setTogglingTask(tareaUsuarioId);
+
     try {
-      setMarcandoTarea(tareaId);
-      
-      const response = await fetch('http://localhost:8000/api/planes/marcar-tarea', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan_usuario_id: parseInt(planUsuarioId as string),
-          tarea_id: tareaId
-        })
+      const response = await fetch(`${API_BASE_URL}/api/planes/marcar-tarea`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tarea_usuario_id: tareaUsuarioId }),
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
-        // Actualizar estado local
-        setTareasDiarias(prev => {
+      const result = await response.json();
+
+      if (result.success) {
+        setDailyProgress((prev) => {
           if (!prev) return prev;
-          
-          return {
-            ...prev,
-            tareas: prev.tareas.map(tarea => 
-              tarea.tarea_id === tareaId 
-                ? { ...tarea, completada: !tarea.completada }
-                : tarea
-            )
-          };
+          const updatedTareas = prev.tareas_hoy.map((tarea) =>
+            tarea.tarea_usuario_id === tareaUsuarioId
+              ? { ...tarea, completada: result.data.completada }
+              : tarea
+          );
+          const completedCount = updatedTareas.filter((t) => t.completada).length;
+          const newProgress = Math.round((completedCount / updatedTareas.length) * 100);
+          return { ...prev, tareas_hoy: updatedTareas, progreso_general: newProgress };
         });
       } else {
-        Alert.alert('Error', data.message || 'No se pudo actualizar la tarea');
+        Alert.alert("Error", "Could not update task");
       }
     } catch (error) {
-      console.error('Error toggling tarea:', error);
-      Alert.alert('Error', 'Error de conexión al actualizar la tarea');
+      Alert.alert("Error", "Connection error");
     } finally {
-      setMarcandoTarea(null);
+      setTogglingTask(null);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchTareasDiarias();
   };
 
   useEffect(() => {
@@ -127,573 +106,441 @@ export default function SeguimientoPlanScreen() {
     }
   }, [planUsuarioId]);
 
-  // Función para retroceder
+  useFocusEffect(
+    useCallback(() => {
+      if (planUsuarioId) {
+        fetchTareasDiarias();
+      }
+    }, [planUsuarioId])
+  );
+
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/(tabs)/planes' as any);
-    }
-  };
-
-  // Obtener color por dificultad
-  const getDifficultyColor = (dificultad: string) => {
-    switch (dificultad) {
-      case 'fácil': return '#10B981';
-      case 'intermedio': return '#F59E0B';
-      case 'difícil': return '#EF4444';
-      default: return '#6B7280';
-    }
-  };
-
-  // Obtener icono por tipo de tarea
-  const getTaskIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'diaria': return 'calendar-outline';
-      case 'semanal': return 'calendar-number-outline';
-      case 'única': return 'checkmark-circle-outline';
-      default: return 'ellipse-outline';
-    }
-  };
-
-  // Componente para renderizar una tarea
-  const TareaItem = ({ tarea }: { tarea: Tarea }) => {
-    const isLoading = marcandoTarea === tarea.tarea_id;
-    
-    return (
-      <TouchableOpacity
-        style={[
-          styles.tareaItem,
-          tarea.completada && styles.tareaCompletada
-        ]}
-        activeOpacity={0.7}
-        onPress={() => toggleTarea(tarea.tarea_id)}
-        disabled={isLoading}
-      >
-        <View style={styles.tareaContent}>
-          {/* Checkbox animado */}
-          <View style={[
-            styles.checkbox,
-            tarea.completada && styles.checkboxCompleted
-          ]}>
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#8B5CF6" />
-            ) : tarea.completada ? (
-              <Ionicons name="checkmark" size={16} color="white" />
-            ) : null}
-          </View>
-          
-          {/* Información de la tarea */}
-          <View style={styles.tareaInfo}>
-            <View style={styles.tareaHeader}>
-              <Text style={[
-                styles.tareaTitle,
-                tarea.completada && styles.tareaTitleCompleted
-              ]}>
-                {tarea.titulo}
-              </Text>
-              <View style={[styles.tipoBadge, { 
-                backgroundColor: tarea.es_diaria ? '#DBEAFE' : '#FEF3C7' 
-              }]}>
-                <Text style={[styles.tipoText, {
-                  color: tarea.es_diaria ? '#1D4ED8' : '#D97706'
-                }]}>
-                  {tarea.tipo}
-                </Text>
-              </View>
-            </View>
-            
-            <Text style={[
-              styles.tareaDescription,
-              tarea.completada && styles.tareaDescriptionCompleted
-            ]}>
-              {tarea.descripcion}
-            </Text>
-            
-            {tarea.hora_completada && (
-              <View style={styles.horaCompletada}>
-                <Ionicons name="time-outline" size={12} color="#10B981" />
-                <Text style={styles.horaCompletadaText}>
-                  Completada a las {tarea.hora_completada.slice(0, 5)}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
+    router.canGoBack() ? router.back() : router.push("/(tabs)/planes");
   };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Cargando...</Text>
-        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando tareas del día...</Text>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading your progress...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (error || !tareasDiarias) {
+  if (!dailyProgress) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Error</Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={48} color="#EF4444" />
-          <Text style={styles.errorTitle}>Error al cargar</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchTareasDiarias}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
+          <Text style={styles.loadingText}>Could not load plan</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const difficultyColor = getDifficultyColor(tareasDiarias.dificultad);
-  const tareasCompletadas = tareasDiarias.tareas.filter(t => t.completada).length;
-  const totalTareas = tareasDiarias.tareas.length;
-  const progresoHoy = totalTareas > 0 ? Math.round((tareasCompletadas / totalTareas) * 100) : 0;
+  const completedToday = dailyProgress.tareas_hoy.filter((t) => t.completada).length;
+  const totalToday = dailyProgress.tareas_hoy.length;
+  const allCompleted = completedToday === totalToday && totalToday > 0;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {titulo || tareasDiarias.meta_principal}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            Día {tareasDiarias.dias_transcurridos} • {tareasDiarias.fase_actual.titulo}
+            {titulo ? decodeURIComponent(titulo as string) : "Plan Progress"}
           </Text>
         </View>
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* PROGRESO DEL DÍA */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Progress Card */}
         <View style={styles.progressCard}>
           <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
-            style={styles.progressGradient}
+            colors={colors.gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.progressCardGradient}
           >
             <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Progreso de hoy</Text>
-              <Text style={styles.progressPercentage}>{progresoHoy}%</Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBackground}>
-                <View style={[
-                  styles.progressBarFill,
-                  { width: `${progresoHoy}%` }
-                ]} />
+              <View>
+                <Text style={styles.progressLabel}>Overall Progress</Text>
+                <Text style={styles.progressValue}>{dailyProgress.progreso_general}%</Text>
+              </View>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayBadgeText}>
+                  Day {dailyProgress.dia_actual}/{dailyProgress.total_dias}
+                </Text>
               </View>
             </View>
-            <View style={styles.progressStats}>
-              <Text style={styles.progressStatsText}>
-                {tareasCompletadas} de {totalTareas} tareas completadas
-              </Text>
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${dailyProgress.progreso_general}%` },
+                  ]}
+                />
+              </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* INFORMACIÓN DE LA FASE ACTUAL */}
-        <View style={styles.faseCard}>
-          <View style={styles.faseHeader}>
-            <View style={styles.faseNumber}>
-              <Text style={styles.faseNumberText}>{tareasDiarias.fase_actual.orden_fase}</Text>
-            </View>
-            <View style={styles.faseInfo}>
-              <Text style={styles.faseTitle}>{tareasDiarias.fase_actual.titulo}</Text>
-              <Text style={styles.faseDescription}>{tareasDiarias.fase_actual.descripcion}</Text>
-            </View>
+        {/* Current Phase */}
+        <View style={styles.phaseCard}>
+          <View style={styles.phaseIcon}>
+            <Ionicons name="layers" size={20} color={colors.primary[600]} />
+          </View>
+          <View style={styles.phaseInfo}>
+            <Text style={styles.phaseLabel}>Current Phase</Text>
+            <Text style={styles.phaseName}>{dailyProgress.fase_actual}</Text>
+            {dailyProgress.fase_descripcion && (
+              <Text style={styles.phaseDescription}>{dailyProgress.fase_descripcion}</Text>
+            )}
           </View>
         </View>
 
-        {/* TAREAS DEL DÍA */}
-        <View style={styles.tareasSection}>
-          <Text style={styles.sectionTitle}>
-            Tareas de hoy ({new Date().toLocaleDateString('es-ES', { 
-              weekday: 'long', 
-              day: 'numeric', 
-              month: 'long' 
-            })})
-          </Text>
-          
-          {tareasDiarias.tareas.length === 0 ? (
-            <View style={styles.noTareasContainer}>
-              <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
-              <Text style={styles.noTareasText}>
-                ¡No tienes tareas para hoy! Día libre 🎉
-              </Text>
+        {/* Today's Tasks */}
+        <View style={styles.tasksSection}>
+          <View style={styles.tasksSectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Tasks</Text>
+            <Text style={styles.tasksCount}>
+              {completedToday}/{totalToday} completed
+            </Text>
+          </View>
+
+          {dailyProgress.tareas_hoy.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="checkmark-done-circle" size={48} color={colors.secondary[500]} />
+              <Text style={styles.emptyTitle}>No tasks for today</Text>
+              <Text style={styles.emptySubtitle}>Come back tomorrow for new tasks</Text>
             </View>
           ) : (
-            tareasDiarias.tareas.map((tarea) => (
-              <TareaItem key={tarea.tarea_id} tarea={tarea} />
-            ))
+            <View style={styles.tasksList}>
+              {dailyProgress.tareas_hoy.map((tarea) => (
+                <TouchableOpacity
+                  key={tarea.tarea_usuario_id}
+                  style={[styles.taskCard, tarea.completada && styles.taskCardCompleted]}
+                  activeOpacity={0.8}
+                  onPress={() => toggleTarea(tarea.tarea_usuario_id)}
+                  disabled={togglingTask === tarea.tarea_usuario_id}
+                >
+                  <View
+                    style={[styles.taskCheckbox, tarea.completada && styles.taskCheckboxCompleted]}
+                  >
+                    {togglingTask === tarea.tarea_usuario_id ? (
+                      <ActivityIndicator size="small" color={colors.neutral[0]} />
+                    ) : tarea.completada ? (
+                      <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
+                    ) : null}
+                  </View>
+                  <View style={styles.taskContent}>
+                    <Text
+                      style={[styles.taskText, tarea.completada && styles.taskTextCompleted]}
+                    >
+                      {tarea.descripcion}
+                    </Text>
+                    {tarea.completada && tarea.fecha_completado && (
+                      <Text style={styles.taskCompletedTime}>
+                        Completed at{" "}
+                        {new Date(tarea.fecha_completado).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </View>
 
-        {/* MOTIVACIÓN */}
-        {progresoHoy === 100 && (
-          <View style={styles.motivacionCard}>
+        {/* Completion Message */}
+        {allCompleted && (
+          <View style={styles.completionCard}>
             <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.motivacionGradient}
+              colors={colors.gradients.secondary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.completionGradient}
             >
-              <Ionicons name="trophy" size={32} color="white" />
-              <Text style={styles.motivacionTitle}>¡Excelente trabajo!</Text>
-              <Text style={styles.motivacionText}>
-                Completaste todas las tareas de hoy. ¡Sigue así! 💪
+              <View style={styles.completionIcon}>
+                <Ionicons name="trophy" size={28} color={colors.neutral[0]} />
+              </View>
+              <Text style={styles.completionTitle}>Great job! 🎉</Text>
+              <Text style={styles.completionText}>
+                You've completed all tasks for today. Keep up the amazing work!
               </Text>
             </LinearGradient>
           </View>
         )}
+
+        <View style={{ height: spacing[10] }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ESTILOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.neutral[50],
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-
-  // Loading
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
+    marginTop: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
   },
-
-  // Error
-  errorContainer: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.neutral[0],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitleContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    alignItems: "center",
+    paddingHorizontal: spacing[3],
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 16,
-    marginBottom: 8,
+  headerTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
   },
-  errorMessage: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Content
   scrollView: {
     flex: 1,
   },
-
-  // Progress Card
-  progressCard: {
-    margin: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+  scrollContent: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[5],
   },
-  progressGradient: {
-    padding: 20,
+  progressCard: {
+    borderRadius: radius["2xl"],
+    overflow: "hidden",
+    marginBottom: spacing[5],
+    ...shadows.lg,
+    shadowColor: colors.primary[600],
+  },
+  progressCardGradient: {
+    padding: spacing[5],
   },
   progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing[4],
   },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'white',
+  progressLabel: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: spacing[1],
   },
-  progressPercentage: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: 'white',
+  progressValue: {
+    fontSize: typography.size["3xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+  },
+  dayBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.full,
+  },
+  dayBadgeText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
   },
   progressBarContainer: {
-    marginBottom: 8,
+    marginTop: spacing[2],
   },
-  progressBarBackground: {
+  progressBarBg: {
     height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: "rgba(255,255,255,0.3)",
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarFill: {
-    height: 8,
-    backgroundColor: 'white',
+    height: "100%",
+    backgroundColor: colors.neutral[0],
     borderRadius: 4,
   },
-  progressStats: {
-    alignItems: 'center',
+  phaseCard: {
+    flexDirection: "row",
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[6],
+    ...shadows.sm,
   },
-  progressStatsText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+  phaseIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary[100],
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing[3],
   },
-
-  // Fase Card
-  faseCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  faseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  faseNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  faseNumberText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  faseInfo: {
+  phaseInfo: {
     flex: 1,
   },
-  faseTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+  phaseLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: spacing[1],
   },
-  faseDescription: {
-    fontSize: 14,
-    color: '#64748B',
+  phaseName: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginBottom: spacing[1],
   },
-
-  // Tareas Section
-  tareasSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  phaseDescription: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    lineHeight: 18,
+  },
+  tasksSection: {
+    marginBottom: spacing[6],
+  },
+  tasksSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[4],
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
   },
-
-  // No tareas
-  noTareasContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    marginTop: 8,
+  tasksCount: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[500],
   },
-  noTareasText: {
-    fontSize: 16,
-    color: '#10B981',
-    marginTop: 12,
-    textAlign: 'center',
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: spacing[10],
   },
-
-  // Tarea Item
-  tareaItem: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+  emptyTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginTop: spacing[3],
+    marginBottom: spacing[1],
   },
-  tareaCompletada: {
-    backgroundColor: '#F0FDF4',
+  emptySubtitle: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+  },
+  tasksList: {
+    gap: spacing[3],
+  },
+  taskCard: {
+    flexDirection: "row",
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  taskCardCompleted: {
+    backgroundColor: colors.secondary[50],
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: colors.secondary[200],
   },
-  tareaContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  
-  // Checkbox
-  checkbox: {
+  taskCheckbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
+    borderColor: colors.neutral[300],
+    marginRight: spacing[3],
+    justifyContent: "center",
+    alignItems: "center",
   },
-  checkboxCompleted: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+  taskCheckboxCompleted: {
+    backgroundColor: colors.secondary[500],
+    borderColor: colors.secondary[500],
   },
-
-  // Tarea Info
-  tareaInfo: {
+  taskContent: {
     flex: 1,
   },
-  tareaHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+  taskText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[800],
+    lineHeight: 22,
   },
-  tareaTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    flex: 1,
-    marginRight: 8,
+  taskTextCompleted: {
+    color: colors.secondary[700],
   },
-  tareaTitleCompleted: {
-    color: '#059669',
+  taskCompletedTime: {
+    fontSize: typography.size.xs,
+    color: colors.secondary[600],
+    marginTop: spacing[1],
   },
-  tipoBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  completionCard: {
+    borderRadius: radius["2xl"],
+    overflow: "hidden",
+    marginBottom: spacing[4],
+    ...shadows.md,
+    shadowColor: colors.secondary[600],
   },
-  tipoText: {
-    fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
+  completionGradient: {
+    padding: spacing[6],
+    alignItems: "center",
   },
-  tareaDescription: {
-    fontSize: 14,
-    color: '#64748B',
+  completionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  completionTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    marginBottom: spacing[1],
+  },
+  completionText: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.9)",
+    textAlign: "center",
     lineHeight: 20,
-    marginBottom: 4,
-  },
-  tareaDescriptionCompleted: {
-    color: '#16A34A',
-  },
-  horaCompletada: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  horaCompletadaText: {
-    fontSize: 12,
-    color: '#10B981',
-    fontWeight: '500',
-  },
-
-  // Motivación
-  motivacionCard: {
-    margin: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  motivacionGradient: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  motivacionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: 'white',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  motivacionText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
   },
 });

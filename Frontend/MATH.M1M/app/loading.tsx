@@ -1,32 +1,39 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { View, Text, Image, StyleSheet, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing } from "../constants/theme";
 
 export default function LoadingScreen() {
   const router = useRouter();
-  const [dots, setDots] = useState("");
-  const maxDots = 3;
-
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
-    // Animación de barra de progreso: 0% a 100% en 2 segundos
+    // Fade in and scale animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Progress bar animation
     Animated.timing(progressAnim, {
       toValue: 1,
-      duration: 2000,
+      duration: 2200,
       useNativeDriver: false,
     }).start(() => {
-      // Cuando termine la animación, redirige
       router.replace("/login");
     });
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => (prev.length < maxDots ? prev + "." : ""));
-    }, 500);
-    return () => clearInterval(interval);
   }, []);
 
   const animatedWidth = progressAnim.interpolate({
@@ -36,28 +43,57 @@ export default function LoadingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 🔽 LOGO LOCAL 🔽 */}
-      <Image
-        source={require("../components/images/iconoLogo.png")} // Ajusta el nombre del archivo
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      {/* 🔼 LOGO LOCAL 🔼 */}
+      <LinearGradient
+        colors={[colors.neutral[0], colors.neutral[50]]}
+        style={styles.gradient}
+      >
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          {/* Logo Container */}
+          <View style={styles.logoContainer}>
+            <LinearGradient
+              colors={colors.gradients.primary}
+              style={styles.logoGradient}
+            >
+              <Image
+                source={require("../components/images/iconoLogo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </LinearGradient>
+          </View>
 
-      <Text style={styles.title}>TASKPIN</Text>
+          {/* Brand Name */}
+          <Text style={styles.brandName}>taskpin</Text>
+          <Text style={styles.tagline}>Build better habits</Text>
 
-      <View style={styles.loadingBarBackground}>
-        <Animated.View style={[styles.progressWrapper, { width: animatedWidth }]}>
-          <LinearGradient
-            colors={["#7DD3FC", "#8B5CF6"]} // Colores de azul claro a morado
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.loadingBar}
-          />
+          {/* Progress Section */}
+          <View style={styles.progressSection}>
+            <View style={styles.progressBarBackground}>
+              <Animated.View style={[styles.progressWrapper, { width: animatedWidth }]}>
+                <LinearGradient
+                  colors={colors.gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.progressBar}
+                />
+              </Animated.View>
+            </View>
+          </View>
         </Animated.View>
-      </View>
 
-      <Text style={styles.text}>Cargando{dots}</Text>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Loading your journey...</Text>
+        </View>
+      </LinearGradient>
     </View>
   );
 }
@@ -65,41 +101,74 @@ export default function LoadingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+  },
+  gradient: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
+  },
+  content: {
+    alignItems: "center",
+    paddingHorizontal: spacing[8],
+  },
+  logoContainer: {
+    marginBottom: spacing[8],
+  },
+  logoGradient: {
+    width: 120,
+    height: 120,
+    borderRadius: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: colors.primary[600],
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 12,
   },
   logo: {
-    width: 150,
-    height: 150,
-    marginBottom: 10,
+    width: 70,
+    height: 70,
+    tintColor: colors.neutral[0],
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1F2937", // Color gris oscuro como en la imagen
-    marginBottom: 40,
-    letterSpacing: 2,
+  brandName: {
+    fontSize: 42,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    letterSpacing: -1,
+    marginBottom: spacing[2],
   },
-  loadingBarBackground: {
-    width: 180,
-    height: 20,
-    borderRadius: 50,
-    backgroundColor: "#E5E7EB", // Gris claro para el fondo
-    justifyContent: "center",
+  tagline: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[500],
+    marginBottom: spacing[12],
+  },
+  progressSection: {
+    width: 200,
+    alignItems: "center",
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.neutral[200],
     overflow: "hidden",
-    marginBottom: 20,
   },
   progressWrapper: {
     height: "100%",
   },
-  loadingBar: {
+  progressBar: {
     height: "100%",
-    borderRadius: 50,
+    borderRadius: 3,
   },
-  text: {
-    fontSize: 16,
-    color: "#6B7280", // Gris medio para el texto
+  footer: {
+    position: "absolute",
+    bottom: spacing[12],
+  },
+  footerText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[400],
   },
 });

@@ -3,361 +3,328 @@ import {
   View,
   Text,
   StyleSheet,
+  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   TextInput,
   Alert,
-  SafeAreaView,
-  StatusBar,
   Modal,
-  Image,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../constants/theme";
+
+interface UserData {
+  user_id: string | null;
+  nombre: string;
+  correo: string;
+}
 
 export default function ConfiguracionScreen() {
   const router = useRouter();
-  
-  // Estados para los datos del usuario
-  const [userData, setUserData] = useState({
-    user_id: '',
-    nombre: '',
-    correo: '',
+  const [userData, setUserData] = useState<UserData>({
+    user_id: null,
+    nombre: "",
+    correo: "",
   });
-  
-  // Estados para edición
-  const [editingField, setEditingField] = useState('');
-  const [editValue, setEditValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [logoutModalVisible, setLogoutModalVisible] = useState(false); // Nuevo estado para modal de logout
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Edit Modal State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editField, setEditField] = useState<"nombre" | "correo" | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  // Logout Modal State
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const API_BASE_URL = "http://localhost:8000";
+
+  const loadUserData = async () => {
+    try {
+      const [nombre, correo, userId] = await AsyncStorage.multiGet([
+        "nombre",
+        "correo",
+        "user_id",
+      ]);
+      setUserData({
+        user_id: userId[1],
+        nombre: nombre[1] || "",
+        correo: correo[1] || "",
+      });
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadUserData();
   }, []);
 
-  const loadUserData = async () => {
-    try {
-      const [user_id, nombre, correo] = await AsyncStorage.multiGet([
-        'user_id',
-        'nombre', 
-        'correo'
-      ]);
-
-      setUserData({
-        user_id: user_id[1] || '',
-        nombre: nombre[1] || 'Usuario',
-        correo: correo[1] || '',
-      });
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
+  const openEditModal = (field: "nombre" | "correo") => {
+    setEditField(field);
+    setEditValue(userData[field]);
+    setEditModalVisible(true);
   };
 
-  const startEditing = (field: string, currentValue: string) => {
-    setEditingField(field);
-    setEditValue(currentValue);
-    setModalVisible(true);
-  };
+  const saveEdit = async () => {
+    if (!editField || !userData.user_id) return;
 
-  const saveChanges = async () => {
     if (!editValue.trim()) {
-      Alert.alert("Error", "El campo no puede estar vacío");
+      Alert.alert("Error", "Field cannot be empty");
       return;
     }
 
-    // Validación específica por campo
-    if (editingField === 'correo') {
+    if (editField === "correo") {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(editValue)) {
-        Alert.alert("Error", "Formato de correo inválido");
+        Alert.alert("Error", "Please enter a valid email");
         return;
       }
     }
 
-    if (editingField === 'nombre' && editValue.trim().length < 2) {
-      Alert.alert("Error", "El nombre debe tener al menos 2 caracteres");
-      return;
-    }
-
-    setLoading(true);
+    setSaving(true);
 
     try {
-      // Preparar datos para actualizar
-      const updateData: any = {};
-      updateData[editingField] = editValue.trim();
+      const updateData = { [editField]: editValue.trim() };
+      await axios.put(`${API_BASE_URL}/api/usuario/${userData.user_id}`, updateData);
 
-      // Hacer petición al backend
-      await axios.put(`http://127.0.0.1:8000/api/usuario/${userData.user_id}`, updateData);
+      setUserData((prev) => ({ ...prev, [editField]: editValue.trim() }));
+      await AsyncStorage.setItem(editField, editValue.trim());
 
-      // Actualizar estado local
-      const newUserData = { ...userData };
-      newUserData[editingField as keyof typeof userData] = editValue.trim();
-      setUserData(newUserData);
-
-      // Actualizar AsyncStorage
-      await AsyncStorage.setItem(editingField, editValue.trim());
-
-      Alert.alert("Éxito", "Datos actualizados correctamente");
-      setModalVisible(false);
-      setEditingField('');
-      setEditValue('');
-
-    } catch (error: any) {
-      console.error('Error updating user data:', error);
-      
-      let errorMessage = "Error al actualizar datos";
-      if (error.response?.status === 400) {
-        errorMessage = "El correo electrónico ya está en uso";
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      }
-      
-      Alert.alert("Error", errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    // Simplemente abrir el modal de confirmación
-    setLogoutModalVisible(true);
-  };
-
-  const confirmLogout = async () => {
-    setLoading(true);
-    try {
-      console.log("Cerrando sesión...");
-      
-      // Limpiar TODOS los datos del AsyncStorage
-      await AsyncStorage.clear();
-      console.log("AsyncStorage limpiado");
-      
-      // Cerrar modal
-      setLogoutModalVisible(false);
-      
-      // Navegar al inicio de la app
-      router.replace("/inicio");
-      console.log("Navegación completada");
-      
+      setEditModalVisible(false);
+      Alert.alert("Success", "Profile updated successfully");
     } catch (error) {
-      console.error('Error during logout:', error);
-      setLogoutModalVisible(false);
+      Alert.alert("Error", "Could not update profile");
     } finally {
-      setLoading(false);
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.clear();
+      setLogoutModalVisible(false);
+      router.replace("/login");
+    } catch (error) {
+      Alert.alert("Error", "Could not sign out");
     }
   };
 
   const goBack = () => {
-    // Navegar de regreso a la pestaña de perfil
-    router.push("/(tabs)/perfil");
+    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
   };
 
-  const getFieldDisplayName = (field: string) => {
-    switch (field) {
-      case 'nombre': return 'Nombre';
-      case 'correo': return 'Correo Electrónico';
-      default: return field;
-    }
-  };
+  const SettingItem = ({
+    icon,
+    title,
+    value,
+    onPress,
+    showChevron = true,
+    danger = false,
+  }: {
+    icon: string;
+    title: string;
+    value?: string;
+    onPress: () => void;
+    showChevron?: boolean;
+    danger?: boolean;
+  }) => (
+    <TouchableOpacity style={styles.settingItem} activeOpacity={0.8} onPress={onPress}>
+      <View
+        style={[
+          styles.settingIcon,
+          { backgroundColor: danger ? colors.semantic.error + "15" : colors.neutral[100] },
+        ]}
+      >
+        <Ionicons
+          name={icon as any}
+          size={20}
+          color={danger ? colors.semantic.error : colors.neutral[600]}
+        />
+      </View>
+      <View style={styles.settingContent}>
+        <Text style={[styles.settingTitle, danger && styles.settingTitleDanger]}>{title}</Text>
+        {value && <Text style={styles.settingValue} numberOfLines={1}>{value}</Text>}
+      </View>
+      {showChevron && (
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={danger ? colors.semantic.error : colors.neutral[300]}
+        />
+      )}
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
-      
-      {/* Header con botón de regreso */}
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <TouchableOpacity style={styles.backButton} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configuración</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Avatar y nombre */}
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            <Ionicons name="person" size={40} color="#8B5CF6" />
-          </View>
-          <Text style={styles.userName}>{userData.nombre}</Text>
-          <Text style={styles.userEmail}>{userData.correo}</Text>
-        </View>
-
-        {/* Sección de información personal */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información Personal</Text>
-          
-          {/* Nombre */}
-          <View style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>NOMBRE COMPLETO</Text>
-              <Text style={styles.value}>{userData.nombre}</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => startEditing('nombre', userData.nombre)}
-            >
-              <Ionicons name="create-outline" size={20} color="#8B5CF6" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Correo */}
-          <View style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
-              <Text style={styles.value}>{userData.correo}</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => startEditing('correo', userData.correo)}
-            >
-              <Ionicons name="create-outline" size={20} color="#8B5CF6" />
-            </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Profile</Text>
+          <View style={styles.sectionCard}>
+            <SettingItem
+              icon="person"
+              title="Name"
+              value={userData.nombre}
+              onPress={() => openEditModal("nombre")}
+            />
+            <View style={styles.settingDivider} />
+            <SettingItem
+              icon="mail"
+              title="Email"
+              value={userData.correo}
+              onPress={() => openEditModal("correo")}
+            />
           </View>
         </View>
 
-        {/* Sección de preferencias */}
+        {/* Preferences Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferencias</Text>
-          
-          <TouchableOpacity style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>NOTIFICACIONES</Text>
-              <Text style={styles.subtitle}>Recordatorios de hábitos y planes</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>TEMA</Text>
-              <Text style={styles.subtitle}>Apariencia de la aplicación</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.sectionCard}>
+            <SettingItem icon="notifications" title="Notifications" onPress={() => {}} />
+            <View style={styles.settingDivider} />
+            <SettingItem icon="moon" title="Dark Mode" onPress={() => {}} />
+            <View style={styles.settingDivider} />
+            <SettingItem icon="language" title="Language" value="English" onPress={() => {}} />
+          </View>
         </View>
 
-        {/* Sección de cuenta */}
+        {/* Privacy Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cuenta</Text>
-          
-          <TouchableOpacity style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>CAMBIAR CONTRASEÑA</Text>
-              <Text style={styles.subtitle}>Actualizar tu contraseña</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.itemRow}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.label}>PRIVACIDAD</Text>
-              <Text style={styles.subtitle}>Configuración de datos</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Privacy & Security</Text>
+          <View style={styles.sectionCard}>
+            <SettingItem icon="lock-closed" title="Change Password" onPress={() => {}} />
+            <View style={styles.settingDivider} />
+            <SettingItem icon="shield" title="Privacy Policy" onPress={() => {}} />
+            <View style={styles.settingDivider} />
+            <SettingItem icon="document-text" title="Terms of Service" onPress={() => {}} />
+          </View>
         </View>
 
-        {/* Botón de cerrar sesión */}
-        <View style={styles.logoutSection}>
-          <TouchableOpacity 
-            style={styles.logoutButton} 
-            onPress={handleLogout}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.logoutText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
+        {/* Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.sectionCard}>
+            <SettingItem
+              icon="log-out"
+              title="Sign Out"
+              onPress={() => setLogoutModalVisible(true)}
+              showChevron={false}
+              danger
+            />
+          </View>
         </View>
 
-        <View style={styles.bottomSpace} />
+        {/* App Version */}
+        <View style={styles.versionContainer}>
+          <Text style={styles.versionText}>Taskpin v1.0.0</Text>
+        </View>
       </ScrollView>
 
-      {/* Modal para cerrar sesión */}
+      {/* Edit Modal */}
       <Modal
+        visible={editModalVisible}
         animationType="slide"
-        transparent={true}
-        visible={logoutModalVisible}
-        onRequestClose={() => setLogoutModalVisible(false)}
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.logoutModalHeader}>
-              <Ionicons name="warning" size={48} color="#EF4444" />
-              <Text style={styles.logoutModalTitle}>¿Cerrar Sesión?</Text>
-              <Text style={styles.logoutModalMessage}>
-                ¿Estás seguro que deseas cerrar sesión?{'\n'}
-              </Text>
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setLogoutModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <SafeAreaView style={styles.modalSafeArea}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.logoutConfirmButton, loading && styles.logoutConfirmButtonDisabled]}
-                onPress={confirmLogout}
-                disabled={loading}
-              >
-                <Text style={styles.logoutConfirmText}>
-                  {loading ? 'Cerrando...' : 'Sí, cerrar sesión'}
+              <Text style={styles.modalTitle}>
+                Edit {editField === "nombre" ? "Name" : "Email"}
+              </Text>
+              <TouchableOpacity onPress={saveEdit} disabled={saving}>
+                <Text style={[styles.modalSave, saving && styles.modalSaveDisabled]}>
+                  {saving ? "Saving..." : "Save"}
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+
+            <View style={styles.modalContent}>
+              <Text style={styles.inputLabel}>
+                {editField === "nombre" ? "Full Name" : "Email Address"}
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={editValue}
+                onChangeText={setEditValue}
+                placeholder={editField === "nombre" ? "Your name" : "your@email.com"}
+                placeholderTextColor={colors.neutral[400]}
+                keyboardType={editField === "correo" ? "email-address" : "default"}
+                autoCapitalize={editField === "nombre" ? "words" : "none"}
+                autoFocus
+              />
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Modal para editar */}
+      {/* Logout Modal */}
       <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        visible={logoutModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setLogoutModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Editar {getFieldDisplayName(editingField)}</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              value={editValue}
-              onChangeText={setEditValue}
-              placeholder={`Ingresa tu ${getFieldDisplayName(editingField).toLowerCase()}`}
-              placeholderTextColor="#9CA3AF"
-              keyboardType={editingField === 'correo' ? 'email-address' : 'default'}
-              autoCapitalize={editingField === 'correo' ? 'none' : 'words'}
-              autoFocus={true}
-            />
-
-            <View style={styles.modalButtons}>
+        <View style={styles.logoutModalOverlay}>
+          <View style={styles.logoutModalContent}>
+            <View style={styles.logoutIconContainer}>
+              <Ionicons name="log-out" size={32} color={colors.semantic.error} />
+            </View>
+            <Text style={styles.logoutTitle}>Sign Out?</Text>
+            <Text style={styles.logoutMessage}>
+              Are you sure you want to sign out of your account?
+            </Text>
+            <View style={styles.logoutButtons}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => {
-                  setModalVisible(false);
-                  setEditingField('');
-                  setEditValue('');
-                }}
+                style={styles.logoutCancelButton}
+                onPress={() => setLogoutModalVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+                <Text style={styles.logoutCancelText}>Cancel</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalSaveButton, loading && styles.modalSaveButtonDisabled]}
-                onPress={saveChanges}
-                disabled={loading}
-              >
-                <Text style={styles.modalSaveText}>
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </Text>
+              <TouchableOpacity style={styles.logoutConfirmButton} onPress={handleLogout}>
+                <Text style={styles.logoutConfirmText}>Sign Out</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -370,218 +337,221 @@ export default function ConfiguracionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.neutral[50],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.neutral[0],
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: colors.neutral[100],
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1F2937",
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
   },
-  placeholder: {
-    width: 40,
-  },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
   },
-  profileSection: {
-    alignItems: "center",
-    paddingVertical: 30,
-    backgroundColor: "#FFFFFF",
-    marginTop: 20,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#E0E7FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 15,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 16,
-    color: "#6B7280",
+  scrollContent: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[6],
+    paddingBottom: spacing[10],
   },
   section: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    marginBottom: spacing[6],
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#10B981",
-    marginBottom: 20,
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[500],
+    marginBottom: spacing[3],
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  itemRow: {
+  sectionCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.sm,
+  },
+  settingItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing[4],
+  },
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing[3],
+  },
+  settingContent: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[800],
+  },
+  settingTitleDanger: {
+    color: colors.semantic.error,
+  },
+  settingValue: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginTop: 2,
+  },
+  settingDivider: {
+    height: 1,
+    backgroundColor: colors.neutral[100],
+    marginLeft: spacing[4] + 40 + spacing[3],
+  },
+  versionContainer: {
+    alignItems: "center",
+    marginTop: spacing[4],
+  },
+  versionText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[400],
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.neutral[0],
+  },
+  modalSafeArea: {
+    flex: 1,
+  },
+  modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 15,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.neutral[100],
   },
-  itemInfo: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#9CA3AF",
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  value: {
-    fontSize: 16,
-    color: "#1F2937",
-    fontWeight: "500",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  editButton: {
-    padding: 8,
-  },
-  logoutSection: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#EF4444",
-    marginLeft: 8,
-  },
-  bottomSpace: {
-    height: 40,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    width: "90%",
-    maxWidth: 400,
+  modalCancel: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1F2937",
-    marginBottom: 20,
-    textAlign: "center",
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
   },
-  modalInput: {
-    backgroundColor: "#F3F4F6",
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
-    color: "#1F2937",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 24,
+  modalSave: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
+  modalSaveDisabled: {
+    color: colors.neutral[400],
   },
-  modalCancelButton: {
+  modalContent: {
+    padding: spacing[6],
+  },
+  inputLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
+  },
+  input: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.neutral[200],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[900],
+  },
+  // Logout Modal Styles
+  logoutModalOverlay: {
     flex: 1,
-    backgroundColor: "#E0E7FF",
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing[6],
+  },
+  logoutModalContent: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius["2xl"],
+    padding: spacing[6],
+    width: "100%",
+    maxWidth: 320,
     alignItems: "center",
   },
-  modalCancelText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#6366F1",
-  },
-  modalSaveButton: {
-    flex: 1,
-    backgroundColor: "#8B5CF6",
-    paddingVertical: 14,
-    borderRadius: 8,
+  logoutIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.semantic.error + "15",
+    justifyContent: "center",
     alignItems: "center",
+    marginBottom: spacing[4],
   },
-  modalSaveButtonDisabled: {
-    backgroundColor: "#D1D5DB",
+  logoutTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[2],
   },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  // Estilos específicos para el modal de logout
-  logoutModalHeader: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  logoutModalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  logoutModalMessage: {
-    fontSize: 16,
-    color: "#6B7280",
+  logoutMessage: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
     textAlign: "center",
+    marginBottom: spacing[6],
     lineHeight: 22,
+  },
+  logoutButtons: {
+    flexDirection: "row",
+    gap: spacing[3],
+    width: "100%",
+  },
+  logoutCancelButton: {
+    flex: 1,
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    backgroundColor: colors.neutral[100],
+    alignItems: "center",
+  },
+  logoutCancelText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
   },
   logoutConfirmButton: {
     flex: 1,
-    backgroundColor: "#EF4444",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    backgroundColor: colors.semantic.error,
     alignItems: "center",
   },
-  logoutConfirmButtonDisabled: {
-    backgroundColor: "#F87171",
-  },
   logoutConfirmText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
   },
 });
