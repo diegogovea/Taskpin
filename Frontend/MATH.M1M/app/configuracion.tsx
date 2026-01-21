@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
+import { API_BASE_URL } from "../constants/api";
 
 interface UserData {
   user_id: string | null;
@@ -44,7 +45,7 @@ export default function ConfiguracionScreen() {
   // Logout Modal State
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  const API_BASE_URL = "http://localhost:8000";
+  // API_BASE_URL importada desde constants/api.ts
 
   const loadUserData = async () => {
     try {

@@ -1,12 +1,13 @@
 import psycopg  # Importa el módulo psycopg para conectarse a PostgreSQL
+from ..config import DATABASE_URL  # Importar configuración centralizada
 
 class habitConnection():
     conn = None
 
     def __init__(self):
         try:
-            # IMPORTANTE: Misma conexión que userConnection
-            self.conn = psycopg.connect("dbname=taskpin user=postgres password=123456 host=localhost port=5433")
+            # Usa la configuración centralizada desde config.py
+            self.conn = psycopg.connect(DATABASE_URL)
         except psycopg.OperationalError as err:
             print(f"Error de conexión a la base de datos: {err}")
 

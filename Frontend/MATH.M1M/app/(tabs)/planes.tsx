@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
 
 interface MiPlan {
   plan_usuario_id: number;
@@ -39,7 +40,7 @@ export default function PlanesScreen() {
 
       const getCurrentUser = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/api/current-user`);
+          const response = await fetch(`${API_BASE_URL}/api/current-user`);
           const data = await response.json();
           if (data.success) return data.data.user_id;
           return null;
@@ -54,7 +55,7 @@ export default function PlanesScreen() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8000/api/planes/mis-planes/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
       const data = await response.json();
 
       if (data.success) {

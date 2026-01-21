@@ -14,6 +14,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
 
 const { width } = Dimensions.get("window");
 
@@ -71,7 +72,7 @@ export default function HomeScreen() {
     nivel_actual: 1,
   });
 
-  const API_BASE_URL = "http://localhost:8000";
+  // API_BASE_URL importada desde constants/api.ts
 
   const getCurrentUser = async () => {
     try {

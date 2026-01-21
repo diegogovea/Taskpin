@@ -11,6 +11,7 @@ from .model.userConnection import userConnection
 from .model.planesConnection import PlanesConnection
 from .schema.userSchema import UserCreateSchema, UserUpdateSchema, LoginData, UserResponseSchema
 from fastapi.middleware.cors import CORSMiddleware
+from .config import JWT_SECRET_KEY, JWT_ALGORITHM  # Configuración centralizada
 
 # IMPORTACIONES PARA HABITOS
 from .model.habitConnection import habitConnection
@@ -23,8 +24,9 @@ from .schema.habitSchema import (
     HabitoResponseSchema
 )
 
-SECRET_KEY = "mi_clave_secreta"
-ALGORITHM = "HS256"
+# Usar configuración desde config.py
+SECRET_KEY = JWT_SECRET_KEY
+ALGORITHM = JWT_ALGORITHM
 
 app = FastAPI()
 conn = userConnection()

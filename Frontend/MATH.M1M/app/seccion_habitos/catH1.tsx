@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
 
 interface Habito {
   habito_id: number;
@@ -38,7 +39,7 @@ export default function CatH1Screen() {
   const [adding, setAdding] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  const API_BASE_URL = "http://localhost:8000";
+  // API_BASE_URL importada desde constants/api.ts
   const CATEGORY_ID = 1;
   const CATEGORY_NAME = "Daily Wellness";
   const CATEGORY_ICON = "heart";
