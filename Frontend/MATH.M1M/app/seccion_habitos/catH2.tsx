@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-// Definir los tipos para TypeScript
 interface Habito {
   habito_id: number;
   categoria_id: number;
@@ -21,272 +21,183 @@ interface Habito {
   descripcion: string | null;
   frecuencia_recomendada: string;
   puntos_base: number;
-  categoria_nombre?: string;
-}
-
-interface ApiResponse {
-  success: boolean;
-  data: Habito[];
 }
 
 export default function CatH2Screen() {
   const router = useRouter();
-  
-  // Estados para manejar los datos
   const [habitos, setHabitos] = useState<Habito[]>([]);
   const [selectedHabits, setSelectedHabits] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  // URL base de tu API
-  const API_BASE_URL = 'http://localhost:8000';
+  const API_BASE_URL = "http://localhost:8000";
+  const CATEGORY_ID = 2;
+  const CATEGORY_NAME = "Energy & Movement";
+  const CATEGORY_ICON = "flash";
+  const CATEGORY_COLOR = colors.accent.amber;
+  const CATEGORY_DESCRIPTION = "Physical activities to keep your body active and energized";
 
-  // Función para obtener el usuario actual desde la BD
   const getCurrentUser = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/current-user`);
       const data = await response.json();
-      
       if (data.success) {
         setCurrentUserId(data.data.user_id);
         return data.data.user_id;
-      } else {
-        Alert.alert('Error', 'No se pudo obtener el usuario actual');
-        return null;
       }
+      return null;
     } catch (error) {
-      console.error('Error getting current user:', error);
-      Alert.alert('Error', 'Error de conexión al obtener usuario');
       return null;
     }
   };
 
-  // Función para obtener los hábitos de la categoría 2 (Energía y Movimiento)
   const fetchHabitos = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/habitos/categoria/2`);
-      const data: ApiResponse = await response.json();
-      
-      if (data.success) {
-        setHabitos(data.data);
-      } else {
-        Alert.alert('Error', 'No se pudieron cargar los hábitos');
-      }
+      const response = await fetch(`${API_BASE_URL}/api/habitos/categoria/${CATEGORY_ID}`);
+      const data = await response.json();
+      if (data.success) setHabitos(data.data);
     } catch (error) {
-      console.error('Error fetching habitos:', error);
-      Alert.alert('Error', 'Error de conexión con el servidor');
+      Alert.alert("Error", "Could not load habits");
     }
   };
 
-  // Función para inicializar datos
-  const initializeData = async () => {
-    try {
-      setLoading(true);
-      
-      // Cargar hábitos (siempre se debe mostrar)
-      await fetchHabitos();
-      
-      // Intentar obtener usuario actual (para agregar hábitos después)
-      await getCurrentUser();
-      
-    } catch (error) {
-      console.error('Error initializing data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cargar datos al montar el componente
   useEffect(() => {
-    initializeData();
+    (async () => {
+      setLoading(true);
+      await fetchHabitos();
+      await getCurrentUser();
+      setLoading(false);
+    })();
   }, []);
 
-  // Función para retroceder
   const goBack = () => {
-    console.log('Intentando retroceder...');
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/(tabs)/home');
-    }
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/habitos");
   };
 
-  // Función para alternar la selección de un hábito
   const toggleHabitSelection = (habitId: number) => {
-    setSelectedHabits(prev => 
-      prev.includes(habitId) 
-        ? prev.filter(id => id !== habitId)
-        : [...prev, habitId]
+    setSelectedHabits((prev) =>
+      prev.includes(habitId) ? prev.filter((id) => id !== habitId) : [...prev, habitId]
     );
   };
 
-  // Función para agregar los hábitos seleccionados
   const agregarHabitos = async () => {
     if (selectedHabits.length === 0) {
-      Alert.alert('Atención', 'Debes seleccionar al menos un hábito');
+      Alert.alert("Notice", "Please select at least one habit");
       return;
     }
-
     if (!currentUserId) {
-      Alert.alert('Error', 'No se pudo identificar el usuario');
+      Alert.alert("Error", "Could not identify user");
       return;
     }
 
+    setAdding(true);
     try {
-      setAdding(true);
-
-      const response = await fetch(`${API_BASE_URL}/api/usuario/${currentUserId}/habitos/multiple`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: currentUserId,
-          habito_ids: selectedHabits,
-          frecuencia_personal: 'diario'
-        }),
-      });
-
+      const response = await fetch(
+        `${API_BASE_URL}/api/usuario/${currentUserId}/habitos/multiple`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: currentUserId,
+            habito_ids: selectedHabits,
+            frecuencia_personal: "diario",
+          }),
+        }
+      );
       const result = await response.json();
-
       if (result.success) {
-        Alert.alert(
-          '¡Éxito!', 
-          `Se agregaron ${result.data.added_habitos.length} hábitos correctamente`,
-          [
-            {
-              text: 'OK', 
-              onPress: () => {
-                // Resetear selecciones y volver atrás
-                setSelectedHabits([]);
-                router.back();
-              }
-            }
-          ]
-        );
+        Alert.alert("Success!", `Added ${result.data.added_habitos.length} habit(s)`, [
+          { text: "OK", onPress: () => { setSelectedHabits([]); router.replace("/(tabs)/habitos"); } },
+        ]);
       } else {
-        Alert.alert('Error', 'No se pudieron agregar los hábitos');
+        Alert.alert("Error", "Could not add habits");
       }
-
     } catch (error) {
-      console.error('Error adding habitos:', error);
-      Alert.alert('Error', 'Error de conexión al agregar hábitos');
+      Alert.alert("Error", "Connection error");
     } finally {
       setAdding(false);
     }
   };
 
-  // Mostrar loading mientras se cargan los datos
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando hábitos...</Text>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading habits...</Text>
         </View>
       </SafeAreaView>
     );
   }
-  
-  // RENDERIZADO PRINCIPAL DEL COMPONENTE
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER CON FLECHA ATRÁS */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
+        {selectedHabits.length > 0 && (
+          <View style={styles.selectedBadge}>
+            <Text style={styles.selectedBadgeText}>{selectedHabits.length}</Text>
+          </View>
+        )}
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* TÍTULO PRINCIPAL */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.mainTitle}>Energía y Movimiento</Text>
-          <Text style={styles.subtitle}>Actividades físicas ligeras para mantener el cuerpo activo ⚡</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.categoryHeader}>
+          <View style={[styles.categoryIconContainer, { backgroundColor: CATEGORY_COLOR + "20" }]}>
+            <Ionicons name={CATEGORY_ICON as any} size={32} color={CATEGORY_COLOR} />
+          </View>
+          <Text style={styles.categoryTitle}>{CATEGORY_NAME}</Text>
+          <Text style={styles.categoryDescription}>{CATEGORY_DESCRIPTION}</Text>
         </View>
 
-        {/* LISTA DE HÁBITOS CON CHECKBOXES */}
         <View style={styles.habitsContainer}>
-          {habitos.map((habito) => (
-            <TouchableOpacity 
-              key={habito.habito_id}
-              style={styles.habitButton} 
-              activeOpacity={0.8}
-              onPress={() => toggleHabitSelection(habito.habito_id)}
-            >
-              <LinearGradient
-                colors={
-                  selectedHabits.includes(habito.habito_id)
-                    ? ['#10B981', '#059669'] // Verde cuando está seleccionado
-                    : ['#DDD6FE', '#C4B5FD'] // Morado suave cuando no está seleccionado
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientCard}
+          {habitos.map((habito) => {
+            const isSelected = selectedHabits.includes(habito.habito_id);
+            return (
+              <TouchableOpacity
+                key={habito.habito_id}
+                style={[styles.habitCard, isSelected && styles.habitCardSelected]}
+                activeOpacity={0.8}
+                onPress={() => toggleHabitSelection(habito.habito_id)}
               >
                 <View style={styles.habitContent}>
-                  <View style={styles.habitTextContainer}>
-                    <Text style={[
-                      styles.habitTitle,
-                      selectedHabits.includes(habito.habito_id) && styles.selectedText
-                    ]}>
-                      {habito.nombre}
-                    </Text>
+                  <View style={styles.habitInfo}>
+                    <Text style={[styles.habitName, isSelected && styles.habitNameSelected]}>{habito.nombre}</Text>
                     {habito.descripcion && (
-                      <Text style={[
-                        styles.habitDescription,
-                        selectedHabits.includes(habito.habito_id) && styles.selectedText
-                      ]}>
-                        {habito.descripcion}
-                      </Text>
+                      <Text style={[styles.habitDescription, isSelected && styles.habitDescriptionSelected]}>{habito.descripcion}</Text>
                     )}
-                    <Text style={[
-                      styles.habitPoints,
-                      selectedHabits.includes(habito.habito_id) && styles.selectedText
-                    ]}>
-                      {habito.puntos_base} puntos • {habito.frecuencia_recomendada}
-                    </Text>
+                    <View style={styles.habitMeta}>
+                      <View style={[styles.metaBadge, isSelected && styles.metaBadgeSelected]}>
+                        <Ionicons name="diamond-outline" size={12} color={isSelected ? colors.neutral[0] : colors.primary[600]} />
+                        <Text style={[styles.metaBadgeText, isSelected && styles.metaBadgeTextSelected]}>{habito.puntos_base} pts</Text>
+                      </View>
+                      <View style={[styles.metaBadge, isSelected && styles.metaBadgeSelected]}>
+                        <Ionicons name="refresh-outline" size={12} color={isSelected ? colors.neutral[0] : colors.neutral[500]} />
+                        <Text style={[styles.metaBadgeText, { color: isSelected ? colors.neutral[0] : colors.neutral[500] }]}>{habito.frecuencia_recomendada}</Text>
+                      </View>
+                    </View>
                   </View>
-                  
-                  {/* CHECKBOX PERSONALIZADO */}
-                  <View style={[
-                    styles.checkbox,
-                    selectedHabits.includes(habito.habito_id) && styles.checkedBox
-                  ]}>
-                    {selectedHabits.includes(habito.habito_id) && (
-                      <Ionicons name="checkmark" size={20} color="white" />
-                    )}
+                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.neutral[0]} />}
                   </View>
                 </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
 
-      {/* BOTÓN FLOTANTE PARA AGREGAR HÁBITOS */}
       {selectedHabits.length > 0 && (
         <View style={styles.floatingButtonContainer}>
-          <TouchableOpacity 
-            style={styles.floatingButton}
-            onPress={agregarHabitos}
-            disabled={adding}
-          >
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.floatingGradient}
-            >
-              {adding ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
+          <TouchableOpacity style={styles.floatingButton} onPress={agregarHabitos} disabled={adding} activeOpacity={0.9}>
+            <LinearGradient colors={colors.gradients.secondary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.floatingButtonGradient}>
+              {adding ? <ActivityIndicator color={colors.neutral[0]} size="small" /> : (
                 <>
-                  <Ionicons name="add" size={20} color="white" style={{ marginRight: 8 }} />
-                  <Text style={styles.floatingButtonText}>
-                    Agregar {selectedHabits.length} hábito{selectedHabits.length > 1 ? 's' : ''}
-                  </Text>
+                  <Ionicons name="add-circle" size={22} color={colors.neutral[0]} />
+                  <Text style={styles.floatingButtonText}>Add {selectedHabits.length} Habit{selectedHabits.length > 1 ? "s" : ""}</Text>
                 </>
               )}
             </LinearGradient>
@@ -297,173 +208,38 @@ export default function CatH2Screen() {
   );
 }
 
-// ESTILOS DEL COMPONENTE
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-
-  backButton: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-
-  scrollView: {
-    flex: 1,
-  },
-
-  titleContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
-    alignItems: 'center',
-  },
-
-  mainTitle: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  habitsContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 100, // Espacio para el botón flotante
-  },
-
-  habitButton: {
-    marginBottom: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-
-  gradientCard: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-  },
-
-  habitContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  habitTextContainer: {
-    flex: 1,
-    marginRight: 16,
-  },
-
-  habitTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-
-  habitDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 6,
-    lineHeight: 18,
-  },
-
-  habitPoints: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-
-  selectedText: {
-    color: '#FFFFFF',
-  },
-
-  checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  checkedBox: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
-  },
-
-  floatingButtonContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 20,
-    right: 20,
-  },
-
-  floatingButton: {
-    borderRadius: 16,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-
-  floatingGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  floatingButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  container: { flex: 1, backgroundColor: colors.neutral[0] },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: spacing[4], fontSize: typography.size.base, color: colors.neutral[500] },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing[5], paddingVertical: spacing[3] },
+  backButton: { width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.neutral[100], justifyContent: "center", alignItems: "center" },
+  selectedBadge: { backgroundColor: colors.primary[600], paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.full },
+  selectedBadgeText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: spacing[5], paddingBottom: 120 },
+  categoryHeader: { alignItems: "center", marginBottom: spacing[8] },
+  categoryIconContainer: { width: 80, height: 80, borderRadius: radius["2xl"], justifyContent: "center", alignItems: "center", marginBottom: spacing[4] },
+  categoryTitle: { fontSize: typography.size["2xl"], fontWeight: typography.weight.bold, color: colors.neutral[900], marginBottom: spacing[2] },
+  categoryDescription: { fontSize: typography.size.base, color: colors.neutral[500], textAlign: "center", lineHeight: 22 },
+  habitsContainer: { gap: spacing[3] },
+  habitCard: { backgroundColor: colors.neutral[50], borderRadius: radius.xl, padding: spacing[4], borderWidth: 1.5, borderColor: colors.neutral[200] },
+  habitCardSelected: { backgroundColor: colors.secondary[500], borderColor: colors.secondary[500] },
+  habitContent: { flexDirection: "row", alignItems: "flex-start" },
+  habitInfo: { flex: 1, marginRight: spacing[3] },
+  habitName: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.neutral[800], marginBottom: spacing[1] },
+  habitNameSelected: { color: colors.neutral[0] },
+  habitDescription: { fontSize: typography.size.sm, color: colors.neutral[500], lineHeight: 20, marginBottom: spacing[3] },
+  habitDescriptionSelected: { color: "rgba(255,255,255,0.85)" },
+  habitMeta: { flexDirection: "row", gap: spacing[2] },
+  metaBadge: { flexDirection: "row", alignItems: "center", backgroundColor: colors.neutral[100], paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.md, gap: 4 },
+  metaBadgeSelected: { backgroundColor: "rgba(255,255,255,0.2)" },
+  metaBadgeText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.primary[600] },
+  metaBadgeTextSelected: { color: colors.neutral[0] },
+  checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.neutral[300], backgroundColor: colors.neutral[0], justifyContent: "center", alignItems: "center" },
+  checkboxSelected: { backgroundColor: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.5)" },
+  floatingButtonContainer: { position: "absolute", bottom: spacing[8], left: spacing[5], right: spacing[5] },
+  floatingButton: { borderRadius: radius.xl, overflow: "hidden", ...shadows.lg, shadowColor: colors.secondary[600] },
+  floatingButtonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: spacing[5], gap: spacing[2] },
+  floatingButtonText: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
 });

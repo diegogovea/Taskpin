@@ -1,183 +1,96 @@
-// Frontend/MATH.M1M/app/seccion_planes/bienestarYSalud.tsx
-
 import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
   SafeAreaView,
+  TouchableOpacity,
+  ScrollView,
   ActivityIndicator,
-  Alert 
+  Alert,
 } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-// Interfaz para el tipo de plan
 interface Plan {
   plan_id: number;
+  categoria_id: number;
   meta_principal: string;
   descripcion: string;
-  plazo_dias_estimado: number;
-  dificultad: 'fácil' | 'intermedio' | 'difícil';
-  imagen: string | null;
+  duracion_estimada_dias: number;
+  dificultad: "fácil" | "intermedio" | "difícil";
+  total_fases: number;
+  total_tareas: number;
 }
 
-export default function BienestarSaludScreen() {
+export default function BienestarYSaludScreen() {
   const router = useRouter();
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Función para obtener planes de la categoría Salud y Bienestar
+  const API_BASE_URL = "http://localhost:8000";
+
   const fetchPlanes = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Llamar al endpoint de categoría 1 (Salud y Bienestar)
-      const response = await fetch('http://localhost:8000/api/planes/categoria/1');
+      const response = await fetch(`${API_BASE_URL}/api/planes/categoria/1`);
       const data = await response.json();
-      
       if (data.success) {
         setPlanes(data.planes);
-      } else {
-        setError('Error al cargar los planes');
       }
     } catch (error) {
-      console.error('Error fetching planes:', error);
-      setError('Error de conexión. Verifica que el backend esté funcionando.');
+      console.error("Error fetching planes:", error);
+      Alert.alert("Error", "Could not load plans");
     } finally {
       setLoading(false);
     }
   };
 
-  // Cargar planes al montar el componente
   useEffect(() => {
     fetchPlanes();
   }, []);
 
-  // Función para retroceder
   const goBack = () => {
-    console.log('Intentando retroceder...');
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/(tabs)/home');
-    }
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
-  // Función para navegar al detalle del plan
   const navigateToPlanDetail = (planId: number) => {
-    console.log(`Navegando al plan ${planId}`);
-    // TODO: Navegar a pantalla de detalle
     router.push(`/seccion_planes/detallePlan?planId=${planId}` as any);
   };
 
-  // Función para obtener el icono basado en el título del plan
-  const getPlanIcon = (titulo: string): string => {
-    const tituloLower = titulo.toLowerCase();
-    if (tituloLower.includes('ejercicio') || tituloLower.includes('rutina')) return 'barbell-outline';
-    if (tituloLower.includes('postura')) return 'body-outline';
-    if (tituloLower.includes('sueño') || tituloLower.includes('dormir')) return 'moon-outline';
-    if (tituloLower.includes('hidratación') || tituloLower.includes('agua')) return 'water-outline';
-    if (tituloLower.includes('autocuidado') || tituloLower.includes('cuidado')) return 'heart-outline';
-    return 'fitness-outline'; // Por defecto
-  };
-
-  // Función para obtener el color basado en la dificultad
   const getDifficultyColor = (dificultad: string) => {
     switch (dificultad) {
-      case 'fácil': return '#10B981'; // Verde
-      case 'intermedio': return '#F59E0B'; // Naranja
-      case 'difícil': return '#EF4444'; // Rojo
-      default: return '#6B7280'; // Gris
+      case "fácil":
+        return colors.secondary[500];
+      case "intermedio":
+        return colors.accent.amber;
+      case "difícil":
+        return colors.semantic.error;
+      default:
+        return colors.neutral[500];
     }
   };
 
-  // Componente para renderizar cada plan
-  const PlanItem = ({ plan }: { plan: Plan }) => {
-    const iconName = getPlanIcon(plan.meta_principal);
-    const difficultyColor = getDifficultyColor(plan.dificultad);
-
-    return (
-      <TouchableOpacity 
-        style={styles.planCard} 
-        activeOpacity={0.8}
-        onPress={() => navigateToPlanDetail(plan.plan_id)}
-      >
-        {/* Contenido principal */}
-        <View style={styles.planContent}>
-          {/* Icono y título */}
-          <View style={styles.planHeader}>
-            <View style={[styles.iconContainer, { backgroundColor: `${difficultyColor}20` }]}>
-              <Ionicons name={iconName as any} size={24} color={difficultyColor} />
-            </View>
-            <View style={styles.planInfo}>
-              <Text style={styles.planTitle} numberOfLines={2}>
-                {plan.meta_principal}
-              </Text>
-              <Text style={styles.planDescription} numberOfLines={2}>
-                {plan.descripcion}
-              </Text>
-            </View>
-          </View>
-          
-          {/* Footer con información del plan */}
-          <View style={styles.planFooter}>
-            <View style={styles.planStats}>
-              <View style={styles.statItem}>
-                <Ionicons name="calendar-outline" size={14} color="#64748B" />
-                <Text style={styles.statText}>{plan.plazo_dias_estimado} días</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Ionicons name="flag-outline" size={14} color={difficultyColor} />
-                <Text style={[styles.statText, { color: difficultyColor }]}>
-                  {plan.dificultad}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
+  const getDifficultyLabel = (dificultad: string) => {
+    switch (dificultad) {
+      case "fácil":
+        return "Easy";
+      case "intermedio":
+        return "Intermediate";
+      case "difícil":
+        return "Difficult";
+      default:
+        return dificultad;
+    }
   };
 
-  // Renderizar loading
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando planes...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Renderizar error
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={48} color="#EF4444" />
-          <Text style={styles.errorTitle}>Error al cargar planes</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchPlanes}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading plans...</Text>
         </View>
       </SafeAreaView>
     );
@@ -185,38 +98,84 @@ export default function BienestarSaludScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER CON FLECHA ATRÁS */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* TÍTULO PRINCIPAL */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.mainTitle}>Salud y Bienestar</Text>
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <View style={styles.categoryIcon}>
+            <Ionicons name="heart" size={28} color={colors.secondary[600]} />
+          </View>
+          <Text style={styles.title}>Health & Wellness</Text>
           <Text style={styles.subtitle}>
-            {planes.length} planes disponibles - Elige el que mejor se adapte a ti
+            Choose a plan to improve your health and well-being
           </Text>
         </View>
-        
-        {/* Lista de planes */}
-        <View style={styles.listContainer}>
-          {planes.map((plan) => (
-            <PlanItem key={plan.plan_id} plan={plan} />
-          ))}
+
+        {/* Plans List */}
+        <View style={styles.plansContainer}>
+          {planes.map((plan) => {
+            const difficultyColor = getDifficultyColor(plan.dificultad);
+            return (
+              <TouchableOpacity
+                key={plan.plan_id}
+                style={styles.planCard}
+                activeOpacity={0.8}
+                onPress={() => navigateToPlanDetail(plan.plan_id)}
+              >
+                <View style={styles.planHeader}>
+                  <Text style={styles.planTitle}>{plan.meta_principal}</Text>
+                  <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor + "15" }]}>
+                    <Text style={[styles.difficultyText, { color: difficultyColor }]}>
+                      {getDifficultyLabel(plan.dificultad)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.planDescription} numberOfLines={3}>
+                  {plan.descripcion}
+                </Text>
+
+                <View style={styles.planMeta}>
+                  <View style={styles.metaItem}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.neutral[400]} />
+                    <Text style={styles.metaText}>{plan.duracion_estimada_dias} days</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Ionicons name="layers-outline" size={14} color={colors.neutral[400]} />
+                    <Text style={styles.metaText}>{plan.total_fases} phases</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Ionicons name="checkmark-circle-outline" size={14} color={colors.neutral[400]} />
+                    <Text style={styles.metaText}>{plan.total_tareas} tasks</Text>
+                  </View>
+                </View>
+
+                <View style={styles.planFooter}>
+                  <Text style={styles.viewDetailsText}>View Details</Text>
+                  <Ionicons name="arrow-forward" size={16} color={colors.primary[600]} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        
-        {/* Mensaje si no hay planes */}
+
         {planes.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-outline" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No hay planes disponibles</Text>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="document-text-outline" size={48} color={colors.neutral[300]} />
+            </View>
+            <Text style={styles.emptyTitle}>No plans available</Text>
+            <Text style={styles.emptySubtitle}>Check back later for new wellness plans</Text>
           </View>
         )}
       </ScrollView>
@@ -224,176 +183,153 @@ export default function BienestarSaludScreen() {
   );
 }
 
-// ESTILOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.neutral[0],
   },
-  
-  // Header
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  // Loading
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
+    marginTop: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
   },
-
-  // Error
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+  header: {
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 16,
-    marginBottom: 8,
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
   },
-  errorMessage: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Content
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingHorizontal: spacing[5],
+    paddingBottom: spacing[10],
   },
-  titleContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
-    alignItems: 'center',
+  titleSection: {
+    alignItems: "center",
+    marginBottom: spacing[8],
   },
-  mainTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
-    marginBottom: 8,
+  categoryIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.xl,
+    backgroundColor: colors.secondary[100],
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[4],
+  },
+  title: {
+    fontSize: typography.size["2xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[2],
   },
   subtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    textAlign: "center",
     lineHeight: 22,
   },
-
-  // Lista de planes
-  listContainer: {
-    paddingHorizontal: 20,
+  plansContainer: {
+    gap: spacing[4],
   },
   planCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  planContent: {
-    padding: 16,
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[5],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
   },
   planHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  planInfo: {
-    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing[3],
   },
   planTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+    flex: 1,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginRight: spacing[3],
+  },
+  difficultyBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
+  },
+  difficultyText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
   },
   planDescription: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
     lineHeight: 20,
+    marginBottom: spacing[4],
+  },
+  planMeta: {
+    flexDirection: "row",
+    gap: spacing[4],
+    marginBottom: spacing[4],
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[1],
+  },
+  metaText: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
   },
   planFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: spacing[1],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
   },
-  planStats: {
-    flexDirection: 'row',
-    gap: 16,
+  viewDetailsText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: spacing[16],
   },
-  statText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[5],
   },
-
-  // Empty state
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
+  emptyTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#64748B',
-    marginTop: 12,
+  emptySubtitle: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    textAlign: "center",
   },
 });

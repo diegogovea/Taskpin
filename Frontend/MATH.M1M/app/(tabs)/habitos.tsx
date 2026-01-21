@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  StyleSheet,
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
   RefreshControl,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-// Definir tipos para TypeScript
 interface HabitoHoy {
   habito_usuario_id: number;
   user_id: number;
@@ -47,50 +47,44 @@ interface ApiResponse {
 
 export default function HabitosScreen() {
   const router = useRouter();
-  
-  // Estados
+
   const [habitos, setHabitos] = useState<HabitoHoy[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({
     total: 0,
     completados: 0,
     pendientes: 0,
-    fecha: 'today'
+    fecha: "today",
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [togglingHabit, setTogglingHabit] = useState<number | null>(null);
 
-  // URL base de tu API
-  const API_BASE_URL = 'http://localhost:8000';
+  const API_BASE_URL = "http://localhost:8000";
 
-  // Obtener fecha actual formateada
   const getCurrentDate = () => {
     const now = new Date();
     const day = now.getDate();
-    const month = now.toLocaleDateString('es', { month: 'short' }).toUpperCase();
-    return { day, month };
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short" });
+    const month = now.toLocaleDateString("en-US", { month: "short" });
+    return { day, weekday, month };
   };
 
-  // Función para obtener el usuario actual
   const getCurrentUser = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/current-user`);
       const data = await response.json();
-      
       if (data.success) {
         setCurrentUserId(data.data.user_id);
         return data.data.user_id;
-      } else {
-        console.log('No se pudo obtener el usuario actual');
-        return null;
       }
+      return null;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error("Error getting current user:", error);
       return null;
     }
   };
 
-  // Función para cargar hábitos de hoy
   const loadHabitosHoy = async (userId?: number) => {
     try {
       const userIdToUse = userId || currentUserId;
@@ -99,80 +93,72 @@ export default function HabitosScreen() {
         if (!fetchedUserId) return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/usuario/${userIdToUse || currentUserId}/habitos/hoy`);
+      const response = await fetch(
+        `${API_BASE_URL}/api/usuario/${userIdToUse || currentUserId}/habitos/hoy`
+      );
       const data: ApiResponse = await response.json();
 
       if (data.success) {
         setHabitos(data.data.habitos);
         setEstadisticas(data.data.estadisticas);
-      } else {
-        console.log('Error al cargar hábitos');
       }
     } catch (error) {
-      console.error('Error loading habits:', error);
+      console.error("Error loading habits:", error);
     }
   };
 
-  // Función para alternar completado de hábito
   const toggleHabitCompletion = async (habitoUsuarioId: number) => {
-    if (!currentUserId) return;
+    if (!currentUserId || togglingHabit) return;
+
+    setTogglingHabit(habitoUsuarioId);
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/usuario/${currentUserId}/habito/${habitoUsuarioId}/toggle`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
         }
       );
 
       const result = await response.json();
 
       if (result.success) {
-        // Actualizar el estado local inmediatamente
-        setHabitos(prevHabitos => 
-          prevHabitos.map(habito => 
+        setHabitos((prevHabitos) =>
+          prevHabitos.map((habito) =>
             habito.habito_usuario_id === habitoUsuarioId
               ? { ...habito, completado_hoy: result.data.completado }
               : habito
           )
         );
 
-        // Recalcular estadísticas localmente
-        const updatedHabitos = habitos.map(habito => 
+        const updatedHabitos = habitos.map((habito) =>
           habito.habito_usuario_id === habitoUsuarioId
             ? { ...habito, completado_hoy: result.data.completado }
             : habito
         );
-        
-        const completados = updatedHabitos.filter(h => h.completado_hoy).length;
-        const pendientes = updatedHabitos.length - completados;
-        
-        setEstadisticas(prev => ({
-          ...prev,
-          completados,
-          pendientes
-        }));
 
+        const completados = updatedHabitos.filter((h) => h.completado_hoy).length;
+        const pendientes = updatedHabitos.length - completados;
+
+        setEstadisticas((prev) => ({ ...prev, completados, pendientes }));
       } else {
-        Alert.alert('Error', 'No se pudo actualizar el hábito');
+        Alert.alert("Error", "Could not update habit");
       }
     } catch (error) {
-      console.error('Error toggling habit:', error);
-      Alert.alert('Error', 'Error de conexión');
+      console.error("Error toggling habit:", error);
+      Alert.alert("Error", "Connection error");
+    } finally {
+      setTogglingHabit(null);
     }
   };
 
-  // Función para refrescar datos
   const onRefresh = async () => {
     setRefreshing(true);
     await loadHabitosHoy();
     setRefreshing(false);
   };
 
-  // Inicializar datos al cargar la pantalla
   const initializeData = async () => {
     setLoading(true);
     const userId = await getCurrentUser();
@@ -182,7 +168,6 @@ export default function HabitosScreen() {
     setLoading(false);
   };
 
-  // Recargar cuando se enfoca la pantalla (volver de agregar hábitos)
   useFocusEffect(
     useCallback(() => {
       if (currentUserId) {
@@ -193,19 +178,22 @@ export default function HabitosScreen() {
     }, [currentUserId])
   );
 
-  // Cargar datos iniciales
   useEffect(() => {
     initializeData();
   }, []);
 
-  const { day, month } = getCurrentDate();
+  const { day, weekday, month } = getCurrentDate();
+  const progress =
+    estadisticas.total > 0
+      ? Math.round((estadisticas.completados / estadisticas.total) * 100)
+      : 0;
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando hábitos...</Text>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading habits...</Text>
         </View>
       </SafeAreaView>
     );
@@ -213,367 +201,429 @@ export default function HabitosScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>My Habits</Text>
+          <Text style={styles.headerSubtitle}>{month} {day}, {weekday}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => router.push("/seccion_habitos/tiposHabitos")}
+        >
+          <Ionicons name="add" size={24} color={colors.primary[600]} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Contenedor de estadísticas */}
+        {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          {/* Fecha */}
           <View style={styles.dateCard}>
-            <Text style={styles.dateNumber}>{day}</Text>
-            <Text style={styles.dateText}>{month}</Text>
+            <LinearGradient colors={colors.gradients.primary} style={styles.dateCardGradient}>
+              <Text style={styles.dateDay}>{day}</Text>
+              <Text style={styles.dateMonth}>{month}</Text>
+            </LinearGradient>
           </View>
-          
-          {/* Hábitos completados */}
-          <View style={[styles.statCard, styles.completedCard]}>
-            <Text style={styles.statLabel}>Hábitos{'\n'}completados</Text>
-            <Text style={styles.statNumber}>{estadisticas.completados}</Text>
+
+          <View style={[styles.statCard, { backgroundColor: colors.secondary[50] }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: colors.secondary[100] }]}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.secondary[600]} />
+            </View>
+            <Text style={[styles.statNumber, { color: colors.secondary[600] }]}>
+              {estadisticas.completados}
+            </Text>
+            <Text style={styles.statLabel}>Completed</Text>
           </View>
-          
-          {/* Hábitos pendientes */}
-          <View style={[styles.statCard, styles.pendingCard]}>
-            <Text style={styles.statLabel}>Hábitos{'\n'}Pendientes</Text>
-            <Text style={styles.statNumber}>{estadisticas.pendientes}</Text>
+
+          <View style={[styles.statCard, { backgroundColor: colors.accent.amber + "15" }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: colors.accent.amber + "25" }]}>
+              <Ionicons name="time" size={20} color={colors.accent.amber} />
+            </View>
+            <Text style={[styles.statNumber, { color: colors.accent.amber }]}>
+              {estadisticas.pendientes}
+            </Text>
+            <Text style={styles.statLabel}>Pending</Text>
           </View>
         </View>
-        
-        {/* Lista de hábitos o mensaje de vacío */}
+
+        {/* Progress Bar */}
+        {habitos.length > 0 && (
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressTitle}>Today's Progress</Text>
+              <Text style={styles.progressPercent}>{progress}%</Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <LinearGradient
+                colors={colors.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBarFill, { width: `${progress}%` }]}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Habits List */}
         {habitos.length === 0 ? (
-          <View style={styles.messageContainer}>
-            <Text style={styles.messageText}>
-              No tienes ningún hábito,{'\n'}crea uno nuevo para{'\n'}empezar.
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="leaf-outline" size={48} color={colors.neutral[300]} />
+            </View>
+            <Text style={styles.emptyTitle}>No habits yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Start building better habits today
             </Text>
-            
-            {/* Botón crear hábito */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.createButton}
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
-              <Text style={styles.createButtonText}>Crear hábito nuevo</Text>
+              <LinearGradient colors={colors.gradients.secondary} style={styles.createButtonGradient}>
+                <Ionicons name="add" size={20} color={colors.neutral[0]} />
+                <Text style={styles.createButtonText}>Create new habit</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.habitsList}>
-            {/* Título de la lista */}
-            <Text style={styles.habitsTitle}>Mis hábitos de hoy</Text>
-            
-            {/* Lista de hábitos */}
+          <View style={styles.habitsSection}>
+            <Text style={styles.sectionTitle}>Today's Habits</Text>
             {habitos.map((habito) => (
               <TouchableOpacity
                 key={habito.habito_usuario_id}
-                style={styles.habitItem}
+                style={[styles.habitCard, habito.completado_hoy && styles.habitCardCompleted]}
+                activeOpacity={0.8}
                 onPress={() => toggleHabitCompletion(habito.habito_usuario_id)}
-                activeOpacity={0.7}
+                disabled={togglingHabit === habito.habito_usuario_id}
               >
-                <LinearGradient
-                  colors={
-                    habito.completado_hoy
-                      ? ['#10B981', '#059669'] // Verde cuando completado
-                      : ['#F3F4F6', '#E5E7EB'] // Gris cuando pendiente
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.habitGradient}
-                >
-                  <View style={styles.habitContent}>
-                    {/* Información del hábito */}
-                    <View style={styles.habitInfo}>
-                      <Text style={[
-                        styles.habitName,
-                        habito.completado_hoy && styles.habitNameCompleted
-                      ]}>
-                        {habito.nombre}
-                      </Text>
-                      <Text style={[
-                        styles.habitCategory,
-                        habito.completado_hoy && styles.habitCategoryCompleted
-                      ]}>
-                        {habito.categoria_nombre} • {habito.puntos_base} puntos
-                      </Text>
-                      {habito.completado_hoy && habito.hora_completado && (
-                        <Text style={styles.habitTime}>
-                          Completado a las {habito.hora_completado.slice(0, 5)}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Checkbox */}
-                    <View style={[
+                <View style={styles.habitContent}>
+                  <View
+                    style={[
                       styles.checkbox,
-                      habito.completado_hoy && styles.checkedBox
-                    ]}>
-                      {habito.completado_hoy && (
-                        <Ionicons name="checkmark" size={20} color="white" />
-                      )}
-                    </View>
+                      habito.completado_hoy && styles.checkboxCompleted,
+                    ]}
+                  >
+                    {togglingHabit === habito.habito_usuario_id ? (
+                      <ActivityIndicator size="small" color={colors.neutral[0]} />
+                    ) : habito.completado_hoy ? (
+                      <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
+                    ) : null}
                   </View>
-                </LinearGradient>
+
+                  <View style={styles.habitInfo}>
+                    <Text
+                      style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
+                    >
+                      {habito.nombre}
+                    </Text>
+                    <View style={styles.habitMeta}>
+                      <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
+                      <View style={styles.habitPoints}>
+                        <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
+                        <Text style={styles.habitPointsText}>{habito.puntos_base}</Text>
+                      </View>
+                    </View>
+                    {habito.completado_hoy && habito.hora_completado && (
+                      <Text style={styles.habitCompletedTime}>
+                        Completed at {habito.hora_completado.slice(0, 5)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
               </TouchableOpacity>
             ))}
 
-            {/* Botón para agregar más hábitos */}
-            <TouchableOpacity 
+            {/* Add More Button */}
+            <TouchableOpacity
               style={styles.addMoreButton}
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
-              <Ionicons name="add" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-              <Text style={styles.addMoreText}>Agregar más hábitos</Text>
+              <Ionicons name="add-circle-outline" size={20} color={colors.primary[600]} />
+              <Text style={styles.addMoreText}>Add more habits</Text>
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Bottom Padding */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // Contenedor principal
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: colors.neutral[50],
   },
-  
-  // Loading
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '500',
+    marginTop: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
   },
-  
-  // Contenedor del contenido
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  
-  // Contenedor de las estadísticas
-  statsContainer: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 30,
+    alignItems: "center",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
+    backgroundColor: colors.neutral[0],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
   },
-  
-  // Tarjeta de fecha (morada)
+  headerTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+  },
+  headerSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary[50],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[5],
+  },
+  statsContainer: {
+    flexDirection: "row",
+    gap: spacing[3],
+    marginBottom: spacing[6],
+  },
   dateCard: {
-    backgroundColor: "#8B5CF6",
-    borderRadius: 12,
-    padding: 15,
+    flex: 1,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.sm,
+  },
+  dateCardGradient: {
+    padding: spacing[4],
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 80,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    minHeight: 88,
   },
-  
-  dateNumber: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
+  dateDay: {
+    fontSize: typography.size["2xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
   },
-  
-  dateText: {
-    fontSize: 14,
-    color: "white",
-    fontWeight: "600",
+  dateMonth: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: spacing[1],
   },
-  
-  // Tarjetas de estadísticas (verde y amarillo)
   statCard: {
-    borderRadius: 12,
-    padding: 15,
+    flex: 1,
+    borderRadius: radius.xl,
+    padding: spacing[4],
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
-    marginLeft: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    minHeight: 88,
   },
-  
-  statLabel: {
-    fontSize: 12,
-    color: "white",
-    textAlign: "center",
-    marginBottom: 5,
-    fontWeight: "500",
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[2],
   },
-  
   statNumber: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "white",
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
   },
-  
-  // Tarjeta de hábitos completados (verde)
-  completedCard: {
-    backgroundColor: "#10B981",
+  statLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
   },
-  
-  // Tarjeta de hábitos pendientes (amarillo)
-  pendingCard: {
-    backgroundColor: "#F59E0B",
+  progressSection: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[5],
+    marginBottom: spacing[6],
+    ...shadows.sm,
   },
-  
-  // Contenedor del mensaje cuando no hay hábitos
-  messageContainer: {
-    flex: 1,
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  progressTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+  },
+  progressPercent: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    color: colors.primary[600],
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: colors.neutral[100],
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: spacing[16],
+  },
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.neutral[100],
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginTop: 50,
+    marginBottom: spacing[5],
   },
-  
-  messageText: {
-    fontSize: 16,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 30,
+  emptyTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
   },
-  
-  // Botón crear hábito
+  emptySubtitle: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    marginBottom: spacing[6],
+  },
   createButton: {
-    backgroundColor: "#10B981",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.md,
+    shadowColor: colors.secondary[600],
   },
-  
+  createButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[6],
+    gap: spacing[2],
+  },
   createButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
   },
-
-  // Lista de hábitos
-  habitsList: {
-    paddingBottom: 20,
+  habitsSection: {
+    marginBottom: spacing[4],
   },
-
-  habitsTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 20,
+  sectionTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginBottom: spacing[4],
   },
-
-  habitItem: {
-    marginBottom: 12,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  habitCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+    ...shadows.sm,
   },
-
-  habitGradient: {
-    borderRadius: 16,
-    padding: 16,
+  habitCardCompleted: {
+    backgroundColor: colors.secondary[50],
+    borderWidth: 1,
+    borderColor: colors.secondary[200],
   },
-
   habitContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.neutral[300],
+    marginRight: spacing[3],
+    marginTop: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxCompleted: {
+    backgroundColor: colors.secondary[500],
+    borderColor: colors.secondary[500],
+  },
   habitInfo: {
     flex: 1,
-    marginRight: 16,
   },
-
   habitName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginBottom: spacing[2],
   },
-
   habitNameCompleted: {
-    color: 'white',
+    color: colors.secondary[700],
   },
-
+  habitMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[3],
+  },
   habitCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
   },
-
-  habitCategoryCompleted: {
-    color: 'rgba(255, 255, 255, 0.8)',
+  habitPoints: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
-
-  habitTime: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontStyle: 'italic',
+  habitPointsText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
   },
-
-  checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
+  habitCompletedTime: {
+    fontSize: typography.size.xs,
+    color: colors.secondary[600],
+    marginTop: spacing[2],
   },
-
-  checkedBox: {
-    backgroundColor: '#047857',
-    borderColor: '#047857',
-  },
-
-  // Botón para agregar más hábitos
   addMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center', 
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#8B5CF6',
-    borderStyle: 'dashed',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    borderWidth: 1.5,
+    borderColor: colors.primary[200],
+    borderStyle: "dashed",
+    marginTop: spacing[2],
+    gap: spacing[2],
   },
-
   addMoreText: {
-    fontSize: 16,
-    color: '#8B5CF6',
-    fontWeight: '600',
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
   },
 });

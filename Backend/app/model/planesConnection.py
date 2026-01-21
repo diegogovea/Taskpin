@@ -5,7 +5,7 @@ import psycopg
 class PlanesConnection:
     def __init__(self):
         try:
-            self.conn = psycopg.connect("dbname=taskpin user=postgres password=123456 host=localhost port=5432")
+            self.conn = psycopg.connect("dbname=taskpin user=postgres password=123456 host=localhost port=5433")
         except psycopg.OperationalError as err:
             print(f"Error de conexión a la base de datos: {err}")
             self.conn = None

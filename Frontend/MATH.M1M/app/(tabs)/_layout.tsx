@@ -1,300 +1,144 @@
-// =====================================
-// IMPORTACIONES NECESARIAS
-// =====================================
 import { Tabs } from "expo-router";
-import { Ionicons, FontAwesome5, MaterialIcons, Entypo, AntDesign } from "@expo/vector-icons";
-import { View, Platform, Text, SafeAreaView } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { View, Platform, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { colors, radius, shadows } from "../../constants/theme";
 
-// =====================================
-// COMPONENTE DEL HEADER GLOBAL BONITO
-// Este header se verá en TODAS las secciones de la app
-// =====================================
-function GlobalHeader({ title }: { title: string }) {
-  return (
-    <>
-      {/* SafeAreaView para evitar que se pegue con la barra de estado del celular */}
-      <SafeAreaView style={{ backgroundColor: "#86EFAC" }} />
-      
-      {/* Header principal con gradiente verde pastel */}
-      <LinearGradient colors={["#86EFAC", "#6EE7B7"]} style={styles.header}>
-        <View style={styles.headerContent}>
-          
-          {/* ========== LADO IZQUIERDO: AVATAR + TEXTO ========== */}
-          <View style={styles.userInfo}>
-            {/* Avatar circular con icono de persona */}
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={24} color="white" />
-            </View>
-            
-            {            /* Textos del usuario */}
-            <View>
-              <Text style={styles.welcomeText}>¡Bienvenido!</Text>
-              {/* Este texto cambia según la sección actual */}
-              <Text style={styles.sectionTitle}>{title}</Text>
-            </View>
-          </View>          
+// Tab icon component with modern styling
+function TabIcon({
+  name,
+  focused,
+  isCenter = false,
+}: {
+  name: keyof typeof Ionicons.glyphMap;
+  focused: boolean;
+  isCenter?: boolean;
+}) {
+  if (isCenter) {
+    return (
+      <View style={styles.centerIconContainer}>
+        <View style={[styles.centerIcon, focused && styles.centerIconFocused]}>
+          <Ionicons
+            name={name}
+            size={26}
+            color={focused ? colors.neutral[0] : colors.primary[600]}
+          />
         </View>
-      </LinearGradient>
-    </>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.iconWrapper}>
+      <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
+        <Ionicons
+          name={focused ? name : (`${name}-outline` as keyof typeof Ionicons.glyphMap)}
+          size={22}
+          color={focused ? colors.primary[600] : colors.neutral[400]}
+        />
+      </View>
+      {focused && <View style={styles.focusIndicator} />}
+    </View>
   );
 }
 
-// =====================================
-// LAYOUT PRINCIPAL DE LAS PESTAÑAS
-// Aquí se configura toda la navegación y diseño
-// =====================================
 export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={({ route }) => ({
-        
-        // ========== HEADER PERSONALIZADO PARA CADA SECCIÓN ==========
-        header: () => {
-          let sectionName = "";
-          
-          // Determina qué texto mostrar según la pestaña actual
-          switch (route.name) {
-            case "home":
-              sectionName = "Inicio";               // Pantalla principal simplificada
-              break;
-            case "perfil":
-              sectionName = "Mi Perfil";            // Para perfil del usuario
-              break;
-            case "habitos":
-              sectionName = "Mis Hábitos";        // Para ajustes
-              break;
-            case "planes":
-              sectionName = "Mis Planes";         // Para progreso y datos
-              break;
-            default:
-              sectionName = "Taskpin";             // Texto por defecto
-          }
-          
-          // Retorna el componente del header con el título correspondiente
-          return <GlobalHeader title={sectionName} />;
-        },
-        
-        // ========== ESTILOS DE LA BARRA DE NAVEGACIÓN INFERIOR ==========
-        tabBarStyle: {
-          backgroundColor: "#8B5CF6",                    // Color púrpura principal
-          borderTopWidth: 0,                             // Sin borde superior
-          height: Platform.OS === 'ios' ? 85 : 70,      // Altura según dispositivo
-          paddingTop: 8,                                 // Espaciado superior
-          paddingBottom: Platform.OS === 'ios' ? 25 : 8, // Espaciado inferior (más en iOS)
-          paddingHorizontal: 15,                         // Más espaciado lateral
-          
-          // Sombra elegante hacia arriba
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.2,
-          shadowRadius: 10,
-          elevation: 12,                                 // Sombra en Android
-          
-          // Esquinas redondeadas en la parte superior
-          borderTopLeftRadius: 25,
-          borderTopRightRadius: 25,
-        },
-        
-        tabBarShowLabel: false, // Ocultar texto de las pestañas (solo iconos)
-        
-        // ========== CONFIGURACIÓN DE ICONOS PARA CADA PESTAÑA ==========
-        tabBarIcon: ({ focused, color, size }) => {
-          let icon;
-          
-          // CONFIGURACIÓN: Check ✓
-          if (route.name === "habitos") {
-            icon = (
-              <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon,
-                styles.iconContainer
-              ]}>
-                <AntDesign 
-                  name="check" 
-                  size={24} 
-                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
-                />
-              </View>
-            );
-          } 
-          
-          // ESTADÍSTICAS: Gráfico de barras 📊
-          else if (route.name === "planes") {
-            icon = (
-              <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon,
-                styles.iconContainer
-              ]}>
-                <MaterialIcons 
-                  name="bar-chart" 
-                  size={24} 
-                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
-                />
-              </View>
-            );
-          } 
-          
-          // HOME: Casa 🏠 (icono central más grande)
-          else if (route.name === "home") {
-            icon = (
-              <View style={styles.homeIcon}>
-                <Entypo name="home" size={28} color="#8B5CF6" />
-              </View>
-            );
-          } 
-          
-          // PERFIL: Usuario 👤
-          else if (route.name === "perfil") {
-            icon = (
-              <View style={[
-                focused ? styles.focusedIcon : styles.normalIcon,
-                styles.iconContainer
-              ]}>
-                <Ionicons 
-                  name="person" 
-                  size={24} 
-                  color={focused ? "#8B5CF6" : "rgba(255,255,255,0.8)"} 
-                />
-              </View>
-            );
-          } 
-          
-
-          return icon;
-        },
-      })}
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true,
+      }}
     >
-      {/* ========== DEFINICIÓN DE LAS PANTALLAS/PESTAÑAS ========== */}
-      <Tabs.Screen name="habitos" /> {/* Check / Settings */}
-      <Tabs.Screen name="planes" />  {/* Gráfico */}
-      <Tabs.Screen name="home" />          {/* Casa (centro) */}
-      <Tabs.Screen name="perfil" />        {/* Persona */}
+      <Tabs.Screen
+        name="habitos"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="checkmark-circle" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="planes"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="bar-chart" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="home"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="home" focused={focused} isCenter />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="person" focused={focused} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
 
-// =====================================
-// ESTILOS PARA TODOS LOS COMPONENTES
-// =====================================
-const styles = {
-  
-  // ========== ESTILOS DEL HEADER GLOBAL ==========
-  header: {
-    paddingHorizontal: 20,                        // Espaciado lateral
-    paddingTop: Platform.OS === 'ios' ? 15 : 20, // Espaciado superior (más en Android)
-    paddingBottom: 20,                            // Espaciado inferior
-    borderBottomLeftRadius: 25,                   // Esquina inferior izquierda redondeada
-    borderBottomRightRadius: 25,                  // Esquina inferior derecha redondeada
+const styles = StyleSheet.create({
+  tabBar: {
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 24 : 16,
+    left: 20,
+    right: 20,
+    height: 72,
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius["2xl"],
+    borderTopWidth: 0,
+    paddingHorizontal: 8,
+    ...shadows.lg,
   },
-  
-  headerContent: {
-    flexDirection: "row" as const,        // Elementos en fila horizontal
-    justifyContent: "space-between" as const, // Separar elementos a los extremos
-    alignItems: "center" as const,        // Centrar verticalmente
+  iconWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
   },
-  
-  // Contenedor del avatar + texto del usuario
-  userInfo: {
-    flexDirection: "row" as const,        // Avatar y texto en fila
-    alignItems: "center" as const,        // Centrar verticalmente
-  },
-  
-  // Avatar circular del usuario
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,                     // Radio para hacer círculo perfecto
-    backgroundColor: "rgba(255,255,255,0.25)", // Fondo blanco semi-transparente
-    justifyContent: "center" as const,    // Centrar icono horizontalmente
-    alignItems: "center" as const,        // Centrar icono verticalmente
-    marginRight: 12,                      // Espacio entre avatar y texto
-  },
-  
-  // Texto "¡Hola!" pequeño
-  welcomeText: {
-    color: "white",
-    fontSize: 14,
-    opacity: 0.9,                         // Ligeramente transparente
-  },
-  
-  // Texto principal (nombre de la sección)
-  sectionTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold" as const,          // Texto en negritas
-  },
-  
-  // Contenedor de las estadísticas (racha + gemas)
-  statsContainer: {
-    flexDirection: "row" as const,        // Stats en fila horizontal
-    gap: 15,                              // Espacio entre cada stat
-  },
-  
-  // Cada elemento de estadística individual
-  statItem: {
-    flexDirection: "row" as const,        // Icono y número en fila
-    alignItems: "center" as const,        // Centrar verticalmente
-    backgroundColor: "rgba(255,255,255,0.2)", // Fondo blanco semi-transparente
-    paddingHorizontal: 12,                // Espaciado horizontal interno
-    paddingVertical: 6,                   // Espaciado vertical interno
-    borderRadius: 15,                     // Bordes redondeados
-    gap: 5,                               // Espacio entre icono y número
-  },
-  
-  // Texto de los números de estadísticas
-  statText: {
-    color: "white",
-    fontWeight: "bold" as const,
-    fontSize: 14,
-  },
-  
-  // ========== ESTILOS DE LA BARRA DE NAVEGACIÓN ==========
-  
-  // Contenedor base para todos los iconos
   iconContainer: {
-    justifyContent: 'center' as const,    // Centrar icono horizontalmente
-    alignItems: 'center' as const,        // Centrar icono verticalmente
-    minWidth: 45,                         // Ancho mínimo para área táctil
-    minHeight: 45,                        // Alto mínimo para área táctil
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  
-  // Estilo para iconos NO seleccionados
-  normalIcon: {
-    padding: 10,                          // Espaciado interno
-    borderRadius: 15,                     // Bordes redondeados
-    backgroundColor: "rgba(255,255,255,0.1)", // Fondo sutil semi-transparente
+  iconContainerFocused: {
+    backgroundColor: colors.primary[50],
   },
-  
-  // Estilo para icono SÍ seleccionado (pestaña actual)
-  focusedIcon: {
-    padding: 12,                          // Más espaciado interno
-    borderRadius: 18,                     // Más redondeado
-    backgroundColor: "white",             // Fondo blanco sólido
-    
-    // Sombra elegante para destacar
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 6,                         // Sombra en Android
+  focusIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary[600],
+    marginTop: 4,
   },
-  
-  // Estilo especial para el icono de HOME (siempre destacado)
-  homeIcon: {
-    padding: 15,                          // Espaciado generoso
-    borderRadius: 30,                     // Círculo perfecto
-    backgroundColor: "white",             // Fondo blanco
-    justifyContent: 'center' as const,    // Centrar horizontalmente
-    alignItems: 'center' as const,        // Centrar verticalmente
-    
-    // Sombra más pronunciada para que sobresalga
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,                         // Sombra en Android
-    
-    minWidth: 55,                         // Tamaño mínimo para que se vea grande
-    minHeight: 55,
+  centerIconContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -20,
   },
-};
+  centerIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: colors.primary[100],
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.md,
+    shadowColor: colors.primary[600],
+  },
+  centerIconFocused: {
+    backgroundColor: colors.primary[600],
+  },
+});

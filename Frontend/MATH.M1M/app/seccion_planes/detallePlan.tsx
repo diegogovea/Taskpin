@@ -1,13 +1,11 @@
-// Frontend/MATH.M1M/app/seccion_planes/detallePlan.tsx
-
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  ScrollView,
+  StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  StyleSheet,
+  ScrollView,
   ActivityIndicator,
   Alert,
   TextInput,
@@ -15,145 +13,58 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 
-// Interfaces
-interface Tarea {
-  tarea_id: number;
-  titulo: string;
-  descripcion: string;
-  tipo: 'diaria' | 'semanal' | 'única';
-  orden: number;
-  es_diaria: boolean;
-}
-
-interface Fase {
-  objetivo_id: number;
-  titulo: string;
-  descripcion: string;
-  orden_fase: number;
-  duracion_dias: number;
-  tareas: Tarea[];
-}
-
-interface PlanCompleto {
+interface PlanDetalle {
   plan_id: number;
   meta_principal: string;
   descripcion: string;
-  plazo_dias_estimado: number;
-  dificultad: 'fácil' | 'intermedio' | 'difícil';
-  imagen: string | null;
+  duracion_estimada_dias: number;
+  dificultad: "fácil" | "intermedio" | "difícil";
   categoria_nombre: string;
-  fases: Fase[];
   total_fases: number;
   total_tareas: number;
+  fases: Fase[];
+}
+
+interface Fase {
+  fase_id: number;
+  nombre: string;
+  descripcion: string;
+  orden: number;
+  tareas: Tarea[];
+}
+
+interface Tarea {
+  tarea_id: number;
+  descripcion: string;
+  dia_relativo: number;
 }
 
 export default function DetallePlanScreen() {
   const router = useRouter();
   const { planId } = useLocalSearchParams();
-  
-  const [plan, setPlan] = useState<PlanCompleto | null>(null);
+  const [plan, setPlan] = useState<PlanDetalle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [diasPersonalizados, setDiasPersonalizados] = useState<string>("");
-  const [agregandoPlan, setAgregandoPlan] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [customDuration, setCustomDuration] = useState("");
+  const [showCustomDuration, setShowCustomDuration] = useState(false);
 
-  // Cargar detalle completo del plan
+  const API_BASE_URL = "http://localhost:8000";
+
   const fetchPlanDetalle = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch(`http://localhost:8000/api/planes/detalle/${planId}`);
+      const response = await fetch(`${API_BASE_URL}/api/planes/detalle/${planId}`);
       const data = await response.json();
-      
       if (data.success) {
         setPlan(data.plan);
-        setDiasPersonalizados(data.plan.plazo_dias_estimado.toString());
-      } else {
-        setError('Plan no encontrado');
+        setCustomDuration(data.plan.duracion_estimada_dias.toString());
       }
     } catch (error) {
-      console.error('Error fetching plan detail:', error);
-      setError('Error de conexión');
+      console.error("Error fetching plan:", error);
+      Alert.alert("Error", "Could not load plan details");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Agregar plan a usuario (hardcoded user_id = 1 por ahora)
-  const agregarPlan = async () => {
-    if (!plan) return;
-    
-    try {
-      setAgregandoPlan(true);
-
-          // Obtener user_id del usuario actual
-
-      const getCurrentUser = async () => {
-        try {
-          const response = await fetch('http://localhost:8000/api/current-user');
-          const data = await response.json();
-          console.log('Current user response in agregar plan:', data); // DEBUG
-          if (data.success) {
-            return data.data.user_id;
-          }
-          return null;
-        } catch (error) {
-          console.error('Error getting current user:', error);
-          return null;
-        }
-      };
-
-      const userId = await getCurrentUser();
-      if (!userId) {
-        Alert.alert('Error', 'No se pudo obtener el usuario actual');
-        return;
-      }
-      
-      
-      const payload = {
-        user_id: userId, // TODO: Obtener del contexto de usuario real
-        plan_id: plan.plan_id,
-        dias_personalizados: parseInt(diasPersonalizados) || plan.plazo_dias_estimado
-      };
-
-      const response = await fetch('http://localhost:8000/api/planes/agregar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        Alert.alert(
-          '¡Éxito!',
-          'Plan agregado correctamente a tus planes',
-          [
-            {
-              text: 'Ver mis planes',
-              onPress: () => {
-                // TODO: Navegar a la pantalla de "Mis planes"
-                router.push('/(tabs)/home' as any);
-              }
-            },
-            {
-              text: 'Continuar',
-              style: 'cancel'
-            }
-          ]
-        );
-      } else {
-        Alert.alert('Error', data.message || 'No se pudo agregar el plan');
-      }
-    } catch (error) {
-      console.error('Error adding plan:', error);
-      Alert.alert('Error', 'Error de conexión al agregar el plan');
-    } finally {
-      setAgregandoPlan(false);
     }
   };
 
@@ -163,120 +74,99 @@ export default function DetallePlanScreen() {
     }
   }, [planId]);
 
-  // Función para retroceder
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push('/seccion_planes/bienestarYSalud' as any);
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
+  };
+
+  const agregarPlan = async () => {
+    if (!plan) return;
+
+    setAdding(true);
+
+    try {
+      const getCurrentUser = async () => {
+        const response = await fetch(`${API_BASE_URL}/api/current-user`);
+        const data = await response.json();
+        return data.success ? data.data.user_id : null;
+      };
+
+      const userId = await getCurrentUser();
+      if (!userId) {
+        Alert.alert("Error", "Could not identify user");
+        return;
+      }
+
+      const duration = showCustomDuration ? parseInt(customDuration) : plan.duracion_estimada_dias;
+
+      const response = await fetch(`${API_BASE_URL}/api/planes/agregar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          plan_id: plan.plan_id,
+          duracion_dias: duration,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        Alert.alert("Success!", "Plan added to your profile", [
+          { text: "OK", onPress: () => router.replace("/(tabs)/planes") },
+        ]);
+      } else {
+        Alert.alert("Error", result.message || "Could not add plan");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Connection error");
+    } finally {
+      setAdding(false);
     }
   };
 
-  // Obtener color por dificultad
   const getDifficultyColor = (dificultad: string) => {
     switch (dificultad) {
-      case 'fácil': return '#10B981';
-      case 'intermedio': return '#F59E0B';
-      case 'difícil': return '#EF4444';
-      default: return '#6B7280';
+      case "fácil":
+        return colors.secondary[500];
+      case "intermedio":
+        return colors.accent.amber;
+      case "difícil":
+        return colors.semantic.error;
+      default:
+        return colors.neutral[500];
     }
   };
 
-  // Obtener icono por tipo de tarea
-  const getTaskIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'diaria': return 'calendar-outline';
-      case 'semanal': return 'calendar-number-outline';
-      case 'única': return 'checkmark-circle-outline';
-      default: return 'ellipse-outline';
+  const getDifficultyLabel = (dificultad: string) => {
+    switch (dificultad) {
+      case "fácil":
+        return "Easy";
+      case "intermedio":
+        return "Intermediate";
+      case "difícil":
+        return "Difficult";
+      default:
+        return dificultad;
     }
   };
-
-  // Componente para renderizar una tarea
-  const TaskItem = ({ tarea }: { tarea: Tarea }) => (
-    <View style={styles.taskItem}>
-      <View style={styles.taskHeader}>
-        <Ionicons 
-          name={getTaskIcon(tarea.tipo) as any} 
-          size={16} 
-          color="#8B5CF6" 
-        />
-        <Text style={styles.taskTitle}>{tarea.titulo}</Text>
-        <View style={[styles.taskTypeBadge, { 
-          backgroundColor: tarea.es_diaria ? '#DBEAFE' : '#FEF3C7' 
-        }]}>
-          <Text style={[styles.taskTypeText, {
-            color: tarea.es_diaria ? '#1D4ED8' : '#D97706'
-          }]}>
-            {tarea.tipo}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.taskDescription}>{tarea.descripcion}</Text>
-    </View>
-  );
-
-  // Componente para renderizar una fase
-  const FaseItem = ({ fase, index }: { fase: Fase; index: number }) => (
-    <View style={styles.faseCard}>
-      <View style={styles.faseHeader}>
-        <View style={styles.faseNumber}>
-          <Text style={styles.faseNumberText}>{index + 1}</Text>
-        </View>
-        <View style={styles.faseInfo}>
-          <Text style={styles.faseTitle}>{fase.titulo}</Text>
-          <Text style={styles.faseDescription}>{fase.descripcion}</Text>
-          <View style={styles.faseDuration}>
-            <Ionicons name="time-outline" size={14} color="#64748B" />
-            <Text style={styles.faseDurationText}>
-              {fase.duracion_dias} días
-            </Text>
-          </View>
-        </View>
-      </View>
-      
-      <View style={styles.tasksContainer}>
-        <Text style={styles.tasksTitle}>
-          Tareas ({fase.tareas.length})
-        </Text>
-        {fase.tareas.map((tarea) => (
-          <TaskItem key={tarea.tarea_id} tarea={tarea} />
-        ))}
-      </View>
-    </View>
-  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Cargando detalles del plan...</Text>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading plan details...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (error || !plan) {
+  if (!plan) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning-outline" size={48} color="#EF4444" />
-          <Text style={styles.errorTitle}>Error</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchPlanDetalle}>
-            <Text style={styles.retryText}>Reintentar</Text>
-          </TouchableOpacity>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
+          <Text style={styles.loadingText}>Plan not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -286,89 +176,151 @@ export default function DetallePlanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
+          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Plan Details</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* INFO PRINCIPAL DEL PLAN */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Plan Header */}
         <View style={styles.planHeader}>
-          <Text style={styles.categoryTag}>{plan.categoria_nombre}</Text>
           <Text style={styles.planTitle}>{plan.meta_principal}</Text>
-          <Text style={styles.planDescription}>{plan.descripcion}</Text>
-          
-          <View style={styles.planStats}>
-            <View style={styles.statItem}>
-              <Ionicons name="calendar-outline" size={16} color="#64748B" />
-              <Text style={styles.statText}>{plan.plazo_dias_estimado} días</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="flag-outline" size={16} color={difficultyColor} />
-              <Text style={[styles.statText, { color: difficultyColor }]}>
-                {plan.dificultad}
+          <View style={styles.badges}>
+            <View style={[styles.badge, { backgroundColor: difficultyColor + "15" }]}>
+              <Text style={[styles.badgeText, { color: difficultyColor }]}>
+                {getDifficultyLabel(plan.dificultad)}
               </Text>
             </View>
-            <View style={styles.statItem}>
-              <Ionicons name="layers-outline" size={16} color="#64748B" />
-              <Text style={styles.statText}>{plan.total_fases} fases</Text>
+            <View style={[styles.badge, { backgroundColor: colors.primary[100] }]}>
+              <Ionicons name="folder-outline" size={12} color={colors.primary[600]} />
+              <Text style={[styles.badgeText, { color: colors.primary[600] }]}>
+                {plan.categoria_nombre}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* PERSONALIZACIÓN DE DURACIÓN */}
-        <View style={styles.customizationCard}>
-          <Text style={styles.customizationTitle}>Personaliza tu plan</Text>
-          <Text style={styles.customizationSubtitle}>
-            Ajusta la duración según tu ritmo
-          </Text>
-          
-          <View style={styles.durationContainer}>
-            <Text style={styles.durationLabel}>Duración (días):</Text>
-            <TextInput
-              style={styles.durationInput}
-              value={diasPersonalizados}
-              onChangeText={setDiasPersonalizados}
-              keyboardType="numeric"
-              placeholder={plan.plazo_dias_estimado.toString()}
-            />
+        {/* Description */}
+        <View style={styles.section}>
+          <Text style={styles.description}>{plan.descripcion}</Text>
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
+              <Ionicons name="calendar" size={18} color={colors.primary[600]} />
+            </View>
+            <Text style={styles.statValue}>{plan.duracion_estimada_dias}</Text>
+            <Text style={styles.statLabel}>Days</Text>
+          </View>
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: colors.secondary[100] }]}>
+              <Ionicons name="layers" size={18} color={colors.secondary[600]} />
+            </View>
+            <Text style={styles.statValue}>{plan.total_fases}</Text>
+            <Text style={styles.statLabel}>Phases</Text>
+          </View>
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: colors.accent.amber + "20" }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.accent.amber} />
+            </View>
+            <Text style={styles.statValue}>{plan.total_tareas}</Text>
+            <Text style={styles.statLabel}>Tasks</Text>
           </View>
         </View>
 
-        {/* FASES DEL PLAN */}
-        <View style={styles.fasesSection}>
-          <Text style={styles.sectionTitle}>Plan detallado</Text>
-          <Text style={styles.sectionSubtitle}>
-            {plan.total_fases} fases • {plan.total_tareas} tareas totales
-          </Text>
-          
+        {/* Custom Duration */}
+        <View style={styles.customDurationSection}>
+          <TouchableOpacity
+            style={styles.customDurationToggle}
+            onPress={() => setShowCustomDuration(!showCustomDuration)}
+          >
+            <Ionicons
+              name={showCustomDuration ? "checkbox" : "square-outline"}
+              size={22}
+              color={showCustomDuration ? colors.primary[600] : colors.neutral[400]}
+            />
+            <Text style={styles.customDurationToggleText}>Customize duration</Text>
+          </TouchableOpacity>
+
+          {showCustomDuration && (
+            <View style={styles.customDurationInput}>
+              <TextInput
+                style={styles.durationInput}
+                value={customDuration}
+                onChangeText={setCustomDuration}
+                keyboardType="number-pad"
+                placeholder="Days"
+                placeholderTextColor={colors.neutral[400]}
+              />
+              <Text style={styles.durationLabel}>days</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Phases */}
+        <View style={styles.phasesSection}>
+          <Text style={styles.sectionTitle}>Plan Phases</Text>
           {plan.fases.map((fase, index) => (
-            <FaseItem key={fase.objetivo_id} fase={fase} index={index} />
+            <View key={fase.fase_id} style={styles.phaseCard}>
+              <View style={styles.phaseHeader}>
+                <View style={styles.phaseNumber}>
+                  <Text style={styles.phaseNumberText}>{index + 1}</Text>
+                </View>
+                <View style={styles.phaseInfo}>
+                  <Text style={styles.phaseName}>{fase.nombre}</Text>
+                  <Text style={styles.phaseDescription}>{fase.descripcion}</Text>
+                </View>
+              </View>
+              <View style={styles.tasksList}>
+                {fase.tareas.slice(0, 3).map((tarea) => (
+                  <View key={tarea.tarea_id} style={styles.taskItem}>
+                    <Ionicons name="checkmark-circle-outline" size={16} color={colors.neutral[400]} />
+                    <Text style={styles.taskText} numberOfLines={2}>
+                      {tarea.descripcion}
+                    </Text>
+                  </View>
+                ))}
+                {fase.tareas.length > 3 && (
+                  <Text style={styles.moreTasks}>+{fase.tareas.length - 3} more tasks</Text>
+                )}
+              </View>
+            </View>
           ))}
         </View>
       </ScrollView>
 
-      {/* BOTÓN FLOTANTE PARA AGREGAR PLAN */}
-      <View style={styles.bottomActions}>
+      {/* Floating Button */}
+      <View style={styles.floatingButtonContainer}>
         <TouchableOpacity
-          style={[styles.addButton, agregandoPlan && styles.addButtonDisabled]}
+          style={styles.floatingButton}
           onPress={agregarPlan}
-          disabled={agregandoPlan}
+          disabled={adding}
+          activeOpacity={0.9}
         >
           <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
-            style={styles.addButtonGradient}
+            colors={colors.gradients.secondary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.floatingButtonGradient}
           >
-            {agregandoPlan ? (
-              <ActivityIndicator size="small" color="white" />
+            {adding ? (
+              <ActivityIndicator color={colors.neutral[0]} size="small" />
             ) : (
-              <Ionicons name="add-circle" size={20} color="white" />
+              <>
+                <Ionicons name="add-circle" size={22} color={colors.neutral[0]} />
+                <Text style={styles.floatingButtonText}>Add This Plan</Text>
+              </>
             )}
-            <Text style={styles.addButtonText}>
-              {agregandoPlan ? 'Agregando...' : 'Agregar a mis planes'}
-            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -376,325 +328,243 @@ export default function DetallePlanScreen() {
   );
 }
 
-// ESTILOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.neutral[0],
   },
-  
-  // Header
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  // Loading y Error (mismos estilos que bienestarYSalud.tsx)
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
+    marginTop: spacing[4],
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 16,
-    marginBottom: 8,
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
   },
-  errorMessage: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 24,
+  headerTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
   },
-  retryButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Content
   scrollView: {
     flex: 1,
   },
-
-  // Plan Header
-  planHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginTop: 10,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  scrollContent: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[6],
+    paddingBottom: 120,
   },
-  categoryTag: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8B5CF6',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+  planHeader: {
+    marginBottom: spacing[4],
   },
   planTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
+    fontSize: typography.size["2xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[3],
   },
-  planDescription: {
-    fontSize: 16,
-    color: '#64748B',
-    lineHeight: 24,
-    marginBottom: 16,
+  badges: {
+    flexDirection: "row",
+    gap: spacing[2],
   },
-  planStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
     gap: 4,
   },
-  statText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
+  badgeText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
   },
-
-  // Customization Card
-  customizationCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  section: {
+    marginBottom: spacing[6],
   },
-  customizationTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+  description: {
+    fontSize: typography.size.base,
+    color: colors.neutral[600],
+    lineHeight: 24,
   },
-  customizationSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 16,
+  statsRow: {
+    flexDirection: "row",
+    gap: spacing[3],
+    marginBottom: spacing[6],
   },
-  durationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[4],
   },
-  durationLabel: {
-    fontSize: 16,
-    color: '#374151',
-    fontWeight: '500',
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[2],
+  },
+  statValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+  },
+  statLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+  },
+  customDurationSection: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[6],
+  },
+  customDurationToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[3],
+  },
+  customDurationToggleText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[700],
+  },
+  customDurationInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing[4],
+    gap: spacing[3],
   },
   durationInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    backgroundColor: '#F9FAFB',
-    minWidth: 80,
-    textAlign: 'center',
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.neutral[200],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+    width: 100,
+    textAlign: "center",
   },
-
-  // Fases Section
-  fasesSection: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 100, // Espacio para el botón flotante
+  durationLabel: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+  },
+  phasesSection: {
+    marginBottom: spacing[4],
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+    marginBottom: spacing[4],
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 20,
+  phaseCard: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[3],
   },
-
-  // Fase Card
-  faseCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  phaseHeader: {
+    flexDirection: "row",
+    marginBottom: spacing[3],
   },
-  faseHeader: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  faseNumber: {
+  phaseNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    backgroundColor: colors.primary[600],
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing[3],
   },
-  faseNumberText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  phaseNumberText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
   },
-  faseInfo: {
+  phaseInfo: {
     flex: 1,
   },
-  faseTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+  phaseName: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+    marginBottom: spacing[1],
   },
-  faseDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 8,
+  phaseDescription: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    lineHeight: 20,
   },
-  faseDuration: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  faseDurationText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-
-  // Tasks
-  tasksContainer: {
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 16,
-  },
-  tasksTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
+  tasksList: {
+    paddingLeft: spacing[3] + 32,
   },
   taskItem: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing[2],
+    paddingVertical: spacing[2],
   },
-  taskHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 8,
-  },
-  taskTitle: {
+  taskText: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    lineHeight: 20,
   },
-  taskTypeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  moreTasks: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
+    marginTop: spacing[2],
   },
-  taskTypeText: {
-    fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
+  floatingButtonContainer: {
+    position: "absolute",
+    bottom: spacing[8],
+    left: spacing[5],
+    right: spacing[5],
   },
-  taskDescription: {
-    fontSize: 12,
-    color: '#64748B',
-    marginLeft: 24,
+  floatingButton: {
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.lg,
+    shadowColor: colors.secondary[600],
   },
-
-  // Bottom Actions
-  bottomActions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+  floatingButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing[5],
+    gap: spacing[2],
   },
-  addButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  addButtonDisabled: {
-    opacity: 0.7,
-  },
-  addButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  floatingButtonText: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
   },
 });
