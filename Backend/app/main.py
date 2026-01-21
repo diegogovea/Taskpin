@@ -1,9 +1,10 @@
 # Backend/app/main.py
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import Response
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel
@@ -31,6 +32,73 @@ ALGORITHM = JWT_ALGORITHM
 app = FastAPI()
 conn = userConnection()
 habit_conn = habitConnection()
+
+# ============================================
+# AUTENTICACIÓN JWT
+# ============================================
+
+# Esquema de seguridad Bearer Token
+security = HTTPBearer(auto_error=False)
+
+class TokenData(BaseModel):
+    """Datos extraídos del token JWT"""
+    user_id: int
+    correo: str
+    control_id: Optional[int] = None
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> TokenData:
+    """
+    Verifica el token JWT y retorna los datos del usuario.
+    Úsalo como dependencia en endpoints protegidos:
+    
+    @app.get("/ruta-protegida")
+    def mi_endpoint(current_user: TokenData = Depends(verify_token)):
+        # current_user.user_id está disponible
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=401, 
+            detail="Token de autenticación requerido",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    try:
+        # Decodificar el token
+        payload = jwt.decode(
+            credentials.credentials, 
+            SECRET_KEY, 
+            algorithms=[ALGORITHM]
+        )
+        
+        user_id = payload.get("user_id")
+        correo = payload.get("sub")
+        control_id = payload.get("control_id")
+        
+        if user_id is None or correo is None:
+            raise HTTPException(
+                status_code=401, 
+                detail="Token inválido: datos incompletos"
+            )
+        
+        return TokenData(user_id=user_id, correo=correo, control_id=control_id)
+        
+    except JWTError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Token inválido o expirado: {str(e)}"
+        )
+
+def verify_user_access(user_id_param: int, current_user: TokenData) -> bool:
+    """
+    Verifica que el usuario del token puede acceder a los datos del user_id_param.
+    Lanza excepción si no tiene acceso.
+    """
+    if current_user.user_id != user_id_param:
+        raise HTTPException(
+            status_code=403, 
+            detail="No tienes permiso para acceder a estos datos"
+        )
+    return True
 
 # Configuración de CORS
 app.add_middleware(
@@ -137,8 +205,11 @@ def get_all_users():
     return items
 
 @app.get("/api/usuario/{user_id}", status_code=HTTP_200_OK)
-def get_one_user(user_id: int):
-    """Obtener un usuario por ID"""
+def get_one_user(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """Obtener un usuario por ID (PROTEGIDO)"""
+    # Verificar que el usuario solo puede ver sus propios datos
+    verify_user_access(user_id, current_user)
+    
     data = conn.read_one(user_id)
     if not data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -232,8 +303,11 @@ def get_current_user():
         raise HTTPException(status_code=500, detail=f"Error al obtener usuario actual: {str(e)}")
 
 @app.put("/api/usuario/{user_id}", status_code=HTTP_204_NO_CONTENT)
-def update_user(user_id: int, user_data: UserUpdateSchema):
-    """Actualizar usuario"""
+def update_user(user_id: int, user_data: UserUpdateSchema, current_user: TokenData = Depends(verify_token)):
+    """Actualizar usuario (PROTEGIDO)"""
+    # Verificar que el usuario solo puede editar sus propios datos
+    verify_user_access(user_id, current_user)
+    
     # Verificar que el usuario existe
     existing_user = conn.read_one(user_id)
     if not existing_user:
@@ -325,9 +399,12 @@ def get_habito_by_id(habito_id: int):
         raise HTTPException(status_code=500, detail=f"Error al obtener hábito: {str(e)}")
 
 @app.post("/api/usuario/{user_id}/habitos", status_code=HTTP_201_CREATED)
-def add_habito_to_user(user_id: int, habito_data: AddHabitoToUserSchema):
-    """Agregar un hábito al usuario"""
+def add_habito_to_user(user_id: int, habito_data: AddHabitoToUserSchema, current_user: TokenData = Depends(verify_token)):
+    """Agregar un hábito al usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -360,9 +437,12 @@ def add_habito_to_user(user_id: int, habito_data: AddHabitoToUserSchema):
         raise HTTPException(status_code=500, detail=f"Error al agregar hábito: {str(e)}")
 
 @app.post("/api/usuario/{user_id}/habitos/multiple", status_code=HTTP_201_CREATED)
-def add_multiple_habitos_to_user(user_id: int, habitos_data: AddMultipleHabitosSchema):
-    """Agregar múltiples hábitos al usuario"""
+def add_multiple_habitos_to_user(user_id: int, habitos_data: AddMultipleHabitosSchema, current_user: TokenData = Depends(verify_token)):
+    """Agregar múltiples hábitos al usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -411,9 +491,12 @@ def add_multiple_habitos_to_user(user_id: int, habitos_data: AddMultipleHabitosS
         raise HTTPException(status_code=500, detail=f"Error al agregar hábitos: {str(e)}")
 
 @app.get("/api/usuario/{user_id}/habitos", status_code=HTTP_200_OK)
-def get_user_habitos(user_id: int):
-    """Obtener todos los hábitos activos de un usuario"""
+def get_user_habitos(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """Obtener todos los hábitos activos de un usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -432,9 +515,12 @@ def get_user_habitos(user_id: int):
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos del usuario: {str(e)}")
 
 @app.get("/api/usuario/{user_id}/habitos/hoy", status_code=HTTP_200_OK)
-def get_user_habits_today(user_id: int):
-    """Obtener hábitos del usuario con su estado de hoy"""
+def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """Obtener hábitos del usuario con su estado de hoy (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -510,9 +596,12 @@ def get_user_habits_today(user_id: int):
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos del día: {str(e)}")
 
 @app.post("/api/usuario/{user_id}/habito/{habito_usuario_id}/toggle", status_code=HTTP_200_OK)
-def toggle_habit_completion(user_id: int, habito_usuario_id: int):
-    """Alternar el completado de un hábito para hoy"""
+def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """Alternar el completado de un hábito para hoy (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         # Verificar que el usuario y hábito existen
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -718,9 +807,12 @@ def agregar_plan_usuario(data: AgregarPlanRequest):
         return {'success': False, 'message': f'Error: {str(e)}'}
 
 @app.get("/api/planes/mis-planes/{user_id}")
-def get_mis_planes(user_id: int):
-    """GET /api/planes/mis-planes/1 - Obtener planes del usuario"""
+def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/mis-planes/1 - Obtener planes del usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
         planes_conn = PlanesConnection()
         mis_planes = planes_conn.get_planes_usuario(user_id)
         
@@ -729,6 +821,8 @@ def get_mis_planes(user_id: int):
             'planes': mis_planes
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener planes del usuario: {str(e)}')
 

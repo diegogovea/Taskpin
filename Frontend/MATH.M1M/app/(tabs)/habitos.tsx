@@ -50,8 +50,8 @@ interface ApiResponse {
 export default function HabitosScreen() {
   const router = useRouter();
   
-  // ✅ NUEVO: Obtenemos el usuario del contexto
-  const { user, isLoading: authLoading } = useAuth();
+  // ✅ Obtenemos user y authFetch del contexto
+  const { user, isLoading: authLoading, authFetch } = useAuth();
 
   const [habitos, setHabitos] = useState<HabitoHoy[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({
@@ -73,14 +73,12 @@ export default function HabitosScreen() {
     return { day, weekday, month };
   };
 
-  // ✅ SIMPLIFICADO: Usamos user.user_id del contexto directamente
+  // ✅ Usa authFetch (incluye token automáticamente)
   const loadHabitosHoy = async () => {
     try {
       if (!user?.user_id) return;
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuario/${user.user_id}/habitos/hoy`
-      );
+      const response = await authFetch(`/api/usuario/${user.user_id}/habitos/hoy`);
       const data: ApiResponse = await response.json();
 
       if (data.success) {
@@ -92,19 +90,16 @@ export default function HabitosScreen() {
     }
   };
 
-  // ✅ ACTUALIZADO: Usa user.user_id del contexto
+  // ✅ Usa authFetch con método POST
   const toggleHabitCompletion = async (habitoUsuarioId: number) => {
     if (!user?.user_id || togglingHabit) return;
 
     setTogglingHabit(habitoUsuarioId);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuario/${user.user_id}/habito/${habitoUsuarioId}/toggle`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habitoUsuarioId}/toggle`,
+        { method: "POST" }
       );
 
       const result = await response.json();

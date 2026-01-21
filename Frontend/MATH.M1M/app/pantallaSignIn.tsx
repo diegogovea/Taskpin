@@ -19,8 +19,15 @@ import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenti
 export default function SignInScreen() {
   const router = useRouter();
   
-  // ✅ NUEVO: Usamos el register del AuthContext
-  const { register } = useAuth();
+  // ✅ Usamos el register del AuthContext
+  const { register, user, isLoading: authLoading } = useAuth();
+
+  // 🔐 Si ya hay sesión, redirigir a home
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/(tabs)/home");
+    }
+  }, [user, authLoading]);
 
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
@@ -136,7 +143,7 @@ export default function SignInScreen() {
         {/* Back Button */}
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace("/login")}
+          onPress={() => router.replace("/login")}
         >
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>

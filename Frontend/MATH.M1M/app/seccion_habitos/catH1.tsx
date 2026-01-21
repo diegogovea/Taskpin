@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Habito {
   habito_id: number;
@@ -32,37 +33,24 @@ interface ApiResponse {
 
 export default function CatH1Screen() {
   const router = useRouter();
+  
+  // ✅ Usamos AuthContext
+  const { user, authFetch, isLoading: authLoading } = useAuth();
 
   const [habitos, setHabitos] = useState<Habito[]>([]);
   const [selectedHabits, setSelectedHabits] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  // API_BASE_URL importada desde constants/api.ts
   const CATEGORY_ID = 1;
   const CATEGORY_NAME = "Daily Wellness";
   const CATEGORY_ICON = "heart";
   const CATEGORY_COLOR = colors.secondary[600];
   const CATEGORY_DESCRIPTION = "Self-care and healthy routines for everyday life";
 
-  const getCurrentUser = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/current-user`);
-      const data = await response.json();
-      if (data.success) {
-        setCurrentUserId(data.data.user_id);
-        return data.data.user_id;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting current user:", error);
-      return null;
-    }
-  };
-
   const fetchHabitos = async () => {
     try {
+      // Este endpoint no requiere auth, es catálogo público
       const response = await fetch(`${API_BASE_URL}/api/habitos/categoria/${CATEGORY_ID}`);
       const data: ApiResponse = await response.json();
       if (data.success) {
@@ -74,20 +62,8 @@ export default function CatH1Screen() {
     }
   };
 
-  const initializeData = async () => {
-    try {
-      setLoading(true);
-      await fetchHabitos();
-      await getCurrentUser();
-    } catch (error) {
-      console.error("Error initializing data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    initializeData();
+    fetchHabitos().finally(() => setLoading(false));
   }, []);
 
   const goBack = () => {
@@ -112,7 +88,7 @@ export default function CatH1Screen() {
       return;
     }
 
-    if (!currentUserId) {
+    if (!user?.user_id) {
       Alert.alert("Error", "Could not identify user");
       return;
     }
@@ -120,13 +96,13 @@ export default function CatH1Screen() {
     try {
       setAdding(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuario/${currentUserId}/habitos/multiple`,
+      // ✅ Usa authFetch con token
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habitos/multiple`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: currentUserId,
+            user_id: user.user_id,
             habito_ids: selectedHabits,
             frecuencia_personal: "diario",
           }),

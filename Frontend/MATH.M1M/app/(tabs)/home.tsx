@@ -55,8 +55,8 @@ interface ResumenUsuario {
 export default function HomeScreen() {
   const router = useRouter();
   
-  // ✅ NUEVO: Obtenemos el usuario del contexto (ya no hacemos API call)
-  const { user, isLoading: authLoading } = useAuth();
+  // ✅ Obtenemos user y authFetch del contexto
+  const { user, isLoading: authLoading, authFetch } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,11 +75,11 @@ export default function HomeScreen() {
     nivel_actual: 1,
   });
 
-  // ✅ getCurrentUser ya NO es necesario - el usuario viene del AuthContext
+  // ✅ Funciones que usan authFetch (incluye token automáticamente)
 
   const loadHabitosHoy = async (userId: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/usuario/${userId}/habitos/hoy`);
+      const response = await authFetch(`/api/usuario/${userId}/habitos/hoy`);
       const data = await response.json();
       if (data.success) {
         setHabitosHoy(data.data.habitos || []);
@@ -95,7 +95,7 @@ export default function HomeScreen() {
 
   const loadMisPlanes = async (userId: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
+      const response = await authFetch(`/api/planes/mis-planes/${userId}`);
       const data = await response.json();
       if (data.success) {
         setMisPlanes(data.planes || []);

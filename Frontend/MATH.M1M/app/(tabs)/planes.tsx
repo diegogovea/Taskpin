@@ -31,15 +31,15 @@ interface MiPlan {
 export default function PlanesScreen() {
   const router = useRouter();
   
-  // ✅ NUEVO: Obtenemos el usuario del contexto
-  const { user, isLoading: authLoading } = useAuth();
+  // ✅ Obtenemos user y authFetch del contexto
+  const { user, isLoading: authLoading, authFetch } = useAuth();
   
   const [planes, setPlanes] = useState<MiPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ SIMPLIFICADO: Ya no necesita getCurrentUser interno
+  // ✅ Usa authFetch (incluye token automáticamente)
   const fetchMisPlanes = async () => {
     try {
       setError(null);
@@ -49,7 +49,7 @@ export default function PlanesScreen() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${user.user_id}`);
+      const response = await authFetch(`/api/planes/mis-planes/${user.user_id}`);
       const data = await response.json();
 
       if (data.success) {

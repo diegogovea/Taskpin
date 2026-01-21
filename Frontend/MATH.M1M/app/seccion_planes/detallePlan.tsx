@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface PlanDetalle {
   plan_id: number;
@@ -45,13 +46,13 @@ interface Tarea {
 export default function DetallePlanScreen() {
   const router = useRouter();
   const { planId } = useLocalSearchParams();
+  const { user } = useAuth();
+  
   const [plan, setPlan] = useState<PlanDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [customDuration, setCustomDuration] = useState("");
   const [showCustomDuration, setShowCustomDuration] = useState(false);
-
-  // API_BASE_URL importada desde constants/api.ts
 
   const fetchPlanDetalle = async () => {
     try {
@@ -85,14 +86,7 @@ export default function DetallePlanScreen() {
     setAdding(true);
 
     try {
-      const getCurrentUser = async () => {
-        const response = await fetch(`${API_BASE_URL}/api/current-user`);
-        const data = await response.json();
-        return data.success ? data.data.user_id : null;
-      };
-
-      const userId = await getCurrentUser();
-      if (!userId) {
+      if (!user?.user_id) {
         Alert.alert("Error", "Could not identify user");
         return;
       }
@@ -103,7 +97,7 @@ export default function DetallePlanScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: userId,
+          user_id: user.user_id,
           plan_id: plan.plan_id,
           duracion_dias: duration,
         }),
