@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 interface MiPlan {
   plan_usuario_id: number;
@@ -29,33 +30,26 @@ interface MiPlan {
 
 export default function PlanesScreen() {
   const router = useRouter();
+  
+  // ✅ NUEVO: Obtenemos el usuario del contexto
+  const { user, isLoading: authLoading } = useAuth();
+  
   const [planes, setPlanes] = useState<MiPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ SIMPLIFICADO: Ya no necesita getCurrentUser interno
   const fetchMisPlanes = async () => {
     try {
       setError(null);
 
-      const getCurrentUser = async () => {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/current-user`);
-          const data = await response.json();
-          if (data.success) return data.data.user_id;
-          return null;
-        } catch (error) {
-          return null;
-        }
-      };
-
-      const userId = await getCurrentUser();
-      if (!userId) {
+      if (!user?.user_id) {
         setError("Could not get current user");
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${user.user_id}`);
       const data = await response.json();
 
       if (data.success) {
@@ -77,9 +71,12 @@ export default function PlanesScreen() {
     fetchMisPlanes();
   };
 
+  // ✅ ACTUALIZADO: Carga cuando el usuario está disponible
   useEffect(() => {
-    fetchMisPlanes();
-  }, []);
+    if (user?.user_id && !authLoading) {
+      fetchMisPlanes();
+    }
+  }, [user?.user_id, authLoading]);
 
   const navigateToSeguimiento = (planUsuarioId: number, metaPrincipal: string) => {
     router.push(

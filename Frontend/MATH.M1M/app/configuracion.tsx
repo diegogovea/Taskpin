@@ -20,6 +20,7 @@ import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 import { API_BASE_URL } from "../constants/api";
+import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 interface UserData {
   user_id: string | null;
@@ -29,6 +30,10 @@ interface UserData {
 
 export default function ConfiguracionScreen() {
   const router = useRouter();
+  
+  // ✅ NUEVO: Obtenemos user y logout del contexto
+  const { user, logout, isLoading: authLoading } = useAuth();
+  
   const [userData, setUserData] = useState<UserData>({
     user_id: null,
     nombre: "",
@@ -45,30 +50,19 @@ export default function ConfiguracionScreen() {
   // Logout Modal State
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  // API_BASE_URL importada desde constants/api.ts
-
-  const loadUserData = async () => {
-    try {
-      const [nombre, correo, userId] = await AsyncStorage.multiGet([
-        "nombre",
-        "correo",
-        "user_id",
-      ]);
+  // ✅ SIMPLIFICADO: Cargamos datos del contexto, no de AsyncStorage
+  useEffect(() => {
+    if (user && !authLoading) {
       setUserData({
-        user_id: userId[1],
-        nombre: nombre[1] || "",
-        correo: correo[1] || "",
+        user_id: String(user.user_id),
+        nombre: user.nombre || "",
+        correo: user.correo || "",
       });
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    } finally {
+      setLoading(false);
+    } else if (!authLoading) {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  }, [user, authLoading]);
 
   const openEditModal = (field: "nombre" | "correo") => {
     setEditField(field);
@@ -110,9 +104,10 @@ export default function ConfiguracionScreen() {
     }
   };
 
+  // ✅ ARREGLADO: Usa logout del AuthContext (limpia memoria + storage)
   const handleLogout = async () => {
     try {
-      await AsyncStorage.clear();
+      await logout(); // ← Ahora usa el logout del contexto
       setLogoutModalVisible(false);
       router.replace("/login");
     } catch (error) {

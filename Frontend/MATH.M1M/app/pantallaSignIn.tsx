@@ -12,12 +12,15 @@ import {
   Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
-import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
+import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 export default function SignInScreen() {
   const router = useRouter();
+  
+  // ✅ NUEVO: Usamos el register del AuthContext
+  const { register } = useAuth();
 
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
@@ -90,40 +93,21 @@ export default function SignInScreen() {
     setLoading(true);
 
     try {
-      const userData = {
-        nombre: nombre.trim(),
-        correo: correo.trim().toLowerCase(),
-        contraseña: contraseña,
-      };
-
-      await axios.post("http://127.0.0.1:8000/register", userData);
-
-      Alert.alert(
-        "Account created!",
-        "Your account has been created successfully. Please sign in.",
-        [
-          {
-            text: "Sign In",
-            onPress: () => router.replace("/inicio"),
-          },
-        ]
+      // ✅ Usamos register del AuthContext (registra + hace login automático)
+      const result = await register(
+        nombre.trim(),
+        correo.trim().toLowerCase(),
+        contraseña
       );
-    } catch (error: any) {
-      let errorMessage = "Error creating account";
 
-      if (error.response?.status === 400) {
-        errorMessage = "This email is already registered";
-      } else if (error.response?.data?.detail) {
-        if (Array.isArray(error.response.data.detail)) {
-          errorMessage = error.response.data.detail.map((err: any) => err.msg).join("\n");
-        } else {
-          errorMessage = error.response.data.detail;
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (result.success) {
+        // El registro + login fueron exitosos, ir a bienvenida
+        router.replace("/bienvenida");
+      } else {
+        Alert.alert("Error", result.message || "Error creating account");
       }
-
-      Alert.alert("Error", errorMessage);
+    } catch (error: any) {
+      Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
