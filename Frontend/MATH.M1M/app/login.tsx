@@ -3,11 +3,21 @@ import { useRouter } from "expo-router";
 import { useRef, useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // 🔐 Si ya hay sesión, redirigir a home
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/(tabs)/home");
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
     Animated.parallel([

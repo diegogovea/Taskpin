@@ -1,5 +1,6 @@
 import psycopg  # Importa el módulo psycopg para conectarse a PostgreSQL
 from passlib.context import CryptContext  # Para hashear contraseñas
+from ..config import DATABASE_URL  # Importar configuración centralizada
 
 # Configuración para hashear contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -9,8 +10,8 @@ class userConnection():
 
     def __init__(self):
         try:
-            # IMPORTANTE: Asegúrate de que apunte a la base de datos 'taskpin'
-            self.conn = psycopg.connect("dbname=taskpin user=postgres password=123456 host=localhost port=5433")
+            # Usa la configuración centralizada desde config.py
+            self.conn = psycopg.connect(DATABASE_URL)
         except psycopg.OperationalError as err:
             print(f"Error de conexión a la base de datos: {err}")
 

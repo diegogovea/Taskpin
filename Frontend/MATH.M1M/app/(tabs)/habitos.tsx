@@ -14,6 +14,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 interface HabitoHoy {
   habito_usuario_id: number;
@@ -47,6 +49,9 @@ interface ApiResponse {
 
 export default function HabitosScreen() {
   const router = useRouter();
+  
+  // ✅ Obtenemos user y authFetch del contexto
+  const { user, isLoading: authLoading, authFetch } = useAuth();
 
   const [habitos, setHabitos] = useState<HabitoHoy[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({
@@ -57,10 +62,8 @@ export default function HabitosScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  // ❌ ELIMINADO: currentUserId - ahora viene de useAuth()
   const [togglingHabit, setTogglingHabit] = useState<number | null>(null);
-
-  const API_BASE_URL = "http://localhost:8000";
 
   const getCurrentDate = () => {
     const now = new Date();
@@ -70,32 +73,12 @@ export default function HabitosScreen() {
     return { day, weekday, month };
   };
 
-  const getCurrentUser = async () => {
+  // ✅ Usa authFetch (incluye token automáticamente)
+  const loadHabitosHoy = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/current-user`);
-      const data = await response.json();
-      if (data.success) {
-        setCurrentUserId(data.data.user_id);
-        return data.data.user_id;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting current user:", error);
-      return null;
-    }
-  };
+      if (!user?.user_id) return;
 
-  const loadHabitosHoy = async (userId?: number) => {
-    try {
-      const userIdToUse = userId || currentUserId;
-      if (!userIdToUse) {
-        const fetchedUserId = await getCurrentUser();
-        if (!fetchedUserId) return;
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuario/${userIdToUse || currentUserId}/habitos/hoy`
-      );
+      const response = await authFetch(`/api/usuario/${user.user_id}/habitos/hoy`);
       const data: ApiResponse = await response.json();
 
       if (data.success) {
@@ -107,18 +90,16 @@ export default function HabitosScreen() {
     }
   };
 
+  // ✅ Usa authFetch con método POST
   const toggleHabitCompletion = async (habitoUsuarioId: number) => {
-    if (!currentUserId || togglingHabit) return;
+    if (!user?.user_id || togglingHabit) return;
 
     setTogglingHabit(habitoUsuarioId);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuario/${currentUserId}/habito/${habitoUsuarioId}/toggle`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habitoUsuarioId}/toggle`,
+        { method: "POST" }
       );
 
       const result = await response.json();
@@ -159,28 +140,24 @@ export default function HabitosScreen() {
     setRefreshing(false);
   };
 
-  const initializeData = async () => {
-    setLoading(true);
-    const userId = await getCurrentUser();
-    if (userId) {
-      await loadHabitosHoy(userId);
+  // ✅ SIMPLIFICADO: Carga datos cuando el usuario está disponible
+  useEffect(() => {
+    if (user?.user_id && !authLoading) {
+      setLoading(true);
+      loadHabitosHoy().finally(() => setLoading(false));
     }
-    setLoading(false);
-  };
+  }, [user?.user_id, authLoading]);
 
+  // ✅ Recargar cuando la pantalla recibe foco
   useFocusEffect(
     useCallback(() => {
-      if (currentUserId) {
+      if (user?.user_id) {
         loadHabitosHoy();
-      } else {
-        initializeData();
       }
-    }, [currentUserId])
+    }, [user?.user_id])
   );
 
-  useEffect(() => {
-    initializeData();
-  }, []);
+  // ❌ ELIMINADO: useEffect con initializeData() - ya no necesario
 
   const { day, weekday, month } = getCurrentDate();
   const progress =

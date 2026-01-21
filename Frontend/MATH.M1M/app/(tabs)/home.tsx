@@ -14,6 +14,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 const { width } = Dimensions.get("window");
 
@@ -52,11 +54,13 @@ interface ResumenUsuario {
 
 export default function HomeScreen() {
   const router = useRouter();
+  
+  // ✅ Obtenemos user y authFetch del contexto
+  const { user, isLoading: authLoading, authFetch } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [userName, setUserName] = useState<string>("User");
+  // ❌ ELIMINADO: currentUserId y userName ya vienen del contexto
   const [habitosHoy, setHabitosHoy] = useState<HabitoHoy[]>([]);
   const [estadisticasHabitos, setEstadisticasHabitos] = useState<EstadisticasHabitos>({
     total: 0,
@@ -71,27 +75,11 @@ export default function HomeScreen() {
     nivel_actual: 1,
   });
 
-  const API_BASE_URL = "http://localhost:8000";
-
-  const getCurrentUser = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/current-user`);
-      const data = await response.json();
-      if (data.success) {
-        setCurrentUserId(data.data.user_id);
-        setUserName(data.data.nombre || "User");
-        return data.data.user_id;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting current user:", error);
-      return null;
-    }
-  };
+  // ✅ Funciones que usan authFetch (incluye token automáticamente)
 
   const loadHabitosHoy = async (userId: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/usuario/${userId}/habitos/hoy`);
+      const response = await authFetch(`/api/usuario/${userId}/habitos/hoy`);
       const data = await response.json();
       if (data.success) {
         setHabitosHoy(data.data.habitos || []);
@@ -107,7 +95,7 @@ export default function HomeScreen() {
 
   const loadMisPlanes = async (userId: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/planes/mis-planes/${userId}`);
+      const response = await authFetch(`/api/planes/mis-planes/${userId}`);
       const data = await response.json();
       if (data.success) {
         setMisPlanes(data.planes || []);
@@ -126,12 +114,16 @@ export default function HomeScreen() {
     });
   };
 
+  // ✅ SIMPLIFICADO: Ya no llamamos a getCurrentUser, usamos user del contexto
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const userId = await getCurrentUser();
-      if (!userId) return;
-      await Promise.all([loadHabitosHoy(userId), loadMisPlanes(userId), loadResumenUsuario()]);
+      if (!user?.user_id) return; // ← Usamos user del contexto
+      await Promise.all([
+        loadHabitosHoy(user.user_id),
+        loadMisPlanes(user.user_id),
+        loadResumenUsuario()
+      ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {
@@ -145,16 +137,20 @@ export default function HomeScreen() {
     loadAllData();
   };
 
+  // ✅ Cargar datos cuando el usuario esté disponible
   useEffect(() => {
-    loadAllData();
-  }, []);
+    if (user?.user_id && !authLoading) {
+      loadAllData();
+    }
+  }, [user?.user_id, authLoading]);
 
+  // ✅ Recargar cuando la pantalla recibe foco
   useFocusEffect(
     useCallback(() => {
-      if (currentUserId) {
+      if (user?.user_id) {
         loadAllData();
       }
-    }, [currentUserId])
+    }, [user?.user_id])
   );
 
   const getGreeting = () => {
@@ -253,7 +249,8 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.userName}>{userName.split(" ")[0]}</Text>
+            {/* ✅ Usamos user del contexto */}
+            <Text style={styles.userName}>{(user?.nombre || "User").split(" ")[0]}</Text>
             <Text style={styles.date}>{getCurrentDate()}</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>

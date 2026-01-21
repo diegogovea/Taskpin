@@ -12,13 +12,23 @@ import {
   Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
+import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
 export default function LoginScreen() {
   const router = useRouter();
+  
+  // ✅ Usamos el login del AuthContext
+  const { login, user, isLoading: authLoading } = useAuth();
+
+  // 🔐 Si ya hay sesión, redirigir a home
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/(tabs)/home");
+    }
+  }, [user, authLoading]);
+  
   const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +54,7 @@ export default function LoginScreen() {
     ]).start();
   }, []);
 
+  // ✅ SIMPLIFICADO: Usa login() del AuthContext
   const handleLogin = async () => {
     if (!correo.trim()) {
       Alert.alert("Error", "Por favor ingresa tu correo electrónico");
@@ -58,31 +69,16 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/login", {
-        correo: correo.trim().toLowerCase(),
-        contraseña,
-      });
+      // Usamos el login del AuthContext (guarda token + user correctamente)
+      const result = await login(correo.trim().toLowerCase(), contraseña);
 
-      const { access_token, user_id, nombre } = res.data;
-
-      await AsyncStorage.setItem("access_token", access_token);
-      await AsyncStorage.setItem("user_id", user_id.toString());
-      await AsyncStorage.setItem("nombre", nombre);
-
-      router.replace("/bienvenida");
-    } catch (err) {
-      const error = err as any;
-      let errorMessage = "Algo salió mal";
-
-      if (error.response?.status === 401) {
-        errorMessage = "Correo o contraseña incorrectos";
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (result.success) {
+        router.replace("/bienvenida");
+      } else {
+        Alert.alert("Error", result.message || "Correo o contraseña incorrectos");
       }
-
-      Alert.alert("Error", errorMessage);
+    } catch (err) {
+      Alert.alert("Error", "Algo salió mal. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +97,7 @@ export default function LoginScreen() {
         {/* Back Button */}
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace("/login")}
+          onPress={() => router.replace("/login")}
         >
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>

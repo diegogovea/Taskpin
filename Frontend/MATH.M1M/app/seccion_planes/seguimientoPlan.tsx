@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
 
 interface TareaDiaria {
   tarea_usuario_id: number;
@@ -42,7 +43,7 @@ export default function SeguimientoPlanScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [togglingTask, setTogglingTask] = useState<number | null>(null);
 
-  const API_BASE_URL = "http://localhost:8000";
+  // API_BASE_URL importada desde constants/api.ts
 
   const fetchTareasDiarias = async () => {
     try {

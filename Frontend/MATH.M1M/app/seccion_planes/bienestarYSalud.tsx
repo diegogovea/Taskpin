@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { API_BASE_URL } from "../../constants/api";
 
 interface Plan {
   plan_id: number;
@@ -30,7 +31,7 @@ export default function BienestarYSaludScreen() {
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = "http://localhost:8000";
+  // API_BASE_URL importada desde constants/api.ts
 
   const fetchPlanes = async () => {
     try {
