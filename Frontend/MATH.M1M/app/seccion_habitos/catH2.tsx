@@ -72,7 +72,7 @@ export default function CatH2Screen() {
   }, []);
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/habitos");
   };
 
   const toggleHabitSelection = (habitId: number) => {
@@ -108,7 +108,7 @@ export default function CatH2Screen() {
       const result = await response.json();
       if (result.success) {
         Alert.alert("Success!", `Added ${result.data.added_habitos.length} habit(s)`, [
-          { text: "OK", onPress: () => { setSelectedHabits([]); router.back(); } },
+          { text: "OK", onPress: () => { setSelectedHabits([]); router.replace("/(tabs)/habitos"); } },
         ]);
       } else {
         Alert.alert("Error", "Could not add habits");

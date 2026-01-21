@@ -75,7 +75,7 @@ export default function DetallePlanScreen() {
   }, [planId]);
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
   const agregarPlan = async () => {
@@ -112,7 +112,7 @@ export default function DetallePlanScreen() {
 
       if (result.success) {
         Alert.alert("Success!", "Plan added to your profile", [
-          { text: "OK", onPress: () => router.push("/(tabs)/planes") },
+          { text: "OK", onPress: () => router.replace("/(tabs)/planes") },
         ]);
       } else {
         Alert.alert("Error", result.message || "Could not add plan");

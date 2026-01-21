@@ -8,9 +8,11 @@ import {
   ScrollView
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from "expo-router";
 
 export default function SubjectsHomeScreen() {
-  
+  const router = useRouter();
+
   // Datos del plan de pérdida de peso
   const planData = {
     id: 1,
@@ -44,10 +46,13 @@ export default function SubjectsHomeScreen() {
     return <View style={styles.starsContainer}>{stars}</View>;
   };
 
-  // Función para el botón de atrás (puedes conectar con tu navegación)
+  // Función para el botón de atrás
   const handleGoBack = () => {
-    console.log('Regresar a la vista anterior');
-    // Aquí puedes agregar tu lógica de navegación
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push("/(tabs)/planes");
+    }
   };
 
   return (

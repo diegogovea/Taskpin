@@ -52,7 +52,7 @@ export default function BienestarYSaludScreen() {
   }, []);
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
   const navigateToPlanDetail = (planId: number) => {

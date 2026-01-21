@@ -77,7 +77,7 @@ export default function TiposHabitosScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.push("/(tabs)/home");
+      router.replace("/(tabs)/habitos");
     }
   };
 

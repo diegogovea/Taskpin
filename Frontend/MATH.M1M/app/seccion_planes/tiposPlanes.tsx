@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -70,7 +71,7 @@ export default function TiposPlanesScreen() {
   const router = useRouter();
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
   return (
@@ -161,17 +162,24 @@ export default function TiposPlanesScreen() {
           ))}
         </View>
 
-        {/* Custom Plan Button */}
+        {/* Custom Plan Button - Coming Soon */}
         <View style={styles.customSection}>
-          <TouchableOpacity style={styles.customButton} activeOpacity={0.9}>
+          <TouchableOpacity 
+            style={[styles.customButton, styles.customButtonDisabled]} 
+            activeOpacity={0.9}
+            onPress={() => Alert.alert("Coming Soon", "Custom plan creation will be available in a future update!")}
+          >
             <LinearGradient
-              colors={colors.gradients.primary}
+              colors={[colors.neutral[400], colors.neutral[500]]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.customButtonGradient}
             >
               <Ionicons name="create-outline" size={22} color={colors.neutral[0]} />
               <Text style={styles.customButtonText}>Create Custom Plan</Text>
+              <View style={styles.comingSoonChip}>
+                <Text style={styles.comingSoonChipText}>Soon</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -297,6 +305,21 @@ const styles = StyleSheet.create({
   },
   customButtonText: {
     fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+  },
+  customButtonDisabled: {
+    opacity: 0.9,
+  },
+  comingSoonChip: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    marginLeft: spacing[2],
+  },
+  comingSoonChipText: {
+    fontSize: typography.size.xs,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
   },

@@ -93,7 +93,7 @@ export default function CatH1Screen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.push("/(tabs)/home");
+      router.replace("/(tabs)/habitos");
     }
   };
 
@@ -143,7 +143,7 @@ export default function CatH1Screen() {
               text: "OK",
               onPress: () => {
                 setSelectedHabits([]);
-                router.back();
+                router.replace("/(tabs)/habitos");
               },
             },
           ]

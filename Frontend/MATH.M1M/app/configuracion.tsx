@@ -120,7 +120,7 @@ export default function ConfiguracionScreen() {
   };
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/home");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/home");
   };
 
   const SettingItem = ({

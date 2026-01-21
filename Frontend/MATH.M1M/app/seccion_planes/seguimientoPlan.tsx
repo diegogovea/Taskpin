@@ -115,7 +115,7 @@ export default function SeguimientoPlanScreen() {
   );
 
   const goBack = () => {
-    router.canGoBack() ? router.back() : router.push("/(tabs)/planes");
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
   if (loading) {
