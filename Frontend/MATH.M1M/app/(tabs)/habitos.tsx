@@ -143,7 +143,7 @@ export default function HabitosScreen() {
   // ✅ SIMPLIFICADO: Carga datos cuando el usuario está disponible
   useEffect(() => {
     if (user?.user_id && !authLoading) {
-      setLoading(true);
+    setLoading(true);
       loadHabitosHoy().finally(() => setLoading(false));
     }
   }, [user?.user_id, authLoading]);

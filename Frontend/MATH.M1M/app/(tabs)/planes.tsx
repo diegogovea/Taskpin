@@ -74,7 +74,7 @@ export default function PlanesScreen() {
   // ✅ ACTUALIZADO: Carga cuando el usuario está disponible
   useEffect(() => {
     if (user?.user_id && !authLoading) {
-      fetchMisPlanes();
+    fetchMisPlanes();
     }
   }, [user?.user_id, authLoading]);
 

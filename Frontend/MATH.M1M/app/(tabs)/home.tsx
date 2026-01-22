@@ -140,7 +140,7 @@ export default function HomeScreen() {
   // ✅ Cargar datos cuando el usuario esté disponible
   useEffect(() => {
     if (user?.user_id && !authLoading) {
-      loadAllData();
+    loadAllData();
     }
   }, [user?.user_id, authLoading]);
 

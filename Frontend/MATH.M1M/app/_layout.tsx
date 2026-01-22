@@ -12,11 +12,11 @@ export default function RootLayout() {
   // pueda acceder al estado de autenticación usando useAuth()
   return (
     <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false, // Oculta la barra superior en todas las pantallas
-        }}
-      />
+    <Stack
+      screenOptions={{
+        headerShown: false, // Oculta la barra superior en todas las pantallas
+      }}
+    />
     </AuthProvider>
   );
 }

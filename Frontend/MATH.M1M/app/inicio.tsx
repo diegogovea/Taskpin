@@ -73,7 +73,7 @@ export default function LoginScreen() {
       const result = await login(correo.trim().toLowerCase(), contraseña);
 
       if (result.success) {
-        router.replace("/bienvenida");
+      router.replace("/bienvenida");
       } else {
         Alert.alert("Error", result.message || "Correo o contraseña incorrectos");
       }
