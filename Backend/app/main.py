@@ -25,6 +25,20 @@ from .schema.habitSchema import (
     HabitoResponseSchema
 )
 
+# IMPORTACIONES PARA PLANES
+from .schema.planSchema import (
+    CategoriaPlanSchema,
+    PlanPredeterminadoSchema,
+    AgregarPlanUsuarioSchema,
+    PlanCompletoSchema,
+    PlanUsuarioSchema,
+    TareasDiariasResponseSchema,
+    MarcarTareaSchema,
+    PlanResponseSchema,
+    PlanUsuarioResponseSchema,
+    TareaMarcadaResponseSchema
+)
+
 # Usar configuración desde config.py
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -108,18 +122,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ============================================
-# MODELOS PYDANTIC PARA PLANES
-# ============================================
-class AgregarPlanRequest(BaseModel):
-    user_id: int
-    plan_id: int
-    dias_personalizados: Optional[int] = None
-
-class MarcarTareaRequest(BaseModel):
-    plan_usuario_id: int
-    tarea_id: int
 
 # Función auxiliar para convertir tupla de DB a diccionario
 def tuple_to_user_dict(data):
@@ -773,38 +775,37 @@ def get_plan_completo(plan_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener plan completo: {str(e)}')
 
-@app.post("/api/planes/agregar")
-def agregar_plan_usuario(data: AgregarPlanRequest):
-    """POST /api/planes/agregar - Agregar plan al usuario"""
-    print(f"DEBUG MAIN: Datos recibidos: {data}")
-    
+@app.post("/api/planes/agregar", response_model=PlanUsuarioResponseSchema)
+def agregar_plan_usuario(data: AgregarPlanUsuarioSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/agregar - Agregar plan al usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso - el usuario solo puede agregar planes a su propia cuenta
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
         planes_conn = PlanesConnection()
-        print(f"DEBUG MAIN: Conexión creada")
-        
         resultado = planes_conn.agregar_plan_usuario(data.user_id, data.plan_id, data.dias_personalizados)
-        print(f"DEBUG MAIN: Resultado recibido: {resultado}")
-        print(f"DEBUG MAIN: Tipo de resultado: {type(resultado)}")
         
-        if resultado is None:
-            print("DEBUG MAIN ERROR: Resultado es None")
-            return {'success': False, 'message': 'Error interno: resultado None'}
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al agregar plan')
+            )
         
-        if not isinstance(resultado, dict):
-            print(f"DEBUG MAIN ERROR: Resultado no es dict: {type(resultado)}")
-            return {'success': False, 'message': 'Error interno: formato inválido'}
+        return PlanUsuarioResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan agregado correctamente'),
+            plan_usuario_id=resultado.get('plan_usuario_id')
+        )
         
-        if 'success' not in resultado:
-            print("DEBUG MAIN ERROR: Sin key 'success'")
-            return {'success': False, 'message': 'Error interno: respuesta inválida'}
-        
-        return resultado
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"DEBUG MAIN ERROR: {e}")
-        import traceback
-        print(f"DEBUG MAIN TRACEBACK: {traceback.format_exc()}")
-        return {'success': False, 'message': f'Error: {str(e)}'}
+        raise HTTPException(status_code=500, detail=f'Error al agregar plan: {str(e)}')
 
 @app.get("/api/planes/mis-planes/{user_id}")
 def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):
@@ -826,37 +827,83 @@ def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener planes del usuario: {str(e)}')
 
-@app.get("/api/planes/tareas-diarias/{plan_usuario_id}")
-def get_tareas_diarias(plan_usuario_id: int):
-    """GET /api/planes/tareas-diarias/1 - Obtener tareas diarias del plan"""
+@app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
+def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/tareas-diarias/1 - Obtener tareas diarias del plan (PROTEGIDO)"""
     try:
         planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
         tareas = planes_conn.get_tareas_diarias_usuario(plan_usuario_id)
         
         if not tareas:
             raise HTTPException(status_code=404, detail='Plan de usuario no encontrado')
         
-        return {
-            'success': True,
-            'tareas_diarias': tareas
-        }
+        # Convertir a schema de respuesta
+        return TareasDiariasResponseSchema(**tareas)
         
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener tareas diarias: {str(e)}')
 
-@app.post("/api/planes/marcar-tarea")
-def marcar_tarea_completada(data: MarcarTareaRequest):
-    """POST /api/planes/marcar-tarea - Marcar tarea como completada/no completada"""
+@app.post("/api/planes/marcar-tarea", response_model=TareaMarcadaResponseSchema)
+def marcar_tarea_completada(data: MarcarTareaSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/marcar-tarea - Marcar tarea como completada/no completada (PROTEGIDO)"""
     try:
         planes_conn = PlanesConnection()
-        resultado = planes_conn.marcar_tarea_completada(data.plan_usuario_id, data.tarea_id)
         
-        return resultado
+        # Verificar que el plan_usuario_id pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == data.plan_usuario_id for p in planes_usuario)
         
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.marcar_tarea_completada(
+            data.plan_usuario_id, 
+            data.tarea_id, 
+            data.fecha
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al marcar tarea')
+            )
+        
+        # Obtener el estado actual de la tarea para la respuesta
+        tareas = planes_conn.get_tareas_diarias_usuario(data.plan_usuario_id)
+        tarea_actual = None
+        if tareas and 'tareas' in tareas:
+            tarea_actual = next(
+                (t for t in tareas['tareas'] if t['tarea_id'] == data.tarea_id), 
+                None
+            )
+        
+        return TareaMarcadaResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Tarea actualizada'),
+            tarea_id=data.tarea_id,
+            completada=tarea_actual['completada'] if tarea_actual else None
+        )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        return {'success': False, 'message': f'Error al marcar tarea: {str(e)}'}
+        raise HTTPException(status_code=500, detail=f'Error al marcar tarea: {str(e)}')
 
 # ========================================
 # ENDPOINTS DE PRUEBA
