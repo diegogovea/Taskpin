@@ -298,11 +298,19 @@ export default function HabitosScreen() {
                     onPress={() => router.push(`/seccion_habitos/detalleHabito?habito_usuario_id=${habito.habito_usuario_id}`)}
                     activeOpacity={0.7}
                   >
-                    <Text
-                      style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
-                    >
-                      {habito.nombre}
-                    </Text>
+                    <View style={styles.habitNameRow}>
+                      <Text
+                        style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
+                      >
+                        {habito.nombre}
+                      </Text>
+                      {habito.categoria_nombre === "My Custom Habits" && (
+                        <View style={styles.customBadge}>
+                          <Ionicons name="sparkles" size={10} color={colors.primary[600]} />
+                          <Text style={styles.customBadgeText}>Custom</Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={styles.habitMeta}>
                       <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
                       <View style={styles.habitPoints}>
@@ -562,14 +570,33 @@ const styles = StyleSheet.create({
   habitInfo: {
     flex: 1,
   },
+  habitNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
   habitName: {
     fontSize: typography.size.base,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[800],
-    marginBottom: spacing[2],
   },
   habitNameCompleted: {
     color: colors.secondary[700],
+  },
+  customBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primary[50],
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radius.md,
+    gap: 3,
+  },
+  customBadgeText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: colors.primary[600],
   },
   habitMeta: {
     flexDirection: "row",

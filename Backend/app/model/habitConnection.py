@@ -224,3 +224,156 @@ class habitConnection():
                         'racha_actual': racha_actual,
                     }
                 }
+
+    def create_habito_personalizado(self, user_id, nombre, descripcion=None, frecuencia_personal='diario'):
+        """Crea un hábito personalizado y lo agrega automáticamente al usuario"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    # 1. Crear el hábito en habitos_predeterminados
+                    cur.execute("""
+                        INSERT INTO habitos_predeterminados 
+                        (categoria_id, nombre, descripcion, frecuencia_recomendada, 
+                         puntos_base, es_personalizado, creado_por_user_id)
+                        VALUES (6, %s, %s, 'diario', 10, true, %s)
+                        RETURNING habito_id;
+                    """, (nombre, descripcion, user_id))
+                    habito_id = cur.fetchone()[0]
+                    
+                    # 2. Agregarlo automáticamente al usuario
+                    cur.execute("""
+                        INSERT INTO habitos_usuario (user_id, habito_id, frecuencia_personal, activo)
+                        VALUES (%s, %s, %s, true)
+                        RETURNING habito_usuario_id;
+                    """, (user_id, habito_id, frecuencia_personal))
+                    habito_usuario_id = cur.fetchone()[0]
+                    
+                    conn.commit()
+                    return {
+                        'habito_id': habito_id,
+                        'habito_usuario_id': habito_usuario_id,
+                        'nombre': nombre,
+                        'descripcion': descripcion,
+                        'puntos_base': 10,
+                        'frecuencia_personal': frecuencia_personal,
+                        'categoria_nombre': 'My Custom Habits'
+                    }
+                except Exception as e:
+                    conn.rollback()
+                    raise e
+
+    def update_habito_personalizado(self, user_id, habito_id, nombre=None, descripcion=None):
+        """Edita un hábito personalizado (solo si el usuario es el creador)"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Verificar que el hábito es personalizado Y del usuario
+                cur.execute("""
+                    SELECT habito_id FROM habitos_predeterminados
+                    WHERE habito_id = %s 
+                      AND es_personalizado = true 
+                      AND creado_por_user_id = %s;
+                """, (habito_id, user_id))
+                
+                if not cur.fetchone():
+                    return None  # No existe o no es del usuario
+                
+                # Construir UPDATE dinámico según los campos proporcionados
+                updates = []
+                values = []
+                if nombre is not None:
+                    updates.append("nombre = %s")
+                    values.append(nombre)
+                if descripcion is not None:
+                    updates.append("descripcion = %s")
+                    values.append(descripcion)
+                
+                if not updates:
+                    # Si no hay nada que actualizar, devolver datos actuales
+                    cur.execute("""
+                        SELECT habito_id, nombre, descripcion 
+                        FROM habitos_predeterminados WHERE habito_id = %s;
+                    """, (habito_id,))
+                    result = cur.fetchone()
+                    return {
+                        'habito_id': result[0],
+                        'nombre': result[1],
+                        'descripcion': result[2]
+                    }
+                
+                values.extend([habito_id, user_id])
+                cur.execute(f"""
+                    UPDATE habitos_predeterminados
+                    SET {', '.join(updates)}
+                    WHERE habito_id = %s AND creado_por_user_id = %s
+                    RETURNING habito_id, nombre, descripcion;
+                """, values)
+                
+                result = cur.fetchone()
+                conn.commit()
+                return {
+                    'habito_id': result[0],
+                    'nombre': result[1],
+                    'descripcion': result[2]
+                }
+
+    def delete_habito_personalizado(self, user_id, habito_id):
+        """Elimina completamente un hábito personalizado (solo si el usuario es el creador)"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Verificar que el hábito es personalizado Y del usuario
+                cur.execute("""
+                    SELECT habito_id FROM habitos_predeterminados
+                    WHERE habito_id = %s 
+                      AND es_personalizado = true 
+                      AND creado_por_user_id = %s;
+                """, (habito_id, user_id))
+                
+                if not cur.fetchone():
+                    return False  # No existe o no es del usuario
+                
+                # Eliminar de habitos_usuario primero (por integridad referencial)
+                cur.execute("""
+                    DELETE FROM habitos_usuario 
+                    WHERE habito_id = %s;
+                """, (habito_id,))
+                
+                # Eliminar de habitos_predeterminados
+                cur.execute("""
+                    DELETE FROM habitos_predeterminados 
+                    WHERE habito_id = %s AND creado_por_user_id = %s;
+                """, (habito_id, user_id))
+                
+                conn.commit()
+                return True
+
+    def get_user_custom_habitos(self, user_id):
+        """Obtiene todos los hábitos personalizados creados por el usuario"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        h.habito_id, h.nombre, h.descripcion, h.puntos_base,
+                        hu.habito_usuario_id, hu.frecuencia_personal, hu.fecha_agregado
+                    FROM habitos_predeterminados h
+                    LEFT JOIN habitos_usuario hu ON h.habito_id = hu.habito_id 
+                        AND hu.user_id = %s AND hu.activo = true
+                    WHERE h.es_personalizado = true 
+                      AND h.creado_por_user_id = %s
+                    ORDER BY h.habito_id DESC;
+                """, (user_id, user_id))
+                
+                results = cur.fetchall()
+                return [{
+                    'habito_id': row[0],
+                    'nombre': row[1],
+                    'descripcion': row[2],
+                    'puntos_base': row[3],
+                    'habito_usuario_id': row[4],
+                    'frecuencia_personal': row[5],
+                    'fecha_agregado': row[6],
+                    'categoria_nombre': 'My Custom Habits'
+                } for row in results]

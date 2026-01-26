@@ -23,7 +23,9 @@ from .schema.habitSchema import (
     AddMultipleHabitosSchema,
     HabitoUsuarioSchema,
     HabitoResponseSchema,
-    HabitoFrecuenciaUpdateSchema
+    HabitoFrecuenciaUpdateSchema,
+    HabitoPersonalizadoCreateSchema,
+    HabitoPersonalizadoUpdateSchema
 )
 
 # IMPORTACIONES PARA PLANES
@@ -984,6 +986,138 @@ def get_habito_usuario_detalle(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener detalle del hábito: {str(e)}")
+
+
+@app.post("/api/usuario/{user_id}/habitos/custom", status_code=HTTP_201_CREATED)
+def create_habito_personalizado(
+    user_id: int,
+    data: HabitoPersonalizadoCreateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Crear un hábito personalizado para el usuario (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        result = habit_conn.create_habito_personalizado(
+            user_id=user_id,
+            nombre=data.nombre,
+            descripcion=data.descripcion,
+            frecuencia_personal=data.frecuencia_personal
+        )
+        
+        return {
+            "success": True,
+            "message": "Hábito personalizado creado exitosamente",
+            "data": result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear hábito personalizado: {str(e)}")
+
+
+@app.put("/api/usuario/{user_id}/habitos/custom/{habito_id}", status_code=HTTP_200_OK)
+def update_habito_personalizado(
+    user_id: int,
+    habito_id: int,
+    data: HabitoPersonalizadoUpdateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Editar un hábito personalizado del usuario (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        result = habit_conn.update_habito_personalizado(
+            user_id=user_id,
+            habito_id=habito_id,
+            nombre=data.nombre,
+            descripcion=data.descripcion
+        )
+        
+        if not result:
+            raise HTTPException(
+                status_code=404, 
+                detail="Hábito no encontrado o no tienes permiso para editarlo"
+            )
+        
+        return {
+            "success": True,
+            "message": "Hábito actualizado exitosamente",
+            "data": result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar hábito: {str(e)}")
+
+
+@app.delete("/api/usuario/{user_id}/habitos/custom/{habito_id}", status_code=HTTP_200_OK)
+def delete_habito_personalizado(
+    user_id: int,
+    habito_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Eliminar completamente un hábito personalizado del usuario (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        success = habit_conn.delete_habito_personalizado(user_id, habito_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail="Hábito no encontrado o no tienes permiso para eliminarlo"
+            )
+        
+        return {
+            "success": True,
+            "message": "Hábito eliminado exitosamente"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar hábito: {str(e)}")
+
+
+@app.get("/api/usuario/{user_id}/habitos/custom", status_code=HTTP_200_OK)
+def get_user_custom_habitos(
+    user_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener todos los hábitos personalizados creados por el usuario (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        habitos = habit_conn.get_user_custom_habitos(user_id)
+        
+        # Convertir fechas a string para JSON
+        for habito in habitos:
+            if habito.get('fecha_agregado'):
+                habito['fecha_agregado'] = habito['fecha_agregado'].isoformat()
+        
+        return {
+            "success": True,
+            "data": habitos
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener hábitos personalizados: {str(e)}")
+
 
 # ============================================
 # ENDPOINTS DE ESTADÍSTICAS (Gamificación)

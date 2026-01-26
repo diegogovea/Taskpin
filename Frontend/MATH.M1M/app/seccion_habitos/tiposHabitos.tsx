@@ -68,6 +68,15 @@ const categories: CategoryItem[] = [
     gradient: [colors.accent.rose + "30", colors.accent.rose + "15"],
     iconColor: colors.accent.rose,
   },
+  {
+    id: "6",
+    title: "My Custom Habits",
+    description: "Your personalized habits",
+    icon: "sparkles",
+    route: "/seccion_habitos/catH6",
+    gradient: [colors.primary[100], colors.primary[50]],
+    iconColor: colors.primary[600],
+  },
 ];
 
 export default function TiposHabitosScreen() {
