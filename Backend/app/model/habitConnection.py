@@ -104,6 +104,18 @@ class habitConnection():
                 """, (user_id,))
                 return cur.fetchall()
 
+    def get_user_habito_ids(self, user_id):
+        """Obtiene solo los IDs de hábitos predeterminados que el usuario ya tiene (para filtrado)"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT habito_id 
+                    FROM habitos_usuario 
+                    WHERE user_id = %s AND activo = true;
+                """, (user_id,))
+                return [row[0] for row in cur.fetchall()]
+
     def remove_habito_from_user(self, user_id, habito_id):
         """Desactiva un hábito del usuario (soft delete)"""
         pool = get_pool()

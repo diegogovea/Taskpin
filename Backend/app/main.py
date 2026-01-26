@@ -559,6 +559,26 @@ def get_user_habitos(user_id: int, current_user: TokenData = Depends(verify_toke
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos del usuario: {str(e)}")
 
+@app.get("/api/usuario/{user_id}/habitos/ids", status_code=HTTP_200_OK)
+def get_user_habito_ids(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """Obtener solo los IDs de hábitos del usuario - para filtrar duplicados (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        ids = habit_conn.get_user_habito_ids(user_id)
+        
+        return {"success": True, "data": ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener IDs de hábitos: {str(e)}")
+
 @app.get("/api/usuario/{user_id}/habitos/hoy", status_code=HTTP_200_OK)
 def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify_token)):
     """Obtener hábitos del usuario con su estado de hoy (PROTEGIDO)"""
