@@ -31,9 +31,7 @@ def init_pool():
             DATABASE_URL,
             min_size=2,      # Mínimo 2 conexiones siempre disponibles
             max_size=10,     # Máximo 10 conexiones simultáneas
-            open=True,       # Crear conexiones al inicializar
-            check=ConnectionPool.check_connection,  # Verificar conexiones antes de usar
-            reset=True       # Resetear conexiones antes de devolverlas al pool
+            open=True        # Crear conexiones al inicializar
         )
         logger.info(f"Pool de conexiones inicializado: min={2}, max={10}")
     except Exception as e:

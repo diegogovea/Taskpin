@@ -22,12 +22,15 @@ export default function LoginScreen() {
   // ✅ Usamos el login del AuthContext
   const { login, user, isLoading: authLoading } = useAuth();
 
-  // 🔐 Si ya hay sesión, redirigir a home
+  // Flag para distinguir entre "sesión restaurada" vs "login recién hecho"
+  const [isNewLogin, setIsNewLogin] = useState(false);
+
+  // 🔐 Si ya hay sesión (restaurada, no login nuevo), redirigir a home
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !isNewLogin) {
       router.replace("/(tabs)/home");
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, isNewLogin]);
   
   const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
@@ -67,17 +70,20 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+    setIsNewLogin(true); // Marcar que es un login nuevo (no sesión restaurada)
 
     try {
       // Usamos el login del AuthContext (guarda token + user correctamente)
       const result = await login(correo.trim().toLowerCase(), contraseña);
 
       if (result.success) {
-      router.replace("/bienvenida");
+        router.replace("/bienvenida");
       } else {
+        setIsNewLogin(false); // Reset si falló el login
         Alert.alert("Error", result.message || "Correo o contraseña incorrectos");
       }
     } catch (err) {
+      setIsNewLogin(false); // Reset si hubo error
       Alert.alert("Error", "Algo salió mal. Intenta de nuevo.");
     } finally {
       setLoading(false);

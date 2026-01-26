@@ -39,6 +39,14 @@ from .schema.planSchema import (
     TareaMarcadaResponseSchema
 )
 
+# IMPORTACIONES PARA ESTADÍSTICAS
+from .model.estadisticasConnection import EstadisticasConnection
+from .schema.estadisticasSchema import (
+    EstadisticasUsuarioSchema,
+    EstadisticasResumenSchema,
+    EstadisticasResponseSchema
+)
+
 # Usar configuración desde config.py
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -46,6 +54,7 @@ ALGORITHM = JWT_ALGORITHM
 app = FastAPI()
 conn = userConnection()
 habit_conn = habitConnection()
+stats_conn = EstadisticasConnection()
 
 # ============================================
 # AUTENTICACIÓN JWT
@@ -528,10 +537,10 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        from ..database import get_pool
+        from .database import get_pool
         pool = get_pool()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
                 cur.execute("""
                     SELECT 
                         hu.habito_usuario_id,
@@ -558,42 +567,42 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                 """, (user_id,))
                 
                 habits_data = cur.fetchall()
-            
-            habits = []
-            for data in habits_data:
-                habit_dict = {
-                    "habito_usuario_id": data[0],
-                    "user_id": data[1],
-                    "habito_id": data[2],
-                    "nombre": data[3],
-                    "descripcion": data[4],
-                    "puntos_base": data[5],
-                    "categoria_nombre": data[6],
-                    "frecuencia_personal": data[7],
-                    "fecha_agregado": data[8],
-                    "completado_hoy": data[9],
-                    "hora_completado": data[10],
-                    "notas": data[11]
-                }
-                habits.append(habit_dict)
-            
-            # Calcular estadísticas
-            total_habitos = len(habits)
-            completados = len([h for h in habits if h["completado_hoy"]])
-            pendientes = total_habitos - completados
-            
-            return {
-                "success": True,
-                "data": {
-                    "habitos": habits,
-                    "estadisticas": {
-                        "total": total_habitos,
-                        "completados": completados,
-                        "pendientes": pendientes,
-                        "fecha": "today"
-                    }
+        
+        habits = []
+        for data in habits_data:
+            habit_dict = {
+                "habito_usuario_id": data[0],
+                "user_id": data[1],
+                "habito_id": data[2],
+                "nombre": data[3],
+                "descripcion": data[4],
+                "puntos_base": data[5],
+                "categoria_nombre": data[6],
+                "frecuencia_personal": data[7],
+                "fecha_agregado": data[8],
+                "completado_hoy": data[9],
+                "hora_completado": data[10],
+                "notas": data[11]
+            }
+            habits.append(habit_dict)
+        
+        # Calcular estadísticas
+        total_habitos = len(habits)
+        completados = len([h for h in habits if h["completado_hoy"]])
+        pendientes = total_habitos - completados
+        
+        return {
+            "success": True,
+            "data": {
+                "habitos": habits,
+                "estadisticas": {
+                    "total": total_habitos,
+                    "completados": completados,
+                    "pendientes": pendientes,
+                    "fecha": "today"
                 }
             }
+        }
             
     except HTTPException:
         raise
@@ -612,10 +621,10 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        from ..database import get_pool
+        from .database import get_pool
         pool = get_pool()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
                 # Verificar que el hábito pertenece al usuario
                 cur.execute("""
                     SELECT habito_usuario_id FROM habitos_usuario 
@@ -653,17 +662,17 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
                     """, (habito_usuario_id,))
                     new_status = True
                 
-                conn.commit()
-            
-            return {
-                "success": True,
-                "message": "Hábito actualizado correctamente",
-                "data": {
-                    "habito_usuario_id": habito_usuario_id,
-                    "completado": new_status,
-                    "fecha": "today"
-                }
+                db_conn.commit()
+        
+        return {
+            "success": True,
+            "message": "Hábito actualizado correctamente",
+            "data": {
+                "habito_usuario_id": habito_usuario_id,
+                "completado": new_status,
+                "fecha": "today"
             }
+        }
             
     except HTTPException:
         raise
@@ -678,10 +687,10 @@ def get_user_habits_stats(user_id: int):
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        from ..database import get_pool
+        from .database import get_pool
         pool = get_pool()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
                 # Estadísticas de hoy
                 cur.execute("""
                     SELECT 
@@ -697,16 +706,16 @@ def get_user_habits_stats(user_id: int):
                 """, (user_id,))
                 
                 stats_today = cur.fetchone()
-            
-            return {
-                "success": True,
-                "data": {
-                    "fecha": "today",
-                    "total_habitos": stats_today[0] if stats_today[0] else 0,
-                    "completados": stats_today[1] if stats_today[1] else 0,
-                    "pendientes": stats_today[2] if stats_today[2] else 0
-                }
+        
+        return {
+            "success": True,
+            "data": {
+                "fecha": "today",
+                "total_habitos": stats_today[0] if stats_today[0] else 0,
+                "completados": stats_today[1] if stats_today[1] else 0,
+                "pendientes": stats_today[2] if stats_today[2] else 0
             }
+        }
             
     except HTTPException:
         raise
@@ -731,6 +740,91 @@ def remove_habito_from_user(user_id: int, habito_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al remover hábito: {str(e)}")
+
+# ============================================
+# ENDPOINTS DE ESTADÍSTICAS (Gamificación)
+# ============================================
+
+def calcular_progreso_nivel(puntos_totales: int, nivel_actual: int) -> int:
+    """
+    Calcula el porcentaje de progreso hacia el siguiente nivel.
+    
+    Escala de puntos:
+    - Nivel 1→2: 50 puntos
+    - Nivel 2→3: 100 puntos (total: 150)
+    - Nivel 3→4: 200 puntos (total: 350)
+    - etc. (duplica cada nivel)
+    """
+    def puntos_para_nivel(nivel: int) -> int:
+        """Puntos necesarios para pasar del nivel n al n+1"""
+        if nivel <= 1:
+            return 50
+        return 50 * (2 ** (nivel - 1))
+    
+    # Calcular puntos acumulados hasta el nivel actual
+    puntos_nivel_actual = sum(puntos_para_nivel(n) for n in range(1, nivel_actual))
+    
+    # Puntos necesarios para el siguiente nivel
+    puntos_siguiente = puntos_para_nivel(nivel_actual)
+    
+    # Puntos dentro del nivel actual
+    puntos_en_nivel = puntos_totales - puntos_nivel_actual
+    
+    # Calcular porcentaje
+    if puntos_siguiente <= 0:
+        return 100
+    
+    progreso = int((puntos_en_nivel / puntos_siguiente) * 100)
+    return max(0, min(100, progreso))  # Entre 0 y 100
+
+
+@app.get("/api/usuario/{user_id}/estadisticas", status_code=HTTP_200_OK)
+def get_estadisticas_usuario(user_id: int):
+    """
+    Obtener estadísticas de gamificación del usuario.
+    
+    Retorna: puntos_totales, racha_actual, racha_maxima, nivel, 
+             ultima_actividad, progreso_siguiente_nivel
+    """
+    try:
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Obtener estadísticas
+        data = stats_conn.get_estadisticas_usuario(user_id)
+        
+        if not data:
+            raise HTTPException(status_code=404, detail="Estadísticas no encontradas para este usuario")
+        
+        # Extraer datos: (estadistica_id, user_id, puntos_totales, racha_actual, 
+        #                 racha_maxima, nivel, ultima_actividad, fecha_creacion)
+        puntos_totales = data[2]
+        racha_actual = data[3]
+        racha_maxima = data[4]
+        nivel = data[5]
+        ultima_actividad = data[6]
+        
+        # Calcular progreso al siguiente nivel
+        progreso_siguiente = calcular_progreso_nivel(puntos_totales, nivel)
+        
+        return {
+            "success": True,
+            "data": {
+                "puntos_totales": puntos_totales,
+                "racha_actual": racha_actual,
+                "racha_maxima": racha_maxima,
+                "nivel": nivel,
+                "ultima_actividad": ultima_actividad.isoformat() if ultima_actividad else None,
+                "progreso_siguiente_nivel": progreso_siguiente
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
 
 # ============================================
 # ENDPOINTS DE PLANES
