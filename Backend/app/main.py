@@ -5,7 +5,7 @@ from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 from pydantic import BaseModel
 from .model.userConnection import userConnection
@@ -25,6 +25,28 @@ from .schema.habitSchema import (
     HabitoResponseSchema
 )
 
+# IMPORTACIONES PARA PLANES
+from .schema.planSchema import (
+    CategoriaPlanSchema,
+    PlanPredeterminadoSchema,
+    AgregarPlanUsuarioSchema,
+    PlanCompletoSchema,
+    PlanUsuarioSchema,
+    TareasDiariasResponseSchema,
+    MarcarTareaSchema,
+    PlanResponseSchema,
+    PlanUsuarioResponseSchema,
+    TareaMarcadaResponseSchema
+)
+
+# IMPORTACIONES PARA ESTADÍSTICAS
+from .model.estadisticasConnection import EstadisticasConnection
+from .schema.estadisticasSchema import (
+    EstadisticasUsuarioSchema,
+    EstadisticasResumenSchema,
+    EstadisticasResponseSchema
+)
+
 # Usar configuración desde config.py
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -32,6 +54,41 @@ ALGORITHM = JWT_ALGORITHM
 app = FastAPI()
 conn = userConnection()
 habit_conn = habitConnection()
+stats_conn = EstadisticasConnection()
+
+# ============================================
+# SISTEMA DE NIVELES - Función helper
+# ============================================
+
+def calcular_nivel(puntos_totales: int) -> dict:
+    """
+    Calcula el nivel del usuario basado en sus puntos totales.
+    Fórmula: puntos_para_nivel(n) = 50 + (n * 50)
+    - Nivel 2: 100 puntos
+    - Nivel 3: 150 puntos adicionales (250 total)
+    - Nivel 4: 200 puntos adicionales (450 total)
+    - etc.
+    """
+    nivel = 1
+    puntos_acumulados = 0
+    
+    while True:
+        puntos_siguiente = 50 + (nivel * 50)  # 100, 150, 200, 250...
+        if puntos_totales < puntos_acumulados + puntos_siguiente:
+            break
+        puntos_acumulados += puntos_siguiente
+        nivel += 1
+    
+    puntos_en_nivel_actual = puntos_totales - puntos_acumulados
+    puntos_para_siguiente = 50 + (nivel * 50)
+    progreso = int((puntos_en_nivel_actual / puntos_para_siguiente) * 100) if puntos_para_siguiente > 0 else 0
+    
+    return {
+        "nivel": nivel,
+        "puntos_en_nivel": puntos_en_nivel_actual,
+        "puntos_para_siguiente": puntos_para_siguiente,
+        "progreso_porcentaje": progreso
+    }
 
 # ============================================
 # AUTENTICACIÓN JWT
@@ -108,18 +165,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ============================================
-# MODELOS PYDANTIC PARA PLANES
-# ============================================
-class AgregarPlanRequest(BaseModel):
-    user_id: int
-    plan_id: int
-    dias_personalizados: Optional[int] = None
-
-class MarcarTareaRequest(BaseModel):
-    plan_usuario_id: int
-    tarea_id: int
 
 # Función auxiliar para convertir tupla de DB a diccionario
 def tuple_to_user_dict(data):
@@ -514,6 +559,26 @@ def get_user_habitos(user_id: int, current_user: TokenData = Depends(verify_toke
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos del usuario: {str(e)}")
 
+@app.get("/api/usuario/{user_id}/habitos/ids", status_code=HTTP_200_OK)
+def get_user_habito_ids(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """Obtener solo los IDs de hábitos del usuario - para filtrar duplicados (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        ids = habit_conn.get_user_habito_ids(user_id)
+        
+        return {"success": True, "data": ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener IDs de hábitos: {str(e)}")
+
 @app.get("/api/usuario/{user_id}/habitos/hoy", status_code=HTTP_200_OK)
 def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify_token)):
     """Obtener hábitos del usuario con su estado de hoy (PROTEGIDO)"""
@@ -526,69 +591,72 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            cur.execute("""
-                SELECT 
-                    hu.habito_usuario_id,
-                    hu.user_id,
-                    hu.habito_id,
-                    h.nombre,
-                    h.descripcion,
-                    h.puntos_base,
-                    c.nombre as categoria_nombre,
-                    hu.frecuencia_personal,
-                    hu.fecha_agregado,
-                    COALESCE(sh.completado, false) as completado_hoy,
-                    sh.hora_completado,
-                    sh.notas
-                FROM habitos_usuario hu
-                INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
-                INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
-                LEFT JOIN seguimiento_habitos sh ON (
-                    sh.habito_usuario_id = hu.habito_usuario_id 
-                    AND sh.fecha = CURRENT_DATE
-                )
-                WHERE hu.user_id = %s AND hu.activo = true
-                ORDER BY h.categoria_id, h.nombre;
-            """, (user_id,))
-            
-            habits_data = cur.fetchall()
-            
-            habits = []
-            for data in habits_data:
-                habit_dict = {
-                    "habito_usuario_id": data[0],
-                    "user_id": data[1],
-                    "habito_id": data[2],
-                    "nombre": data[3],
-                    "descripcion": data[4],
-                    "puntos_base": data[5],
-                    "categoria_nombre": data[6],
-                    "frecuencia_personal": data[7],
-                    "fecha_agregado": data[8],
-                    "completado_hoy": data[9],
-                    "hora_completado": data[10],
-                    "notas": data[11]
-                }
-                habits.append(habit_dict)
-            
-            # Calcular estadísticas
-            total_habitos = len(habits)
-            completados = len([h for h in habits if h["completado_hoy"]])
-            pendientes = total_habitos - completados
-            
-            return {
-                "success": True,
-                "data": {
-                    "habitos": habits,
-                    "estadisticas": {
-                        "total": total_habitos,
-                        "completados": completados,
-                        "pendientes": pendientes,
-                        "fecha": "today"
-                    }
+        from .database import get_pool
+        pool = get_pool()
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        hu.habito_usuario_id,
+                        hu.user_id,
+                        hu.habito_id,
+                        h.nombre,
+                        h.descripcion,
+                        h.puntos_base,
+                        c.nombre as categoria_nombre,
+                        hu.frecuencia_personal,
+                        hu.fecha_agregado,
+                        COALESCE(sh.completado, false) as completado_hoy,
+                        sh.hora_completado,
+                        sh.notas
+                    FROM habitos_usuario hu
+                    INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
+                    LEFT JOIN seguimiento_habitos sh ON (
+                        sh.habito_usuario_id = hu.habito_usuario_id 
+                        AND sh.fecha = CURRENT_DATE
+                    )
+                    WHERE hu.user_id = %s AND hu.activo = true
+                    ORDER BY h.categoria_id, h.nombre;
+                """, (user_id,))
+                
+                habits_data = cur.fetchall()
+        
+        habits = []
+        for data in habits_data:
+            habit_dict = {
+                "habito_usuario_id": data[0],
+                "user_id": data[1],
+                "habito_id": data[2],
+                "nombre": data[3],
+                "descripcion": data[4],
+                "puntos_base": data[5],
+                "categoria_nombre": data[6],
+                "frecuencia_personal": data[7],
+                "fecha_agregado": data[8],
+                "completado_hoy": data[9],
+                "hora_completado": data[10],
+                "notas": data[11]
+            }
+            habits.append(habit_dict)
+        
+        # Calcular estadísticas
+        total_habitos = len(habits)
+        completados = len([h for h in habits if h["completado_hoy"]])
+        pendientes = total_habitos - completados
+        
+        return {
+            "success": True,
+            "data": {
+                "habitos": habits,
+                "estadisticas": {
+                    "total": total_habitos,
+                    "completados": completados,
+                    "pendientes": pendientes,
+                    "fecha": "today"
                 }
             }
+        }
             
     except HTTPException:
         raise
@@ -607,55 +675,183 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            # Verificar que el hábito pertenece al usuario
-            cur.execute("""
-                SELECT habito_usuario_id FROM habitos_usuario 
-                WHERE habito_usuario_id = %s AND user_id = %s AND activo = true;
-            """, (habito_usuario_id, user_id))
-            
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
-            
-            # Verificar si ya existe un registro para hoy
-            cur.execute("""
-                SELECT seguimiento_id, completado FROM seguimiento_habitos
-                WHERE habito_usuario_id = %s AND fecha = CURRENT_DATE;
-            """, (habito_usuario_id,))
-            
-            existing_record = cur.fetchone()
-            
-            if existing_record:
-                # Ya existe, alternar el estado
-                new_status = not existing_record[1]
-                hora_completado = "CURRENT_TIME" if new_status else "NULL"
-                
-                cur.execute(f"""
-                    UPDATE seguimiento_habitos 
-                    SET completado = %s, 
-                        hora_completado = {hora_completado}
-                    WHERE seguimiento_id = %s;
-                """, (new_status, existing_record[0]))
-                
-            else:
-                # No existe, crear nuevo registro como completado
+        from .database import get_pool
+        pool = get_pool()
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
+                # Verificar que el hábito pertenece al usuario y obtener puntos_base
                 cur.execute("""
-                    INSERT INTO seguimiento_habitos (habito_usuario_id, fecha, completado, hora_completado)
-                    VALUES (%s, CURRENT_DATE, true, CURRENT_TIME);
+                    SELECT hu.habito_usuario_id, COALESCE(hp.puntos_base, 10) as puntos_base
+                    FROM habitos_usuario hu
+                    LEFT JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                    WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
+                """, (habito_usuario_id, user_id))
+                
+                habito_data = cur.fetchone()
+                if not habito_data:
+                    raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
+                
+                puntos_habito = habito_data[1]  # puntos_base del hábito
+                
+                # Verificar si ya existe un registro para hoy
+                cur.execute("""
+                    SELECT seguimiento_id, completado FROM seguimiento_habitos
+                    WHERE habito_usuario_id = %s AND fecha = CURRENT_DATE;
                 """, (habito_usuario_id,))
-                new_status = True
-            
-            habit_conn.conn.commit()
-            
-            return {
-                "success": True,
-                "message": "Hábito actualizado correctamente",
-                "data": {
-                    "habito_usuario_id": habito_usuario_id,
-                    "completado": new_status,
-                    "fecha": "today"
-                }
-            }
+                
+                existing_record = cur.fetchone()
+                
+                if existing_record:
+                    # Ya existe, alternar el estado
+                    new_status = not existing_record[1]
+                    hora_completado = "CURRENT_TIME" if new_status else "NULL"
+                    
+                    cur.execute(f"""
+                        UPDATE seguimiento_habitos 
+                        SET completado = %s, 
+                            hora_completado = {hora_completado}
+                        WHERE seguimiento_id = %s;
+                    """, (new_status, existing_record[0]))
+                    
+                else:
+                    # No existe, crear nuevo registro como completado
+                    cur.execute("""
+                        INSERT INTO seguimiento_habitos (habito_usuario_id, fecha, completado, hora_completado)
+                        VALUES (%s, CURRENT_DATE, true, CURRENT_TIME);
+                    """, (habito_usuario_id,))
+                    new_status = True
+                
+                # ========================================
+                # LÓGICA DE RACHA - Solo si se COMPLETA
+                # ========================================
+                racha_info = None
+                if new_status:
+                    # Obtener estadísticas actuales del usuario
+                    cur.execute("""
+                        SELECT racha_actual, racha_maxima, ultima_actividad 
+                        FROM estadisticas_usuario 
+                        WHERE user_id = %s;
+                    """, (user_id,))
+                    stats = cur.fetchone()
+                    
+                    if stats:
+                        racha_actual, racha_maxima, ultima_actividad = stats
+                        hoy = date.today()
+                        ayer = hoy - timedelta(days=1)
+                        
+                        # Calcular nueva racha
+                        if ultima_actividad == hoy:
+                            # Ya completó algo hoy, no cambiar racha
+                            nueva_racha = racha_actual
+                        elif ultima_actividad == ayer:
+                            # Día consecutivo, incrementar
+                            nueva_racha = racha_actual + 1
+                        else:
+                            # Racha rota o primera vez, empezar en 1
+                            nueva_racha = 1
+                        
+                        # Actualizar racha máxima si es necesario
+                        nueva_racha_maxima = max(racha_maxima, nueva_racha)
+                        
+                        # Guardar cambios en estadísticas
+                        cur.execute("""
+                            UPDATE estadisticas_usuario 
+                            SET racha_actual = %s,
+                                racha_maxima = %s,
+                                ultima_actividad = CURRENT_DATE
+                            WHERE user_id = %s;
+                        """, (nueva_racha, nueva_racha_maxima, user_id))
+                        
+                        racha_info = {
+                            "racha_actual": nueva_racha,
+                            "racha_maxima": nueva_racha_maxima,
+                            "racha_incrementada": nueva_racha > racha_actual
+                        }
+                
+                # ========================================
+                # LÓGICA DE PUNTOS - Sumar o restar
+                # ========================================
+                puntos_info = None
+                nivel_info = None
+                
+                # Calcular cambio de puntos
+                if new_status:
+                    puntos_cambio = puntos_habito  # Sumar al completar
+                else:
+                    puntos_cambio = -puntos_habito  # Restar al desmarcar
+                
+                # Obtener nivel actual antes del cambio
+                cur.execute("""
+                    SELECT nivel FROM estadisticas_usuario WHERE user_id = %s;
+                """, (user_id,))
+                nivel_anterior = cur.fetchone()
+                nivel_anterior = nivel_anterior[0] if nivel_anterior else 1
+                
+                # Actualizar puntos en estadisticas_usuario
+                cur.execute("""
+                    UPDATE estadisticas_usuario 
+                    SET puntos_totales = GREATEST(0, puntos_totales + %s)
+                    WHERE user_id = %s
+                    RETURNING puntos_totales;
+                """, (puntos_cambio, user_id))
+                
+                resultado_puntos = cur.fetchone()
+                if resultado_puntos:
+                    puntos_totales_nuevos = resultado_puntos[0]
+                    puntos_info = {
+                        "puntos_cambio": puntos_cambio,
+                        "puntos_totales": puntos_totales_nuevos
+                    }
+                    
+                    # ========================================
+                    # LÓGICA DE NIVEL - Calcular y actualizar
+                    # ========================================
+                    nivel_calculado = calcular_nivel(puntos_totales_nuevos)
+                    nuevo_nivel = nivel_calculado["nivel"]
+                    
+                    # Actualizar nivel en BD si cambió
+                    if nuevo_nivel != nivel_anterior:
+                        cur.execute("""
+                            UPDATE estadisticas_usuario 
+                            SET nivel = %s
+                            WHERE user_id = %s;
+                        """, (nuevo_nivel, user_id))
+                    
+                    nivel_info = {
+                        "nivel": nuevo_nivel,
+                        "puntos_en_nivel": nivel_calculado["puntos_en_nivel"],
+                        "puntos_para_siguiente": nivel_calculado["puntos_para_siguiente"],
+                        "progreso_porcentaje": nivel_calculado["progreso_porcentaje"],
+                        "subio_nivel": nuevo_nivel > nivel_anterior,
+                        "bajo_nivel": nuevo_nivel < nivel_anterior
+                    }
+                
+                db_conn.commit()
+        
+        # Construir respuesta
+        response_data = {
+            "habito_usuario_id": habito_usuario_id,
+            "completado": new_status,
+            "fecha": "today"
+        }
+        
+        # Agregar info de racha si se actualizó
+        if racha_info:
+            response_data["racha"] = racha_info
+        
+        # Agregar info de puntos
+        if puntos_info:
+            response_data["puntos"] = puntos_info
+        
+        # Agregar info de nivel
+        if nivel_info:
+            response_data["nivel"] = nivel_info
+        
+        return {
+            "success": True,
+            "message": "Hábito actualizado correctamente",
+            "data": response_data
+        }
             
     except HTTPException:
         raise
@@ -670,32 +866,35 @@ def get_user_habits_stats(user_id: int):
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            # Estadísticas de hoy
-            cur.execute("""
-                SELECT 
-                    COUNT(*) as total_habitos,
-                    COUNT(CASE WHEN sh.completado = true THEN 1 END) as completados_hoy,
-                    COUNT(CASE WHEN sh.completado = false OR sh.completado IS NULL THEN 1 END) as pendientes_hoy
-                FROM habitos_usuario hu
-                LEFT JOIN seguimiento_habitos sh ON (
-                    sh.habito_usuario_id = hu.habito_usuario_id 
-                    AND sh.fecha = CURRENT_DATE
-                )
-                WHERE hu.user_id = %s AND hu.activo = true;
-            """, (user_id,))
-            
-            stats_today = cur.fetchone()
-            
-            return {
-                "success": True,
-                "data": {
-                    "fecha": "today",
-                    "total_habitos": stats_today[0] if stats_today[0] else 0,
-                    "completados": stats_today[1] if stats_today[1] else 0,
-                    "pendientes": stats_today[2] if stats_today[2] else 0
-                }
+        from .database import get_pool
+        pool = get_pool()
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
+                # Estadísticas de hoy
+                cur.execute("""
+                    SELECT 
+                        COUNT(*) as total_habitos,
+                        COUNT(CASE WHEN sh.completado = true THEN 1 END) as completados_hoy,
+                        COUNT(CASE WHEN sh.completado = false OR sh.completado IS NULL THEN 1 END) as pendientes_hoy
+                    FROM habitos_usuario hu
+                    LEFT JOIN seguimiento_habitos sh ON (
+                        sh.habito_usuario_id = hu.habito_usuario_id 
+                        AND sh.fecha = CURRENT_DATE
+                    )
+                    WHERE hu.user_id = %s AND hu.activo = true;
+                """, (user_id,))
+                
+                stats_today = cur.fetchone()
+        
+        return {
+            "success": True,
+            "data": {
+                "fecha": "today",
+                "total_habitos": stats_today[0] if stats_today[0] else 0,
+                "completados": stats_today[1] if stats_today[1] else 0,
+                "pendientes": stats_today[2] if stats_today[2] else 0
             }
+        }
             
     except HTTPException:
         raise
@@ -720,6 +919,91 @@ def remove_habito_from_user(user_id: int, habito_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al remover hábito: {str(e)}")
+
+# ============================================
+# ENDPOINTS DE ESTADÍSTICAS (Gamificación)
+# ============================================
+
+def calcular_progreso_nivel(puntos_totales: int, nivel_actual: int) -> int:
+    """
+    Calcula el porcentaje de progreso hacia el siguiente nivel.
+    
+    Escala de puntos:
+    - Nivel 1→2: 50 puntos
+    - Nivel 2→3: 100 puntos (total: 150)
+    - Nivel 3→4: 200 puntos (total: 350)
+    - etc. (duplica cada nivel)
+    """
+    def puntos_para_nivel(nivel: int) -> int:
+        """Puntos necesarios para pasar del nivel n al n+1"""
+        if nivel <= 1:
+            return 50
+        return 50 * (2 ** (nivel - 1))
+    
+    # Calcular puntos acumulados hasta el nivel actual
+    puntos_nivel_actual = sum(puntos_para_nivel(n) for n in range(1, nivel_actual))
+    
+    # Puntos necesarios para el siguiente nivel
+    puntos_siguiente = puntos_para_nivel(nivel_actual)
+    
+    # Puntos dentro del nivel actual
+    puntos_en_nivel = puntos_totales - puntos_nivel_actual
+    
+    # Calcular porcentaje
+    if puntos_siguiente <= 0:
+        return 100
+    
+    progreso = int((puntos_en_nivel / puntos_siguiente) * 100)
+    return max(0, min(100, progreso))  # Entre 0 y 100
+
+
+@app.get("/api/usuario/{user_id}/estadisticas", status_code=HTTP_200_OK)
+def get_estadisticas_usuario(user_id: int):
+    """
+    Obtener estadísticas de gamificación del usuario.
+    
+    Retorna: puntos_totales, racha_actual, racha_maxima, nivel, 
+             ultima_actividad, progreso_siguiente_nivel
+    """
+    try:
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Obtener estadísticas
+        data = stats_conn.get_estadisticas_usuario(user_id)
+        
+        if not data:
+            raise HTTPException(status_code=404, detail="Estadísticas no encontradas para este usuario")
+        
+        # Extraer datos: (estadistica_id, user_id, puntos_totales, racha_actual, 
+        #                 racha_maxima, nivel, ultima_actividad, fecha_creacion)
+        puntos_totales = data[2]
+        racha_actual = data[3]
+        racha_maxima = data[4]
+        nivel = data[5]
+        ultima_actividad = data[6]
+        
+        # Calcular progreso al siguiente nivel
+        progreso_siguiente = calcular_progreso_nivel(puntos_totales, nivel)
+        
+        return {
+            "success": True,
+            "data": {
+                "puntos_totales": puntos_totales,
+                "racha_actual": racha_actual,
+                "racha_maxima": racha_maxima,
+                "nivel": nivel,
+                "ultima_actividad": ultima_actividad.isoformat() if ultima_actividad else None,
+                "progreso_siguiente_nivel": progreso_siguiente
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
 
 # ============================================
 # ENDPOINTS DE PLANES
@@ -773,38 +1057,37 @@ def get_plan_completo(plan_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener plan completo: {str(e)}')
 
-@app.post("/api/planes/agregar")
-def agregar_plan_usuario(data: AgregarPlanRequest):
-    """POST /api/planes/agregar - Agregar plan al usuario"""
-    print(f"DEBUG MAIN: Datos recibidos: {data}")
-    
+@app.post("/api/planes/agregar", response_model=PlanUsuarioResponseSchema)
+def agregar_plan_usuario(data: AgregarPlanUsuarioSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/agregar - Agregar plan al usuario (PROTEGIDO)"""
     try:
+        # Verificar acceso - el usuario solo puede agregar planes a su propia cuenta
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
         planes_conn = PlanesConnection()
-        print(f"DEBUG MAIN: Conexión creada")
-        
         resultado = planes_conn.agregar_plan_usuario(data.user_id, data.plan_id, data.dias_personalizados)
-        print(f"DEBUG MAIN: Resultado recibido: {resultado}")
-        print(f"DEBUG MAIN: Tipo de resultado: {type(resultado)}")
         
-        if resultado is None:
-            print("DEBUG MAIN ERROR: Resultado es None")
-            return {'success': False, 'message': 'Error interno: resultado None'}
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al agregar plan')
+            )
         
-        if not isinstance(resultado, dict):
-            print(f"DEBUG MAIN ERROR: Resultado no es dict: {type(resultado)}")
-            return {'success': False, 'message': 'Error interno: formato inválido'}
+        return PlanUsuarioResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan agregado correctamente'),
+            plan_usuario_id=resultado.get('plan_usuario_id')
+        )
         
-        if 'success' not in resultado:
-            print("DEBUG MAIN ERROR: Sin key 'success'")
-            return {'success': False, 'message': 'Error interno: respuesta inválida'}
-        
-        return resultado
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"DEBUG MAIN ERROR: {e}")
-        import traceback
-        print(f"DEBUG MAIN TRACEBACK: {traceback.format_exc()}")
-        return {'success': False, 'message': f'Error: {str(e)}'}
+        raise HTTPException(status_code=500, detail=f'Error al agregar plan: {str(e)}')
 
 @app.get("/api/planes/mis-planes/{user_id}")
 def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):
@@ -826,37 +1109,83 @@ def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener planes del usuario: {str(e)}')
 
-@app.get("/api/planes/tareas-diarias/{plan_usuario_id}")
-def get_tareas_diarias(plan_usuario_id: int):
-    """GET /api/planes/tareas-diarias/1 - Obtener tareas diarias del plan"""
+@app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
+def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/tareas-diarias/1 - Obtener tareas diarias del plan (PROTEGIDO)"""
     try:
         planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
         tareas = planes_conn.get_tareas_diarias_usuario(plan_usuario_id)
         
         if not tareas:
             raise HTTPException(status_code=404, detail='Plan de usuario no encontrado')
         
-        return {
-            'success': True,
-            'tareas_diarias': tareas
-        }
+        # Convertir a schema de respuesta
+        return TareasDiariasResponseSchema(**tareas)
         
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener tareas diarias: {str(e)}')
 
-@app.post("/api/planes/marcar-tarea")
-def marcar_tarea_completada(data: MarcarTareaRequest):
-    """POST /api/planes/marcar-tarea - Marcar tarea como completada/no completada"""
+@app.post("/api/planes/marcar-tarea", response_model=TareaMarcadaResponseSchema)
+def marcar_tarea_completada(data: MarcarTareaSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/marcar-tarea - Marcar tarea como completada/no completada (PROTEGIDO)"""
     try:
         planes_conn = PlanesConnection()
-        resultado = planes_conn.marcar_tarea_completada(data.plan_usuario_id, data.tarea_id)
         
-        return resultado
+        # Verificar que el plan_usuario_id pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == data.plan_usuario_id for p in planes_usuario)
         
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.marcar_tarea_completada(
+            data.plan_usuario_id, 
+            data.tarea_id, 
+            data.fecha
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al marcar tarea')
+            )
+        
+        # Obtener el estado actual de la tarea para la respuesta
+        tareas = planes_conn.get_tareas_diarias_usuario(data.plan_usuario_id)
+        tarea_actual = None
+        if tareas and 'tareas' in tareas:
+            tarea_actual = next(
+                (t for t in tareas['tareas'] if t['tarea_id'] == data.tarea_id), 
+                None
+            )
+        
+        return TareaMarcadaResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Tarea actualizada'),
+            tarea_id=data.tarea_id,
+            completada=tarea_actual['completada'] if tarea_actual else None
+        )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        return {'success': False, 'message': f'Error al marcar tarea: {str(e)}'}
+        raise HTTPException(status_code=500, detail=f'Error al marcar tarea: {str(e)}')
 
 # ========================================
 # ENDPOINTS DE PRUEBA

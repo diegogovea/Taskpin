@@ -1,19 +1,18 @@
-import psycopg  # Importa el módulo psycopg para conectarse a PostgreSQL
 from passlib.context import CryptContext  # Para hashear contraseñas
-from ..config import DATABASE_URL  # Importar configuración centralizada
+from ..database import get_pool  # Importar pool de conexiones
 
 # Configuración para hashear contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class userConnection():
-    conn = None
-
+    """
+    Clase para manejar operaciones de usuarios.
+    Usa el pool de conexiones compartido.
+    """
+    
     def __init__(self):
-        try:
-            # Usa la configuración centralizada desde config.py
-            self.conn = psycopg.connect(DATABASE_URL)
-        except psycopg.OperationalError as err:
-            print(f"Error de conexión a la base de datos: {err}")
+        # Ya no creamos conexión aquí, usamos el pool
+        pass
 
     def hash_password(self, password):
         """Hashea una contraseña"""
@@ -25,98 +24,110 @@ class userConnection():
 
     def read_all(self):
         """Lee todos los usuarios"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
-                FROM usuarios
-                ORDER BY fecha_registro DESC;
-            """)
-            return cur.fetchall()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
+                    FROM usuarios
+                    ORDER BY fecha_registro DESC;
+                """)
+                return cur.fetchall()
 
     def read_one(self, user_id):
         """Lee un usuario por su ID"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
-                FROM usuarios 
-                WHERE user_id = %s;
-            """, (user_id,))
-            return cur.fetchone()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
+                    FROM usuarios 
+                    WHERE user_id = %s;
+                """, (user_id,))
+                return cur.fetchone()
 
     def read_by_email(self, correo):
         """Lee un usuario por correo electrónico"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
-                FROM usuarios 
-                WHERE correo = %s;
-            """, (correo,))
-            return cur.fetchone()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT user_id, nombre, correo, contraseña, fecha_registro, activo 
+                    FROM usuarios 
+                    WHERE correo = %s;
+                """, (correo,))
+                return cur.fetchone()
 
     def write(self, data):
         """Inserta un nuevo usuario"""
-        with self.conn.cursor() as cur:
-            # Hashear la contraseña antes de guardarla
-            hashed_password = self.hash_password(data['contraseña'])
-            
-            cur.execute("""
-                INSERT INTO usuarios (nombre, correo, contraseña, activo) 
-                VALUES (%(nombre)s, %(correo)s, %(contraseña)s, %(activo)s)
-                RETURNING user_id;
-            """, {
-                'nombre': data['nombre'],
-                'correo': data['correo'],
-                'contraseña': hashed_password,
-                'activo': data.get('activo', True)
-            })
-            
-            # Obtener el ID del usuario recién creado
-            user_id = cur.fetchone()[0]
-            self.conn.commit()
-            return user_id
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Hashear la contraseña antes de guardarla
+                hashed_password = self.hash_password(data['contraseña'])
+                
+                cur.execute("""
+                    INSERT INTO usuarios (nombre, correo, contraseña, activo) 
+                    VALUES (%(nombre)s, %(correo)s, %(contraseña)s, %(activo)s)
+                    RETURNING user_id;
+                """, {
+                    'nombre': data['nombre'],
+                    'correo': data['correo'],
+                    'contraseña': hashed_password,
+                    'activo': data.get('activo', True)
+                })
+                
+                # Obtener el ID del usuario recién creado
+                user_id = cur.fetchone()[0]
+                conn.commit()
+                return user_id
 
     def update(self, user_id, data):
         """Actualiza un usuario existente"""
-        with self.conn.cursor() as cur:
-            # Construir la consulta dinámicamente basada en los campos proporcionados
-            set_clauses = []
-            params = {'user_id': user_id}
-            
-            if 'nombre' in data and data['nombre']:
-                set_clauses.append("nombre = %(nombre)s")
-                params['nombre'] = data['nombre']
-            
-            if 'correo' in data and data['correo']:
-                set_clauses.append("correo = %(correo)s")
-                params['correo'] = data['correo']
-            
-            if 'contraseña' in data and data['contraseña']:
-                set_clauses.append("contraseña = %(contraseña)s")
-                params['contraseña'] = self.hash_password(data['contraseña'])
-            
-            if 'activo' in data:
-                set_clauses.append("activo = %(activo)s")
-                params['activo'] = data['activo']
-            
-            if not set_clauses:
-                return  # No hay nada que actualizar
-            
-            query = f"""
-                UPDATE usuarios 
-                SET {', '.join(set_clauses)}
-                WHERE user_id = %(user_id)s;
-            """
-            
-            cur.execute(query, params)
-            self.conn.commit()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Construir la consulta dinámicamente basada en los campos proporcionados
+                set_clauses = []
+                params = {'user_id': user_id}
+                
+                if 'nombre' in data and data['nombre']:
+                    set_clauses.append("nombre = %(nombre)s")
+                    params['nombre'] = data['nombre']
+                
+                if 'correo' in data and data['correo']:
+                    set_clauses.append("correo = %(correo)s")
+                    params['correo'] = data['correo']
+                
+                if 'contraseña' in data and data['contraseña']:
+                    set_clauses.append("contraseña = %(contraseña)s")
+                    params['contraseña'] = self.hash_password(data['contraseña'])
+                
+                if 'activo' in data:
+                    set_clauses.append("activo = %(activo)s")
+                    params['activo'] = data['activo']
+                
+                if not set_clauses:
+                    return  # No hay nada que actualizar
+                
+                query = f"""
+                    UPDATE usuarios 
+                    SET {', '.join(set_clauses)}
+                    WHERE user_id = %(user_id)s;
+                """
+                
+                cur.execute(query, params)
+                conn.commit()
 
     def delete(self, user_id):
         """Elimina un usuario por ID"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                DELETE FROM usuarios WHERE user_id = %s;
-            """, (user_id,))
-            self.conn.commit()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM usuarios WHERE user_id = %s;
+                """, (user_id,))
+                conn.commit()
 
     def authenticate_user(self, correo, contraseña):
         """Autentica un usuario verificando correo y contraseña"""
@@ -131,35 +142,41 @@ class userConnection():
 
     def create_session(self, user_id):
         """Crea una nueva sesión en la tabla control"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO control (user_id) 
-                VALUES (%s)
-                RETURNING id_control;
-            """, (user_id,))
-            
-            control_id = cur.fetchone()[0]
-            self.conn.commit()
-            return control_id
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO control (user_id) 
+                    VALUES (%s)
+                    RETURNING id_control;
+                """, (user_id,))
+                
+                control_id = cur.fetchone()[0]
+                conn.commit()
+                return control_id
 
     def get_active_session(self, user_id):
         """Obtiene la sesión activa más reciente del usuario"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                SELECT id_control, user_id, creacion, last_access 
-                FROM control 
-                WHERE user_id = %s 
-                ORDER BY last_access DESC 
-                LIMIT 1;
-            """, (user_id,))
-            return cur.fetchone()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id_control, user_id, creacion, last_access 
+                    FROM control 
+                    WHERE user_id = %s 
+                    ORDER BY last_access DESC 
+                    LIMIT 1;
+                """, (user_id,))
+                return cur.fetchone()
 
     def update_last_access(self, user_id):
         """Actualiza el último acceso del usuario"""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                UPDATE control 
-                SET last_access = CURRENT_TIMESTAMP 
-                WHERE user_id = %s;
-            """, (user_id,))
-            self.conn.commit()
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE control 
+                    SET last_access = CURRENT_TIMESTAMP 
+                    WHERE user_id = %s;
+                """, (user_id,))
+                conn.commit()

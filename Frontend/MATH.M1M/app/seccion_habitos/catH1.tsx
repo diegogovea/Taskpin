@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +14,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { ConfirmModal } from "../../components/modals";
+import { Toast } from "../../components/ui";
 
 interface Habito {
   habito_id: number;
@@ -41,6 +42,15 @@ export default function CatH1Screen() {
   const [selectedHabits, setSelectedHabits] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [alreadyAddedIds, setAlreadyAddedIds] = useState<number[]>([]);
+  
+  // Modal & Toast states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [toast, setToast] = useState({
+    visible: false,
+    message: '',
+    type: 'success' as 'success' | 'error',
+  });
 
   const CATEGORY_ID = 1;
   const CATEGORY_NAME = "Daily Wellness";
@@ -58,13 +68,37 @@ export default function CatH1Screen() {
       }
     } catch (error) {
       console.error("Error fetching habitos:", error);
-      Alert.alert("Error", "Could not load habits");
+      setToast({
+        visible: true,
+        message: 'Could not load habits',
+        type: 'error',
+      });
+    }
+  };
+
+  const fetchUserHabitoIds = async () => {
+    if (!user?.user_id) return;
+    try {
+      const response = await authFetch(`/api/usuario/${user.user_id}/habitos/ids`);
+      const data = await response.json();
+      if (data.success) {
+        setAlreadyAddedIds(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching user habit ids:", error);
     }
   };
 
   useEffect(() => {
-    fetchHabitos().finally(() => setLoading(false));
-  }, []);
+    const loadData = async () => {
+      await Promise.all([
+        fetchHabitos(),
+        fetchUserHabitoIds(),
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [user?.user_id]);
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -82,21 +116,29 @@ export default function CatH1Screen() {
     );
   };
 
-  const agregarHabitos = async () => {
+  // Handle "Add Habits" button press - shows confirmation modal
+  const handleAddPress = () => {
     if (selectedHabits.length === 0) {
-      Alert.alert("Notice", "Please select at least one habit");
+      setToast({
+        visible: true,
+        message: 'Please select at least one habit',
+        type: 'error',
+      });
       return;
     }
+    setShowConfirmModal(true);
+  };
 
+  // Actually add the habits after confirmation
+  const agregarHabitos = async () => {
     if (!user?.user_id) {
-      Alert.alert("Error", "Could not identify user");
+      setToast({ visible: true, message: 'User not found', type: 'error' });
       return;
     }
 
     try {
       setAdding(true);
 
-      // ✅ Usa authFetch con token
       const response = await authFetch(
         `/api/usuario/${user.user_id}/habitos/multiple`,
         {
@@ -112,25 +154,37 @@ export default function CatH1Screen() {
       const result = await response.json();
 
       if (result.success) {
-        Alert.alert(
-          "Success!",
-          `Added ${result.data.added_habitos.length} habit(s) successfully`,
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                setSelectedHabits([]);
-                router.replace("/(tabs)/habitos");
-              },
-            },
-          ]
-        );
+        const count = result.data.added_habitos.length;
+        setShowConfirmModal(false);
+        setSelectedHabits([]);
+        
+        // Show success toast
+        setToast({
+          visible: true,
+          message: `${count} habit${count > 1 ? 's' : ''} added successfully!`,
+          type: 'success',
+        });
+        
+        // Navigate after toast is visible
+        setTimeout(() => {
+          router.replace("/(tabs)/habitos");
+        }, 1500);
       } else {
-        Alert.alert("Error", "Could not add habits");
+        setShowConfirmModal(false);
+        setToast({
+          visible: true,
+          message: 'Could not add habits. Try again.',
+          type: 'error',
+        });
       }
     } catch (error) {
       console.error("Error adding habitos:", error);
-      Alert.alert("Error", "Connection error while adding habits");
+      setShowConfirmModal(false);
+      setToast({
+        visible: true,
+        message: 'Connection error. Please try again.',
+        type: 'error',
+      });
     } finally {
       setAdding(false);
     }
@@ -179,16 +233,35 @@ export default function CatH1Screen() {
         <View style={styles.habitsContainer}>
           {habitos.map((habito) => {
             const isSelected = selectedHabits.includes(habito.habito_id);
+            const isAlreadyAdded = alreadyAddedIds.includes(habito.habito_id);
+            
             return (
               <TouchableOpacity
                 key={habito.habito_id}
-                style={[styles.habitCard, isSelected && styles.habitCardSelected]}
-                activeOpacity={0.8}
-                onPress={() => toggleHabitSelection(habito.habito_id)}
+                style={[
+                  styles.habitCard, 
+                  isSelected && styles.habitCardSelected,
+                  isAlreadyAdded && styles.habitCardDisabled,
+                ]}
+                activeOpacity={isAlreadyAdded ? 1 : 0.8}
+                onPress={() => !isAlreadyAdded && toggleHabitSelection(habito.habito_id)}
+                disabled={isAlreadyAdded}
               >
                 <View style={styles.habitContent}>
                   <View style={styles.habitInfo}>
-                    <Text style={[styles.habitName, isSelected && styles.habitNameSelected]}>
+                    {/* Already added badge */}
+                    {isAlreadyAdded && (
+                      <View style={styles.alreadyAddedBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color={colors.secondary[500]} />
+                        <Text style={styles.alreadyAddedText}>Already added</Text>
+                      </View>
+                    )}
+                    
+                    <Text style={[
+                      styles.habitName, 
+                      isSelected && styles.habitNameSelected,
+                      isAlreadyAdded && styles.habitNameDisabled,
+                    ]}>
                       {habito.nombre}
                     </Text>
                     {habito.descripcion && (
@@ -196,37 +269,47 @@ export default function CatH1Screen() {
                         style={[
                           styles.habitDescription,
                           isSelected && styles.habitDescriptionSelected,
+                          isAlreadyAdded && styles.habitDescriptionDisabled,
                         ]}
                       >
                         {habito.descripcion}
                       </Text>
                     )}
                     <View style={styles.habitMeta}>
-                      <View style={[styles.metaBadge, isSelected && styles.metaBadgeSelected]}>
+                      <View style={[
+                        styles.metaBadge, 
+                        isSelected && styles.metaBadgeSelected,
+                        isAlreadyAdded && styles.metaBadgeDisabled,
+                      ]}>
                         <Ionicons
                           name="diamond-outline"
                           size={12}
-                          color={isSelected ? colors.neutral[0] : colors.primary[600]}
+                          color={isAlreadyAdded ? colors.neutral[400] : (isSelected ? colors.neutral[0] : colors.primary[600])}
                         />
                         <Text
                           style={[
                             styles.metaBadgeText,
                             isSelected && styles.metaBadgeTextSelected,
+                            isAlreadyAdded && styles.metaBadgeTextDisabled,
                           ]}
                         >
                           {habito.puntos_base} pts
                         </Text>
                       </View>
-                      <View style={[styles.metaBadge, isSelected && styles.metaBadgeSelected]}>
+                      <View style={[
+                        styles.metaBadge, 
+                        isSelected && styles.metaBadgeSelected,
+                        isAlreadyAdded && styles.metaBadgeDisabled,
+                      ]}>
                         <Ionicons
                           name="refresh-outline"
                           size={12}
-                          color={isSelected ? colors.neutral[0] : colors.neutral[500]}
+                          color={isAlreadyAdded ? colors.neutral[400] : (isSelected ? colors.neutral[0] : colors.neutral[500])}
                         />
                         <Text
                           style={[
                             styles.metaBadgeText,
-                            { color: isSelected ? colors.neutral[0] : colors.neutral[500] },
+                            { color: isAlreadyAdded ? colors.neutral[400] : (isSelected ? colors.neutral[0] : colors.neutral[500]) },
                           ]}
                         >
                           {habito.frecuencia_recomendada}
@@ -235,9 +318,16 @@ export default function CatH1Screen() {
                     </View>
                   </View>
 
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.neutral[0]} />}
-                  </View>
+                  {/* Checkbox or already added icon */}
+                  {isAlreadyAdded ? (
+                    <View style={styles.alreadyAddedIcon}>
+                      <Ionicons name="checkmark-done" size={20} color={colors.secondary[500]} />
+                    </View>
+                  ) : (
+                    <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                      {isSelected && <Ionicons name="checkmark" size={18} color={colors.neutral[0]} />}
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -250,7 +340,7 @@ export default function CatH1Screen() {
         <View style={styles.floatingButtonContainer}>
           <TouchableOpacity
             style={styles.floatingButton}
-            onPress={agregarHabitos}
+            onPress={handleAddPress}
             disabled={adding}
             activeOpacity={0.9}
           >
@@ -274,6 +364,29 @@ export default function CatH1Screen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={showConfirmModal}
+        title="Add Habits?"
+        message={`You're about to add ${selectedHabits.length} habit${selectedHabits.length > 1 ? 's' : ''} to your daily routine.`}
+        icon="add-circle-outline"
+        iconColor={colors.secondary[500]}
+        confirmText="Add"
+        cancelText="Cancel"
+        confirmGradient={colors.gradients.secondary as readonly [string, string, ...string[]]}
+        isLoading={adding}
+        onConfirm={agregarHabitos}
+        onCancel={() => setShowConfirmModal(false)}
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </SafeAreaView>
   );
 }
@@ -364,6 +477,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary[500],
     borderColor: colors.secondary[500],
   },
+  habitCardDisabled: {
+    opacity: 0.6,
+    backgroundColor: colors.neutral[100],
+    borderColor: colors.neutral[200],
+  },
   habitContent: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -381,6 +499,9 @@ const styles = StyleSheet.create({
   habitNameSelected: {
     color: colors.neutral[0],
   },
+  habitNameDisabled: {
+    color: colors.neutral[400],
+  },
   habitDescription: {
     fontSize: typography.size.sm,
     color: colors.neutral[500],
@@ -389,6 +510,28 @@ const styles = StyleSheet.create({
   },
   habitDescriptionSelected: {
     color: "rgba(255,255,255,0.85)",
+  },
+  habitDescriptionDisabled: {
+    color: colors.neutral[400],
+  },
+  alreadyAddedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: spacing[1],
+  },
+  alreadyAddedText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: colors.secondary[500],
+  },
+  alreadyAddedIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.secondary[50],
+    justifyContent: "center",
+    alignItems: "center",
   },
   habitMeta: {
     flexDirection: "row",
@@ -406,6 +549,9 @@ const styles = StyleSheet.create({
   metaBadgeSelected: {
     backgroundColor: "rgba(255,255,255,0.2)",
   },
+  metaBadgeDisabled: {
+    backgroundColor: colors.neutral[200],
+  },
   metaBadgeText: {
     fontSize: typography.size.xs,
     fontWeight: typography.weight.medium,
@@ -413,6 +559,9 @@ const styles = StyleSheet.create({
   },
   metaBadgeTextSelected: {
     color: colors.neutral[0],
+  },
+  metaBadgeTextDisabled: {
+    color: colors.neutral[400],
   },
   checkbox: {
     width: 28,
