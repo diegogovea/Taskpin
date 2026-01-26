@@ -270,28 +270,34 @@ export default function HabitosScreen() {
           <View style={styles.habitsSection}>
             <Text style={styles.sectionTitle}>Today's Habits</Text>
             {habitos.map((habito) => (
-              <TouchableOpacity
+              <View
                 key={habito.habito_usuario_id}
                 style={[styles.habitCard, habito.completado_hoy && styles.habitCardCompleted]}
-                activeOpacity={0.8}
-                onPress={() => toggleHabitCompletion(habito.habito_usuario_id)}
-                disabled={togglingHabit === habito.habito_usuario_id}
               >
                 <View style={styles.habitContent}>
-                  <View
+                  {/* Checkbox - toggles completion */}
+                  <TouchableOpacity
                     style={[
                       styles.checkbox,
                       habito.completado_hoy && styles.checkboxCompleted,
                     ]}
+                    onPress={() => toggleHabitCompletion(habito.habito_usuario_id)}
+                    disabled={togglingHabit === habito.habito_usuario_id}
+                    activeOpacity={0.7}
                   >
                     {togglingHabit === habito.habito_usuario_id ? (
-                      <ActivityIndicator size="small" color={colors.neutral[0]} />
+                      <ActivityIndicator size="small" color={habito.completado_hoy ? colors.neutral[0] : colors.neutral[400]} />
                     ) : habito.completado_hoy ? (
                       <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
 
-                  <View style={styles.habitInfo}>
+                  {/* Habit Info - navigates to detail */}
+                  <TouchableOpacity 
+                    style={styles.habitInfo}
+                    onPress={() => router.push(`/seccion_habitos/detalleHabito?habito_usuario_id=${habito.habito_usuario_id}`)}
+                    activeOpacity={0.7}
+                  >
                     <Text
                       style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
                     >
@@ -309,9 +315,12 @@ export default function HabitosScreen() {
                         Completed at {habito.hora_completado.slice(0, 5)}
                       </Text>
                     )}
-                  </View>
+                  </TouchableOpacity>
+
+                  {/* Arrow indicator */}
+                  <Ionicons name="chevron-forward" size={20} color={colors.neutral[300]} />
                 </View>
-              </TouchableOpacity>
+              </View>
             ))}
 
             {/* Add More Button */}

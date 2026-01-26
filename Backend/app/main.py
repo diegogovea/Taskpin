@@ -22,7 +22,8 @@ from .schema.habitSchema import (
     AddHabitoToUserSchema, 
     AddMultipleHabitosSchema,
     HabitoUsuarioSchema,
-    HabitoResponseSchema
+    HabitoResponseSchema,
+    HabitoFrecuenciaUpdateSchema
 )
 
 # IMPORTACIONES PARA PLANES
@@ -919,6 +920,70 @@ def remove_habito_from_user(user_id: int, habito_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al remover hábito: {str(e)}")
+
+@app.put("/api/usuario/{user_id}/habito/{habito_usuario_id}/frecuencia", status_code=HTTP_200_OK)
+def update_habito_frecuencia(
+    user_id: int, 
+    habito_usuario_id: int, 
+    data: HabitoFrecuenciaUpdateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Actualizar la frecuencia personal de un hábito del usuario (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        result = habit_conn.update_habito_frecuencia(habito_usuario_id, data.frecuencia_personal)
+        if not result:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado o inactivo")
+        
+        return {
+            "success": True, 
+            "message": "Frecuencia actualizada correctamente",
+            "data": {
+                "habito_usuario_id": result[0],
+                "frecuencia_personal": result[1]
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar frecuencia: {str(e)}")
+
+@app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/detalle", status_code=HTTP_200_OK)
+def get_habito_usuario_detalle(
+    user_id: int, 
+    habito_usuario_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener detalle completo de un hábito del usuario incluyendo estadísticas (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        detalle = habit_conn.get_habito_usuario_detalle(habito_usuario_id, user_id)
+        if not detalle:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        # Convertir fecha a string para JSON
+        if detalle.get('fecha_agregado'):
+            detalle['fecha_agregado'] = detalle['fecha_agregado'].isoformat()
+        
+        return {"success": True, "data": detalle}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener detalle del hábito: {str(e)}")
 
 # ============================================
 # ENDPOINTS DE ESTADÍSTICAS (Gamificación)

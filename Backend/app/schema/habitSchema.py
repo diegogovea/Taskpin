@@ -56,3 +56,13 @@ class HabitoResponseSchema(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+class HabitoFrecuenciaUpdateSchema(BaseModel):
+    frecuencia_personal: str
+
+    @validator('frecuencia_personal')
+    def validate_frecuencia(cls, v):
+        allowed = ['diario', 'semanal', 'mensual', 'personalizado']
+        if v not in allowed:
+            raise ValueError(f'La frecuencia debe ser: {", ".join(allowed)}')
+        return v

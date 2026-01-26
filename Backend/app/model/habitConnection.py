@@ -128,3 +128,99 @@ class habitConnection():
                 """, (user_id, habito_id))
                 conn.commit()
                 return cur.rowcount > 0
+
+    def update_habito_frecuencia(self, habito_usuario_id, frecuencia_personal):
+        """Actualiza la frecuencia personal de un hábito del usuario"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE habitos_usuario 
+                    SET frecuencia_personal = %s 
+                    WHERE habito_usuario_id = %s AND activo = true
+                    RETURNING habito_usuario_id, frecuencia_personal;
+                """, (frecuencia_personal, habito_usuario_id))
+                result = cur.fetchone()
+                conn.commit()
+                return result
+
+    def get_habito_usuario_detalle(self, habito_usuario_id, user_id):
+        """Obtiene el detalle completo de un hábito del usuario incluyendo estadísticas"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Info básica del hábito
+                cur.execute("""
+                    SELECT 
+                        hu.habito_usuario_id,
+                        hu.user_id,
+                        hu.habito_id,
+                        hu.fecha_agregado,
+                        hu.activo,
+                        hu.frecuencia_personal,
+                        h.nombre,
+                        h.descripcion,
+                        h.puntos_base,
+                        h.frecuencia_recomendada,
+                        c.nombre as categoria_nombre,
+                        c.icono as categoria_icono,
+                        c.categoria_id
+                    FROM habitos_usuario hu
+                    INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
+                    WHERE hu.habito_usuario_id = %s 
+                      AND hu.user_id = %s 
+                      AND hu.activo = true;
+                """, (habito_usuario_id, user_id))
+                habito_info = cur.fetchone()
+                
+                if not habito_info:
+                    return None
+                
+                # Estadísticas: días completados total
+                cur.execute("""
+                    SELECT COUNT(*) 
+                    FROM seguimiento_habitos 
+                    WHERE habito_usuario_id = %s AND completado = true;
+                """, (habito_usuario_id,))
+                dias_completados = cur.fetchone()[0]
+                
+                # Estadísticas: racha actual
+                cur.execute("""
+                    SELECT fecha FROM seguimiento_habitos 
+                    WHERE habito_usuario_id = %s AND completado = true
+                    ORDER BY fecha DESC;
+                """, (habito_usuario_id,))
+                fechas = [row[0] for row in cur.fetchall()]
+                
+                racha_actual = 0
+                if fechas:
+                    from datetime import date, timedelta
+                    hoy = date.today()
+                    fecha_esperada = hoy
+                    for fecha in fechas:
+                        if fecha == fecha_esperada or fecha == fecha_esperada - timedelta(days=1):
+                            racha_actual += 1
+                            fecha_esperada = fecha - timedelta(days=1)
+                        else:
+                            break
+                
+                return {
+                    'habito_usuario_id': habito_info[0],
+                    'user_id': habito_info[1],
+                    'habito_id': habito_info[2],
+                    'fecha_agregado': habito_info[3],
+                    'activo': habito_info[4],
+                    'frecuencia_personal': habito_info[5],
+                    'nombre': habito_info[6],
+                    'descripcion': habito_info[7],
+                    'puntos_base': habito_info[8],
+                    'frecuencia_recomendada': habito_info[9],
+                    'categoria_nombre': habito_info[10],
+                    'categoria_icono': habito_info[11],
+                    'categoria_id': habito_info[12],
+                    'estadisticas': {
+                        'dias_completados': dias_completados,
+                        'racha_actual': racha_actual,
+                    }
+                }
