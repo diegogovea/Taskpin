@@ -528,33 +528,36 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            cur.execute("""
-                SELECT 
-                    hu.habito_usuario_id,
-                    hu.user_id,
-                    hu.habito_id,
-                    h.nombre,
-                    h.descripcion,
-                    h.puntos_base,
-                    c.nombre as categoria_nombre,
-                    hu.frecuencia_personal,
-                    hu.fecha_agregado,
-                    COALESCE(sh.completado, false) as completado_hoy,
-                    sh.hora_completado,
-                    sh.notas
-                FROM habitos_usuario hu
-                INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
-                INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
-                LEFT JOIN seguimiento_habitos sh ON (
-                    sh.habito_usuario_id = hu.habito_usuario_id 
-                    AND sh.fecha = CURRENT_DATE
-                )
-                WHERE hu.user_id = %s AND hu.activo = true
-                ORDER BY h.categoria_id, h.nombre;
-            """, (user_id,))
-            
-            habits_data = cur.fetchall()
+        from ..database import get_pool
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        hu.habito_usuario_id,
+                        hu.user_id,
+                        hu.habito_id,
+                        h.nombre,
+                        h.descripcion,
+                        h.puntos_base,
+                        c.nombre as categoria_nombre,
+                        hu.frecuencia_personal,
+                        hu.fecha_agregado,
+                        COALESCE(sh.completado, false) as completado_hoy,
+                        sh.hora_completado,
+                        sh.notas
+                    FROM habitos_usuario hu
+                    INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
+                    LEFT JOIN seguimiento_habitos sh ON (
+                        sh.habito_usuario_id = hu.habito_usuario_id 
+                        AND sh.fecha = CURRENT_DATE
+                    )
+                    WHERE hu.user_id = %s AND hu.activo = true
+                    ORDER BY h.categoria_id, h.nombre;
+                """, (user_id,))
+                
+                habits_data = cur.fetchall()
             
             habits = []
             for data in habits_data:
@@ -609,45 +612,48 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            # Verificar que el hábito pertenece al usuario
-            cur.execute("""
-                SELECT habito_usuario_id FROM habitos_usuario 
-                WHERE habito_usuario_id = %s AND user_id = %s AND activo = true;
-            """, (habito_usuario_id, user_id))
-            
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
-            
-            # Verificar si ya existe un registro para hoy
-            cur.execute("""
-                SELECT seguimiento_id, completado FROM seguimiento_habitos
-                WHERE habito_usuario_id = %s AND fecha = CURRENT_DATE;
-            """, (habito_usuario_id,))
-            
-            existing_record = cur.fetchone()
-            
-            if existing_record:
-                # Ya existe, alternar el estado
-                new_status = not existing_record[1]
-                hora_completado = "CURRENT_TIME" if new_status else "NULL"
-                
-                cur.execute(f"""
-                    UPDATE seguimiento_habitos 
-                    SET completado = %s, 
-                        hora_completado = {hora_completado}
-                    WHERE seguimiento_id = %s;
-                """, (new_status, existing_record[0]))
-                
-            else:
-                # No existe, crear nuevo registro como completado
+        from ..database import get_pool
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Verificar que el hábito pertenece al usuario
                 cur.execute("""
-                    INSERT INTO seguimiento_habitos (habito_usuario_id, fecha, completado, hora_completado)
-                    VALUES (%s, CURRENT_DATE, true, CURRENT_TIME);
+                    SELECT habito_usuario_id FROM habitos_usuario 
+                    WHERE habito_usuario_id = %s AND user_id = %s AND activo = true;
+                """, (habito_usuario_id, user_id))
+                
+                if not cur.fetchone():
+                    raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
+                
+                # Verificar si ya existe un registro para hoy
+                cur.execute("""
+                    SELECT seguimiento_id, completado FROM seguimiento_habitos
+                    WHERE habito_usuario_id = %s AND fecha = CURRENT_DATE;
                 """, (habito_usuario_id,))
-                new_status = True
-            
-            habit_conn.conn.commit()
+                
+                existing_record = cur.fetchone()
+                
+                if existing_record:
+                    # Ya existe, alternar el estado
+                    new_status = not existing_record[1]
+                    hora_completado = "CURRENT_TIME" if new_status else "NULL"
+                    
+                    cur.execute(f"""
+                        UPDATE seguimiento_habitos 
+                        SET completado = %s, 
+                            hora_completado = {hora_completado}
+                        WHERE seguimiento_id = %s;
+                    """, (new_status, existing_record[0]))
+                    
+                else:
+                    # No existe, crear nuevo registro como completado
+                    cur.execute("""
+                        INSERT INTO seguimiento_habitos (habito_usuario_id, fecha, completado, hora_completado)
+                        VALUES (%s, CURRENT_DATE, true, CURRENT_TIME);
+                    """, (habito_usuario_id,))
+                    new_status = True
+                
+                conn.commit()
             
             return {
                 "success": True,
@@ -672,22 +678,25 @@ def get_user_habits_stats(user_id: int):
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        with habit_conn.conn.cursor() as cur:
-            # Estadísticas de hoy
-            cur.execute("""
-                SELECT 
-                    COUNT(*) as total_habitos,
-                    COUNT(CASE WHEN sh.completado = true THEN 1 END) as completados_hoy,
-                    COUNT(CASE WHEN sh.completado = false OR sh.completado IS NULL THEN 1 END) as pendientes_hoy
-                FROM habitos_usuario hu
-                LEFT JOIN seguimiento_habitos sh ON (
-                    sh.habito_usuario_id = hu.habito_usuario_id 
-                    AND sh.fecha = CURRENT_DATE
-                )
-                WHERE hu.user_id = %s AND hu.activo = true;
-            """, (user_id,))
-            
-            stats_today = cur.fetchone()
+        from ..database import get_pool
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Estadísticas de hoy
+                cur.execute("""
+                    SELECT 
+                        COUNT(*) as total_habitos,
+                        COUNT(CASE WHEN sh.completado = true THEN 1 END) as completados_hoy,
+                        COUNT(CASE WHEN sh.completado = false OR sh.completado IS NULL THEN 1 END) as pendientes_hoy
+                    FROM habitos_usuario hu
+                    LEFT JOIN seguimiento_habitos sh ON (
+                        sh.habito_usuario_id = hu.habito_usuario_id 
+                        AND sh.fecha = CURRENT_DATE
+                    )
+                    WHERE hu.user_id = %s AND hu.activo = true;
+                """, (user_id,))
+                
+                stats_today = cur.fetchone()
             
             return {
                 "success": True,
