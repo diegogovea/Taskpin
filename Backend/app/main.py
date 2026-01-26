@@ -1119,6 +1119,56 @@ def get_user_custom_habitos(
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos personalizados: {str(e)}")
 
 
+@app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/historial", status_code=HTTP_200_OK)
+def get_habito_historial(
+    user_id: int,
+    habito_usuario_id: int,
+    dias: int = 30,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener historial de completado de un hábito - últimos N días (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Limitar días entre 1 y 90
+        dias = max(1, min(dias, 90))
+        
+        historial = habit_conn.get_habito_historial(habito_usuario_id, user_id, dias)
+        
+        if not historial:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return {"success": True, "data": historial}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener historial: {str(e)}")
+
+
+@app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/rachas", status_code=HTTP_200_OK)
+def get_habito_rachas(
+    user_id: int,
+    habito_usuario_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener estadísticas de rachas de un hábito (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        rachas = habit_conn.get_habito_rachas(habito_usuario_id, user_id)
+        
+        if not rachas:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return {"success": True, "data": rachas}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener rachas: {str(e)}")
+
+
 # ============================================
 # ENDPOINTS DE ESTADÍSTICAS (Gamificación)
 # ============================================

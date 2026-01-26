@@ -377,3 +377,171 @@ class habitConnection():
                     'fecha_agregado': row[6],
                     'categoria_nombre': 'My Custom Habits'
                 } for row in results]
+
+    def get_habito_historial(self, habito_usuario_id, user_id, dias=30):
+        """Obtiene el historial de completado de un hábito (últimos N días)"""
+        from datetime import date, timedelta
+        
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Verificar que el hábito pertenece al usuario
+                cur.execute("""
+                    SELECT hu.habito_usuario_id, h.nombre
+                    FROM habitos_usuario hu
+                    JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
+                """, (habito_usuario_id, user_id))
+                
+                habito_info = cur.fetchone()
+                if not habito_info:
+                    return None
+                
+                # Generar lista de los últimos N días
+                hoy = date.today()
+                fechas = [hoy - timedelta(days=i) for i in range(dias)]
+                
+                # Obtener registros de seguimiento existentes
+                cur.execute("""
+                    SELECT fecha, completado, hora_completado
+                    FROM seguimiento_habitos
+                    WHERE habito_usuario_id = %s 
+                      AND fecha >= %s
+                    ORDER BY fecha DESC;
+                """, (habito_usuario_id, hoy - timedelta(days=dias)))
+                
+                registros = {row[0]: {'completado': row[1], 'hora': row[2]} 
+                            for row in cur.fetchall()}
+                
+                # Construir historial completo (incluye días sin registro como no completados)
+                historial = []
+                dias_completados = 0
+                for fecha in fechas:
+                    registro = registros.get(fecha, {'completado': False, 'hora': None})
+                    historial.append({
+                        'fecha': fecha.isoformat(),
+                        'completado': registro['completado'],
+                        'hora_completado': str(registro['hora'])[:5] if registro['hora'] else None
+                    })
+                    if registro['completado']:
+                        dias_completados += 1
+                
+                return {
+                    'habito_usuario_id': habito_usuario_id,
+                    'nombre': habito_info[1],
+                    'dias': historial,
+                    'resumen': {
+                        'total_dias': dias,
+                        'dias_completados': dias_completados,
+                        'porcentaje_completado': round((dias_completados / dias) * 100, 1) if dias > 0 else 0
+                    }
+                }
+
+    def get_habito_rachas(self, habito_usuario_id, user_id):
+        """Obtiene estadísticas de rachas de un hábito"""
+        from datetime import date, timedelta
+        
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Verificar que el hábito pertenece al usuario
+                cur.execute("""
+                    SELECT hu.habito_usuario_id, h.nombre, hu.fecha_agregado
+                    FROM habitos_usuario hu
+                    JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
+                """, (habito_usuario_id, user_id))
+                
+                habito_info = cur.fetchone()
+                if not habito_info:
+                    return None
+                
+                # Obtener todas las fechas completadas ordenadas
+                cur.execute("""
+                    SELECT fecha FROM seguimiento_habitos
+                    WHERE habito_usuario_id = %s AND completado = true
+                    ORDER BY fecha ASC;
+                """, (habito_usuario_id,))
+                fechas = [row[0] for row in cur.fetchall()]
+                
+                # Si no hay fechas, devolver valores por defecto
+                if not fechas:
+                    return {
+                        'habito_usuario_id': habito_usuario_id,
+                        'nombre': habito_info[1],
+                        'racha_actual': 0,
+                        'racha_maxima': 0,
+                        'fecha_inicio_racha_actual': None,
+                        'todas_rachas': [],
+                        'estadisticas': {
+                            'total_rachas': 0,
+                            'promedio_racha': 0,
+                            'dias_desde_primera_actividad': 0
+                        }
+                    }
+                
+                # Analizar rachas (días consecutivos)
+                rachas = []
+                racha_inicio = fechas[0]
+                racha_fin = fechas[0]
+                
+                for i in range(1, len(fechas)):
+                    if fechas[i] == racha_fin + timedelta(days=1):
+                        # Continúa la racha
+                        racha_fin = fechas[i]
+                    else:
+                        # Racha terminó, guardar y empezar nueva
+                        rachas.append({
+                            'inicio': racha_inicio.isoformat(),
+                            'fin': racha_fin.isoformat(),
+                            'dias': (racha_fin - racha_inicio).days + 1
+                        })
+                        racha_inicio = fechas[i]
+                        racha_fin = fechas[i]
+                
+                # Agregar última racha
+                rachas.append({
+                    'inicio': racha_inicio.isoformat(),
+                    'fin': racha_fin.isoformat(),
+                    'dias': (racha_fin - racha_inicio).days + 1
+                })
+                
+                # Determinar racha actual (si la última incluye hoy o ayer)
+                hoy = date.today()
+                ayer = hoy - timedelta(days=1)
+                ultima_racha = rachas[-1]
+                
+                if racha_fin == hoy or racha_fin == ayer:
+                    racha_actual = ultima_racha['dias']
+                    fecha_inicio_racha_actual = ultima_racha['inicio']
+                    # Marcar como racha activa (fin = null)
+                    if racha_fin == hoy:
+                        ultima_racha['fin'] = None
+                else:
+                    racha_actual = 0
+                    fecha_inicio_racha_actual = None
+                
+                # Encontrar racha máxima
+                racha_maxima = max(r['dias'] for r in rachas) if rachas else 0
+                
+                # Calcular estadísticas
+                total_rachas = len(rachas)
+                promedio_racha = round(sum(r['dias'] for r in rachas) / total_rachas, 1) if total_rachas > 0 else 0
+                dias_desde_primera = (hoy - fechas[0]).days if fechas else 0
+                
+                # Ordenar rachas de más reciente a más antigua
+                rachas.reverse()
+                
+                return {
+                    'habito_usuario_id': habito_usuario_id,
+                    'nombre': habito_info[1],
+                    'racha_actual': racha_actual,
+                    'racha_maxima': racha_maxima,
+                    'fecha_inicio_racha_actual': fecha_inicio_racha_actual,
+                    'todas_rachas': rachas[:10],  # Limitar a las 10 más recientes
+                    'estadisticas': {
+                        'total_rachas': total_rachas,
+                        'promedio_racha': promedio_racha,
+                        'dias_desde_primera_actividad': dias_desde_primera
+                    }
+                }
