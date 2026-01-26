@@ -56,3 +56,68 @@ class HabitoResponseSchema(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+class HabitoFrecuenciaUpdateSchema(BaseModel):
+    frecuencia_personal: str
+
+    @validator('frecuencia_personal')
+    def validate_frecuencia(cls, v):
+        allowed = ['diario', 'semanal', 'mensual', 'personalizado']
+        if v not in allowed:
+            raise ValueError(f'La frecuencia debe ser: {", ".join(allowed)}')
+        return v
+
+
+class HabitoPersonalizadoCreateSchema(BaseModel):
+    """Schema para crear un hábito personalizado"""
+    nombre: str
+    descripcion: Optional[str] = None
+    frecuencia_personal: Optional[str] = 'diario'
+
+    @validator('nombre')
+    def validate_nombre(cls, v):
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError('El nombre debe tener al menos 3 caracteres')
+        if len(v) > 100:
+            raise ValueError('El nombre no puede exceder 100 caracteres')
+        return v
+
+    @validator('descripcion')
+    def validate_descripcion(cls, v):
+        if v is not None:
+            v = v.strip()
+            if len(v) > 500:
+                raise ValueError('La descripción no puede exceder 500 caracteres')
+        return v
+
+    @validator('frecuencia_personal')
+    def validate_frecuencia(cls, v):
+        allowed = ['diario', 'semanal', 'mensual', 'personalizado']
+        if v not in allowed:
+            raise ValueError(f'La frecuencia debe ser: {", ".join(allowed)}')
+        return v
+
+
+class HabitoPersonalizadoUpdateSchema(BaseModel):
+    """Schema para editar un hábito personalizado"""
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+
+    @validator('nombre')
+    def validate_nombre(cls, v):
+        if v is not None:
+            v = v.strip()
+            if len(v) < 3:
+                raise ValueError('El nombre debe tener al menos 3 caracteres')
+            if len(v) > 100:
+                raise ValueError('El nombre no puede exceder 100 caracteres')
+        return v
+
+    @validator('descripcion')
+    def validate_descripcion(cls, v):
+        if v is not None:
+            v = v.strip()
+            if len(v) > 500:
+                raise ValueError('La descripción no puede exceder 500 caracteres')
+        return v

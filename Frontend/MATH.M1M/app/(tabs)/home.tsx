@@ -356,11 +356,18 @@ export default function HomeScreen() {
                     )}
                   </View>
                   <View style={styles.habitInfo}>
-                    <Text
-                      style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
-                    >
-                      {habito.nombre}
-                    </Text>
+                    <View style={styles.habitNameRow}>
+                      <Text
+                        style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
+                      >
+                        {habito.nombre}
+                      </Text>
+                      {habito.categoria_nombre === "My Custom Habits" && (
+                        <View style={styles.customBadge}>
+                          <Ionicons name="sparkles" size={8} color={colors.primary[600]} />
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
                   </View>
                   <View style={styles.habitPoints}>
@@ -715,6 +722,11 @@ const styles = StyleSheet.create({
   habitInfo: {
     flex: 1,
   },
+  habitNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+  },
   habitName: {
     fontSize: typography.size.base,
     fontWeight: typography.weight.medium,
@@ -724,6 +736,15 @@ const styles = StyleSheet.create({
   habitNameCompleted: {
     color: colors.neutral[500],
     textDecorationLine: "line-through",
+  },
+  customBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.primary[50],
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
   },
   habitCategory: {
     fontSize: typography.size.xs,
