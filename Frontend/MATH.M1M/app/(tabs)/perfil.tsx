@@ -10,14 +10,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
-
-interface UserData {
-  nombre: string;
-  correo: string;
-}
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Stats {
   totalHabits: number;
@@ -29,37 +24,75 @@ interface Stats {
 
 export default function PerfilScreen() {
   const router = useRouter();
-  const [userData, setUserData] = useState<UserData>({ nombre: "", correo: "" });
+  const { user, authFetch } = useAuth();
+  
   const [stats, setStats] = useState<Stats>({
     totalHabits: 0,
     completedToday: 0,
-    streak: 7,
-    totalPoints: 156,
-    level: 3,
+    streak: 0,
+    totalPoints: 0,
+    level: 1,
   });
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadUserData = async () => {
+  // ✅ Cargar estadísticas de gamificación desde el backend
+  const loadEstadisticas = async (userId: number) => {
     try {
-      const [nombre, correo] = await AsyncStorage.multiGet(["nombre", "correo"]);
-      setUserData({
-        nombre: nombre[1] || "User",
-        correo: correo[1] || "user@email.com",
-      });
+      const response = await authFetch(`/api/usuario/${userId}/estadisticas`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStats(prev => ({
+          ...prev,
+          streak: data.data.racha_actual,
+          totalPoints: data.data.puntos_totales,
+          level: data.data.nivel,
+        }));
+      }
     } catch (error) {
-      console.error("Error loading user data:", error);
+      console.error("Error loading estadisticas:", error);
     }
+  };
+
+  // ✅ Cargar estadísticas de hábitos del día
+  const loadHabitosStats = async (userId: number) => {
+    try {
+      const response = await authFetch(`/api/usuario/${userId}/habitos/hoy`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStats(prev => ({
+          ...prev,
+          totalHabits: data.data.estadisticas.total,
+          completedToday: data.data.estadisticas.completados,
+        }));
+      }
+    } catch (error) {
+      console.error("Error loading habitos stats:", error);
+    }
+  };
+
+  // ✅ Cargar todos los datos
+  const loadAllData = async () => {
+    if (!user?.user_id) return;
+    
+    await Promise.all([
+      loadEstadisticas(user.user_id),
+      loadHabitosStats(user.user_id),
+    ]);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadUserData();
+    await loadAllData();
     setRefreshing(false);
   };
 
   useEffect(() => {
-    loadUserData();
-  }, []);
+    if (user?.user_id) {
+      loadAllData();
+    }
+  }, [user?.user_id]);
 
   const getInitials = (name: string) => {
     return name
@@ -129,11 +162,11 @@ export default function PerfilScreen() {
           >
             <View style={styles.profileContent}>
               <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>{getInitials(userData.nombre)}</Text>
+                <Text style={styles.avatarText}>{getInitials(user?.nombre || "User")}</Text>
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{userData.nombre}</Text>
-                <Text style={styles.profileEmail}>{userData.correo}</Text>
+                <Text style={styles.profileName}>{user?.nombre || "User"}</Text>
+                <Text style={styles.profileEmail}>{user?.correo || ""}</Text>
                 <View style={styles.levelBadge}>
                   <Ionicons name="trophy" size={14} color={colors.accent.amber} />
                   <Text style={styles.levelText}>Level {stats.level}</Text>

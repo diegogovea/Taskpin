@@ -48,8 +48,9 @@ interface MiPlan {
 
 interface ResumenUsuario {
   racha_actual: number;
-  gemas_totales: number;
+  puntos_totales: number;   // ← Renombrado de gemas_totales
   nivel_actual: number;
+  racha_maxima: number;     // ← Nuevo campo del backend
 }
 
 export default function HomeScreen() {
@@ -71,8 +72,9 @@ export default function HomeScreen() {
   const [misPlanes, setMisPlanes] = useState<MiPlan[]>([]);
   const [resumenUsuario, setResumenUsuario] = useState<ResumenUsuario>({
     racha_actual: 0,
-    gemas_totales: 0,
+    puntos_totales: 0,
     nivel_actual: 1,
+    racha_maxima: 0,
   });
 
   // ✅ Funciones que usan authFetch (incluye token automáticamente)
@@ -106,12 +108,23 @@ export default function HomeScreen() {
     }
   };
 
-  const loadResumenUsuario = async () => {
-    setResumenUsuario({
-      racha_actual: 7,
-      gemas_totales: 156,
-      nivel_actual: 3,
-    });
+  const loadResumenUsuario = async (userId: number) => {
+    try {
+      const response = await authFetch(`/api/usuario/${userId}/estadisticas`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setResumenUsuario({
+          racha_actual: data.data.racha_actual,
+          puntos_totales: data.data.puntos_totales,
+          nivel_actual: data.data.nivel,
+          racha_maxima: data.data.racha_maxima,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading estadisticas:", error);
+      // Mantener valores por defecto en caso de error
+    }
   };
 
   // ✅ SIMPLIFICADO: Ya no llamamos a getCurrentUser, usamos user del contexto
@@ -122,7 +135,7 @@ export default function HomeScreen() {
       await Promise.all([
         loadHabitosHoy(user.user_id),
         loadMisPlanes(user.user_id),
-        loadResumenUsuario()
+        loadResumenUsuario(user.user_id)
       ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -269,7 +282,7 @@ export default function HomeScreen() {
           />
           <StatCard
             icon="diamond"
-            value={resumenUsuario.gemas_totales}
+            value={resumenUsuario.puntos_totales}
             label="Points"
             gradient={colors.gradients.primary}
           />

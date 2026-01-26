@@ -5,7 +5,7 @@ from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 from pydantic import BaseModel
 from .model.userConnection import userConnection
@@ -55,6 +55,40 @@ app = FastAPI()
 conn = userConnection()
 habit_conn = habitConnection()
 stats_conn = EstadisticasConnection()
+
+# ============================================
+# SISTEMA DE NIVELES - Función helper
+# ============================================
+
+def calcular_nivel(puntos_totales: int) -> dict:
+    """
+    Calcula el nivel del usuario basado en sus puntos totales.
+    Fórmula: puntos_para_nivel(n) = 50 + (n * 50)
+    - Nivel 2: 100 puntos
+    - Nivel 3: 150 puntos adicionales (250 total)
+    - Nivel 4: 200 puntos adicionales (450 total)
+    - etc.
+    """
+    nivel = 1
+    puntos_acumulados = 0
+    
+    while True:
+        puntos_siguiente = 50 + (nivel * 50)  # 100, 150, 200, 250...
+        if puntos_totales < puntos_acumulados + puntos_siguiente:
+            break
+        puntos_acumulados += puntos_siguiente
+        nivel += 1
+    
+    puntos_en_nivel_actual = puntos_totales - puntos_acumulados
+    puntos_para_siguiente = 50 + (nivel * 50)
+    progreso = int((puntos_en_nivel_actual / puntos_para_siguiente) * 100) if puntos_para_siguiente > 0 else 0
+    
+    return {
+        "nivel": nivel,
+        "puntos_en_nivel": puntos_en_nivel_actual,
+        "puntos_para_siguiente": puntos_para_siguiente,
+        "progreso_porcentaje": progreso
+    }
 
 # ============================================
 # AUTENTICACIÓN JWT
@@ -625,14 +659,19 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         pool = get_pool()
         with pool.connection() as db_conn:
             with db_conn.cursor() as cur:
-                # Verificar que el hábito pertenece al usuario
+                # Verificar que el hábito pertenece al usuario y obtener puntos_base
                 cur.execute("""
-                    SELECT habito_usuario_id FROM habitos_usuario 
-                    WHERE habito_usuario_id = %s AND user_id = %s AND activo = true;
+                    SELECT hu.habito_usuario_id, COALESCE(hp.puntos_base, 10) as puntos_base
+                    FROM habitos_usuario hu
+                    LEFT JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                    WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
                 """, (habito_usuario_id, user_id))
                 
-                if not cur.fetchone():
+                habito_data = cur.fetchone()
+                if not habito_data:
                     raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
+                
+                puntos_habito = habito_data[1]  # puntos_base del hábito
                 
                 # Verificar si ya existe un registro para hoy
                 cur.execute("""
@@ -662,16 +701,136 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
                     """, (habito_usuario_id,))
                     new_status = True
                 
+                # ========================================
+                # LÓGICA DE RACHA - Solo si se COMPLETA
+                # ========================================
+                racha_info = None
+                if new_status:
+                    # Obtener estadísticas actuales del usuario
+                    cur.execute("""
+                        SELECT racha_actual, racha_maxima, ultima_actividad 
+                        FROM estadisticas_usuario 
+                        WHERE user_id = %s;
+                    """, (user_id,))
+                    stats = cur.fetchone()
+                    
+                    if stats:
+                        racha_actual, racha_maxima, ultima_actividad = stats
+                        hoy = date.today()
+                        ayer = hoy - timedelta(days=1)
+                        
+                        # Calcular nueva racha
+                        if ultima_actividad == hoy:
+                            # Ya completó algo hoy, no cambiar racha
+                            nueva_racha = racha_actual
+                        elif ultima_actividad == ayer:
+                            # Día consecutivo, incrementar
+                            nueva_racha = racha_actual + 1
+                        else:
+                            # Racha rota o primera vez, empezar en 1
+                            nueva_racha = 1
+                        
+                        # Actualizar racha máxima si es necesario
+                        nueva_racha_maxima = max(racha_maxima, nueva_racha)
+                        
+                        # Guardar cambios en estadísticas
+                        cur.execute("""
+                            UPDATE estadisticas_usuario 
+                            SET racha_actual = %s,
+                                racha_maxima = %s,
+                                ultima_actividad = CURRENT_DATE
+                            WHERE user_id = %s;
+                        """, (nueva_racha, nueva_racha_maxima, user_id))
+                        
+                        racha_info = {
+                            "racha_actual": nueva_racha,
+                            "racha_maxima": nueva_racha_maxima,
+                            "racha_incrementada": nueva_racha > racha_actual
+                        }
+                
+                # ========================================
+                # LÓGICA DE PUNTOS - Sumar o restar
+                # ========================================
+                puntos_info = None
+                nivel_info = None
+                
+                # Calcular cambio de puntos
+                if new_status:
+                    puntos_cambio = puntos_habito  # Sumar al completar
+                else:
+                    puntos_cambio = -puntos_habito  # Restar al desmarcar
+                
+                # Obtener nivel actual antes del cambio
+                cur.execute("""
+                    SELECT nivel FROM estadisticas_usuario WHERE user_id = %s;
+                """, (user_id,))
+                nivel_anterior = cur.fetchone()
+                nivel_anterior = nivel_anterior[0] if nivel_anterior else 1
+                
+                # Actualizar puntos en estadisticas_usuario
+                cur.execute("""
+                    UPDATE estadisticas_usuario 
+                    SET puntos_totales = GREATEST(0, puntos_totales + %s)
+                    WHERE user_id = %s
+                    RETURNING puntos_totales;
+                """, (puntos_cambio, user_id))
+                
+                resultado_puntos = cur.fetchone()
+                if resultado_puntos:
+                    puntos_totales_nuevos = resultado_puntos[0]
+                    puntos_info = {
+                        "puntos_cambio": puntos_cambio,
+                        "puntos_totales": puntos_totales_nuevos
+                    }
+                    
+                    # ========================================
+                    # LÓGICA DE NIVEL - Calcular y actualizar
+                    # ========================================
+                    nivel_calculado = calcular_nivel(puntos_totales_nuevos)
+                    nuevo_nivel = nivel_calculado["nivel"]
+                    
+                    # Actualizar nivel en BD si cambió
+                    if nuevo_nivel != nivel_anterior:
+                        cur.execute("""
+                            UPDATE estadisticas_usuario 
+                            SET nivel = %s
+                            WHERE user_id = %s;
+                        """, (nuevo_nivel, user_id))
+                    
+                    nivel_info = {
+                        "nivel": nuevo_nivel,
+                        "puntos_en_nivel": nivel_calculado["puntos_en_nivel"],
+                        "puntos_para_siguiente": nivel_calculado["puntos_para_siguiente"],
+                        "progreso_porcentaje": nivel_calculado["progreso_porcentaje"],
+                        "subio_nivel": nuevo_nivel > nivel_anterior,
+                        "bajo_nivel": nuevo_nivel < nivel_anterior
+                    }
+                
                 db_conn.commit()
+        
+        # Construir respuesta
+        response_data = {
+            "habito_usuario_id": habito_usuario_id,
+            "completado": new_status,
+            "fecha": "today"
+        }
+        
+        # Agregar info de racha si se actualizó
+        if racha_info:
+            response_data["racha"] = racha_info
+        
+        # Agregar info de puntos
+        if puntos_info:
+            response_data["puntos"] = puntos_info
+        
+        # Agregar info de nivel
+        if nivel_info:
+            response_data["nivel"] = nivel_info
         
         return {
             "success": True,
             "message": "Hábito actualizado correctamente",
-            "data": {
-                "habito_usuario_id": habito_usuario_id,
-                "completado": new_status,
-                "fecha": "today"
-            }
+            "data": response_data
         }
             
     except HTTPException:
