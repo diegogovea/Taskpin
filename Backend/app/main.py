@@ -278,6 +278,9 @@ def register(user_data: UserCreateSchema):
         # Insertar usuario y obtener su ID
         user_id = conn.write(data)
         
+        # Crear registro de estadísticas para el nuevo usuario (puntos, rachas, nivel)
+        stats_conn.crear_estadisticas_usuario(user_id)
+        
         return {"message": "Usuario registrado correctamente", "user_id": user_id}
     
     except Exception as e:
