@@ -21,7 +21,7 @@ interface PlanDetalle {
   plan_id: number;
   meta_principal: string;
   descripcion: string;
-  duracion_estimada_dias: number;
+  plazo_dias_estimado: number;
   dificultad: "fácil" | "intermedio" | "difícil";
   categoria_nombre: string;
   total_fases: number;
@@ -46,7 +46,7 @@ interface Tarea {
 export default function DetallePlanScreen() {
   const router = useRouter();
   const { planId } = useLocalSearchParams();
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
   
   const [plan, setPlan] = useState<PlanDetalle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +60,7 @@ export default function DetallePlanScreen() {
       const data = await response.json();
       if (data.success) {
         setPlan(data.plan);
-        setCustomDuration(data.plan.duracion_estimada_dias.toString());
+        setCustomDuration(data.plan.plazo_dias_estimado.toString());
       }
     } catch (error) {
       console.error("Error fetching plan:", error);
@@ -91,15 +91,17 @@ export default function DetallePlanScreen() {
         return;
       }
 
-      const duration = showCustomDuration ? parseInt(customDuration) : plan.duracion_estimada_dias;
+      console.log("DEBUG agregarPlan: user_id=", user.user_id, "plan_id=", plan.plan_id);
+      
+      const duration = showCustomDuration ? parseInt(customDuration) : plan.plazo_dias_estimado;
 
-      const response = await fetch(`${API_BASE_URL}/api/planes/agregar`, {
+      const response = await authFetch(`/api/planes/agregar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.user_id,
           plan_id: plan.plan_id,
-          duracion_dias: duration,
+          dias_personalizados: duration,
         }),
       });
 
@@ -214,7 +216,7 @@ export default function DetallePlanScreen() {
             <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
               <Ionicons name="calendar" size={18} color={colors.primary[600]} />
             </View>
-            <Text style={styles.statValue}>{plan.duracion_estimada_dias}</Text>
+            <Text style={styles.statValue}>{plan.plazo_dias_estimado}</Text>
             <Text style={styles.statLabel}>Days</Text>
           </View>
           <View style={styles.statItem}>

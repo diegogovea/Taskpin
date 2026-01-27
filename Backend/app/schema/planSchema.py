@@ -213,3 +213,24 @@ class TareaMarcadaResponseSchema(BaseModel):
     message: str
     tarea_id: Optional[int] = None
     completada: Optional[bool] = None
+
+# ============================================
+# SCHEMAS PARA GESTIÓN DE ESTADO DE PLANES
+# ============================================
+
+class PlanEstadoUpdateSchema(BaseModel):
+    """Schema para actualizar estado de un plan"""
+    estado: str
+    
+    @validator('estado')
+    def validate_estado(cls, v):
+        estados_validos = ['activo', 'pausado', 'completado', 'cancelado']
+        if v not in estados_validos:
+            raise ValueError(f'Estado debe ser: {", ".join(estados_validos)}')
+        return v
+
+class PlanEstadoResponseSchema(BaseModel):
+    """Schema para respuesta de cambio de estado"""
+    success: bool
+    message: str
+    data: Optional[dict] = None

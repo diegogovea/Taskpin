@@ -9,47 +9,73 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
+import { useAuth } from "../../contexts/AuthContext";
+import ConfirmModal from "../../components/modals/ConfirmModal";
 
 interface TareaDiaria {
-  tarea_usuario_id: number;
+  tarea_id: number;
+  tarea_usuario_id: number | null;
+  titulo: string;
   descripcion: string;
-  dia_relativo: number;
+  tipo: string;
+  es_diaria: boolean;
   completada: boolean;
-  fecha_completado: string | null;
-  fase_nombre: string;
-  fase_descripcion: string;
+  hora_completada: string | null;
+}
+
+interface FaseActual {
+  objetivo_id: number;
+  titulo: string;
+  descripcion: string;
+  orden_fase: number;
+  duracion_dias: number;
 }
 
 interface DailyProgress {
-  dia_actual: number;
-  total_dias: number;
-  progreso_general: number;
-  tareas_hoy: TareaDiaria[];
-  fase_actual: string;
-  fase_descripcion: string;
+  plan_usuario_id: number;
+  meta_principal: string;
+  dificultad: string;
+  fecha: string;
+  dias_transcurridos: number;
+  fase_actual: FaseActual;
+  tareas: TareaDiaria[];
 }
 
 export default function SeguimientoPlanScreen() {
   const router = useRouter();
   const { planUsuarioId, titulo } = useLocalSearchParams();
+  const { user, authFetch } = useAuth();
+  
   const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [togglingTask, setTogglingTask] = useState<number | null>(null);
-
-  // API_BASE_URL importada desde constants/api.ts
+  
+  // Estados para gestión del plan
+  const [estadoPlan, setEstadoPlan] = useState<string>("activo");
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [accionPendiente, setAccionPendiente] = useState<"pausar" | "reanudar" | "cancelar" | null>(null);
+  const [procesandoAccion, setProcesandoAccion] = useState(false);
 
   const fetchTareasDiarias = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/planes/tareas-diarias/${planUsuarioId}`);
+      const response = await authFetch(`/api/planes/tareas-diarias/${planUsuarioId}`);
       const data = await response.json();
-      if (data.success) {
+      
+      // El backend devuelve directamente el objeto, no { success, data }
+      if (data && data.plan_usuario_id) {
+        setDailyProgress(data);
+      } else if (data.success && data.data) {
+        // Fallback por si se cambia el formato
         setDailyProgress(data.data);
       }
     } catch (error) {
@@ -61,15 +87,128 @@ export default function SeguimientoPlanScreen() {
     }
   };
 
-  const toggleTarea = async (tareaUsuarioId: number) => {
+  // Obtener el estado actual del plan
+  const fetchEstadoPlan = async () => {
+    if (!user?.user_id) return;
+    try {
+      const response = await authFetch(`/api/planes/mis-planes/${user.user_id}`);
+      const data = await response.json();
+      if (data.success && data.planes) {
+        const planActual = data.planes.find(
+          (p: any) => p.plan_usuario_id === Number(planUsuarioId)
+        );
+        if (planActual) {
+          setEstadoPlan(planActual.estado || "activo");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching estado plan:", error);
+    }
+  };
+
+  // Cambiar estado del plan
+  const cambiarEstadoPlan = async (nuevoEstado: string) => {
+    setProcesandoAccion(true);
+    try {
+      const response = await authFetch(`/api/planes/${planUsuarioId}/estado`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setEstadoPlan(nuevoEstado);
+        setShowConfirmModal(false);
+        setAccionPendiente(null);
+        
+        if (nuevoEstado === "cancelado") {
+          Alert.alert("Plan Cancelled", "The plan has been cancelled.", [
+            { text: "OK", onPress: () => router.replace("/(tabs)/planes") }
+          ]);
+        } else if (nuevoEstado === "pausado") {
+          Alert.alert("Plan Paused", "You can resume this plan anytime.");
+        } else if (nuevoEstado === "activo") {
+          Alert.alert("Plan Resumed", "Your plan is active again!");
+          fetchTareasDiarias();
+        }
+      } else {
+        Alert.alert("Error", data.message || "Could not update plan status");
+      }
+    } catch (error) {
+      console.error("Error cambiando estado:", error);
+      Alert.alert("Error", "Connection error");
+    } finally {
+      setProcesandoAccion(false);
+    }
+  };
+
+  // Manejar acción del menú
+  const handleAccion = (accion: "pausar" | "reanudar" | "cancelar") => {
+    setShowActionMenu(false);
+    setAccionPendiente(accion);
+    setShowConfirmModal(true);
+  };
+
+  // Confirmar acción
+  const confirmarAccion = () => {
+    if (!accionPendiente) return;
+    const nuevoEstado = accionPendiente === "pausar" ? "pausado" 
+                      : accionPendiente === "reanudar" ? "activo" 
+                      : "cancelado";
+    cambiarEstadoPlan(nuevoEstado);
+  };
+
+  // Obtener configuración del modal según la acción
+  const getModalConfig = () => {
+    switch (accionPendiente) {
+      case "pausar":
+        return {
+          title: "Pause Plan?",
+          message: "Your progress will be saved. You can resume this plan anytime.",
+          confirmText: "Pause",
+          icon: "pause-circle" as const,
+          danger: false,
+        };
+      case "reanudar":
+        return {
+          title: "Resume Plan?",
+          message: "Ready to continue your journey? Let's get back on track!",
+          confirmText: "Resume",
+          icon: "play-circle" as const,
+          danger: false,
+        };
+      case "cancelar":
+        return {
+          title: "Cancel Plan?",
+          message: "This action cannot be undone. All progress will be lost.",
+          confirmText: "Cancel Plan",
+          icon: "close-circle" as const,
+          danger: true,
+        };
+      default:
+        return {
+          title: "",
+          message: "",
+          confirmText: "Confirm",
+          icon: "help-circle" as const,
+          danger: false,
+        };
+    }
+  };
+
+  const toggleTarea = async (tareaId: number) => {
     if (togglingTask) return;
-    setTogglingTask(tareaUsuarioId);
+    setTogglingTask(tareaId);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/planes/marcar-tarea`, {
+      const response = await authFetch(`/api/planes/marcar-tarea`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tarea_usuario_id: tareaUsuarioId }),
+        body: JSON.stringify({ 
+          plan_usuario_id: Number(planUsuarioId),
+          tarea_id: tareaId 
+        }),
       });
 
       const result = await response.json();
@@ -77,17 +216,15 @@ export default function SeguimientoPlanScreen() {
       if (result.success) {
         setDailyProgress((prev) => {
           if (!prev) return prev;
-          const updatedTareas = prev.tareas_hoy.map((tarea) =>
-            tarea.tarea_usuario_id === tareaUsuarioId
-              ? { ...tarea, completada: result.data.completada }
+          const updatedTareas = prev.tareas.map((tarea) =>
+            tarea.tarea_id === tareaId
+              ? { ...tarea, completada: result.completada }
               : tarea
           );
-          const completedCount = updatedTareas.filter((t) => t.completada).length;
-          const newProgress = Math.round((completedCount / updatedTareas.length) * 100);
-          return { ...prev, tareas_hoy: updatedTareas, progreso_general: newProgress };
+          return { ...prev, tareas: updatedTareas };
         });
       } else {
-        Alert.alert("Error", "Could not update task");
+        Alert.alert("Error", result.message || "Could not update task");
       }
     } catch (error) {
       Alert.alert("Error", "Connection error");
@@ -104,6 +241,7 @@ export default function SeguimientoPlanScreen() {
   useEffect(() => {
     if (planUsuarioId) {
       fetchTareasDiarias();
+      fetchEstadoPlan();
     }
   }, [planUsuarioId]);
 
@@ -111,6 +249,7 @@ export default function SeguimientoPlanScreen() {
     useCallback(() => {
       if (planUsuarioId) {
         fetchTareasDiarias();
+        fetchEstadoPlan();
       }
     }, [planUsuarioId])
   );
@@ -141,9 +280,10 @@ export default function SeguimientoPlanScreen() {
     );
   }
 
-  const completedToday = dailyProgress.tareas_hoy.filter((t) => t.completada).length;
-  const totalToday = dailyProgress.tareas_hoy.length;
+  const completedToday = dailyProgress.tareas.filter((t) => t.completada).length;
+  const totalToday = dailyProgress.tareas.length;
   const allCompleted = completedToday === totalToday && totalToday > 0;
+  const progresoCalculado = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -157,7 +297,17 @@ export default function SeguimientoPlanScreen() {
             {titulo ? decodeURIComponent(titulo as string) : "Plan Progress"}
           </Text>
         </View>
-        <View style={{ width: 44 }} />
+        {/* Menu Button - only show if plan is not completed or cancelled */}
+        {estadoPlan !== "completado" && estadoPlan !== "cancelado" ? (
+          <TouchableOpacity 
+            style={styles.menuButton} 
+            onPress={() => setShowActionMenu(true)}
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color={colors.neutral[700]} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
       </View>
 
       <ScrollView
@@ -166,6 +316,39 @@ export default function SeguimientoPlanScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* Status Banner for Paused/Cancelled Plans */}
+        {estadoPlan === "pausado" && (
+          <View style={styles.statusBanner}>
+            <View style={[styles.statusBannerIcon, { backgroundColor: colors.accent.amber + '20' }]}>
+              <Ionicons name="pause-circle" size={24} color={colors.accent.amber} />
+            </View>
+            <View style={styles.statusBannerContent}>
+              <Text style={styles.statusBannerTitle}>Plan Paused</Text>
+              <Text style={styles.statusBannerText}>Your progress is saved. Resume anytime!</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.statusBannerButton}
+              onPress={() => handleAccion("reanudar")}
+            >
+              <Text style={styles.statusBannerButtonText}>Resume</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {estadoPlan === "cancelado" && (
+          <View style={[styles.statusBanner, { backgroundColor: colors.semantic.error + '10' }]}>
+            <View style={[styles.statusBannerIcon, { backgroundColor: colors.semantic.error + '20' }]}>
+              <Ionicons name="close-circle" size={24} color={colors.semantic.error} />
+            </View>
+            <View style={styles.statusBannerContent}>
+              <Text style={[styles.statusBannerTitle, { color: colors.semantic.error }]}>
+                Plan Cancelled
+              </Text>
+              <Text style={styles.statusBannerText}>This plan is no longer active</Text>
+            </View>
+          </View>
+        )}
+
         {/* Progress Card */}
         <View style={styles.progressCard}>
           <LinearGradient
@@ -176,12 +359,12 @@ export default function SeguimientoPlanScreen() {
           >
             <View style={styles.progressHeader}>
               <View>
-                <Text style={styles.progressLabel}>Overall Progress</Text>
-                <Text style={styles.progressValue}>{dailyProgress.progreso_general}%</Text>
+                <Text style={styles.progressLabel}>Today's Progress</Text>
+                <Text style={styles.progressValue}>{progresoCalculado}%</Text>
               </View>
               <View style={styles.dayBadge}>
                 <Text style={styles.dayBadgeText}>
-                  Day {dailyProgress.dia_actual}/{dailyProgress.total_dias}
+                  Day {dailyProgress.dias_transcurridos}
                 </Text>
               </View>
             </View>
@@ -190,7 +373,7 @@ export default function SeguimientoPlanScreen() {
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${dailyProgress.progreso_general}%` },
+                    { width: `${progresoCalculado}%` },
                   ]}
                 />
               </View>
@@ -205,9 +388,9 @@ export default function SeguimientoPlanScreen() {
           </View>
           <View style={styles.phaseInfo}>
             <Text style={styles.phaseLabel}>Current Phase</Text>
-            <Text style={styles.phaseName}>{dailyProgress.fase_actual}</Text>
-            {dailyProgress.fase_descripcion && (
-              <Text style={styles.phaseDescription}>{dailyProgress.fase_descripcion}</Text>
+            <Text style={styles.phaseName}>{dailyProgress.fase_actual.titulo}</Text>
+            {dailyProgress.fase_actual.descripcion && (
+              <Text style={styles.phaseDescription}>{dailyProgress.fase_actual.descripcion}</Text>
             )}
           </View>
         </View>
@@ -221,7 +404,7 @@ export default function SeguimientoPlanScreen() {
             </Text>
           </View>
 
-          {dailyProgress.tareas_hoy.length === 0 ? (
+          {dailyProgress.tareas.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="checkmark-done-circle" size={48} color={colors.secondary[500]} />
               <Text style={styles.emptyTitle}>No tasks for today</Text>
@@ -229,18 +412,18 @@ export default function SeguimientoPlanScreen() {
             </View>
           ) : (
             <View style={styles.tasksList}>
-              {dailyProgress.tareas_hoy.map((tarea) => (
+              {dailyProgress.tareas.map((tarea) => (
                 <TouchableOpacity
-                  key={tarea.tarea_usuario_id}
+                  key={tarea.tarea_id}
                   style={[styles.taskCard, tarea.completada && styles.taskCardCompleted]}
                   activeOpacity={0.8}
-                  onPress={() => toggleTarea(tarea.tarea_usuario_id)}
-                  disabled={togglingTask === tarea.tarea_usuario_id}
+                  onPress={() => toggleTarea(tarea.tarea_id)}
+                  disabled={togglingTask === tarea.tarea_id}
                 >
                   <View
                     style={[styles.taskCheckbox, tarea.completada && styles.taskCheckboxCompleted]}
                   >
-                    {togglingTask === tarea.tarea_usuario_id ? (
+                    {togglingTask === tarea.tarea_id ? (
                       <ActivityIndicator size="small" color={colors.neutral[0]} />
                     ) : tarea.completada ? (
                       <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
@@ -250,12 +433,15 @@ export default function SeguimientoPlanScreen() {
                     <Text
                       style={[styles.taskText, tarea.completada && styles.taskTextCompleted]}
                     >
-                      {tarea.descripcion}
+                      {tarea.titulo}
                     </Text>
-                    {tarea.completada && tarea.fecha_completado && (
+                    {tarea.descripcion && (
+                      <Text style={styles.taskDescription}>{tarea.descripcion}</Text>
+                    )}
+                    {tarea.completada && tarea.hora_completada && (
                       <Text style={styles.taskCompletedTime}>
                         Completed at{" "}
-                        {new Date(tarea.fecha_completado).toLocaleTimeString("en-US", {
+                        {new Date(`2000-01-01T${tarea.hora_completada}`).toLocaleTimeString("en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -290,6 +476,96 @@ export default function SeguimientoPlanScreen() {
 
         <View style={{ height: spacing[10] }} />
       </ScrollView>
+
+      {/* Action Menu Modal */}
+      <Modal
+        visible={showActionMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActionMenu(false)}
+      >
+        <Pressable 
+          style={styles.actionMenuOverlay} 
+          onPress={() => setShowActionMenu(false)}
+        >
+          <View style={styles.actionMenuContainer}>
+            <View style={styles.actionMenuHeader}>
+              <Text style={styles.actionMenuTitle}>Plan Options</Text>
+            </View>
+            
+            {estadoPlan === "activo" && (
+              <TouchableOpacity 
+                style={styles.actionMenuItem}
+                onPress={() => handleAccion("pausar")}
+              >
+                <View style={[styles.actionMenuIcon, { backgroundColor: colors.accent.amber + '15' }]}>
+                  <Ionicons name="pause-circle" size={22} color={colors.accent.amber} />
+                </View>
+                <View style={styles.actionMenuTextContainer}>
+                  <Text style={styles.actionMenuItemText}>Pause Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Take a break, resume anytime</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            
+            {estadoPlan === "pausado" && (
+              <TouchableOpacity 
+                style={styles.actionMenuItem}
+                onPress={() => handleAccion("reanudar")}
+              >
+                <View style={[styles.actionMenuIcon, { backgroundColor: colors.secondary[500] + '15' }]}>
+                  <Ionicons name="play-circle" size={22} color={colors.secondary[500]} />
+                </View>
+                <View style={styles.actionMenuTextContainer}>
+                  <Text style={styles.actionMenuItemText}>Resume Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Continue your journey</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            
+            {(estadoPlan === "activo" || estadoPlan === "pausado") && (
+              <TouchableOpacity 
+                style={styles.actionMenuItem}
+                onPress={() => handleAccion("cancelar")}
+              >
+                <View style={[styles.actionMenuIcon, { backgroundColor: colors.semantic.error + '15' }]}>
+                  <Ionicons name="close-circle" size={22} color={colors.semantic.error} />
+                </View>
+                <View style={styles.actionMenuTextContainer}>
+                  <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>
+                    Cancel Plan
+                  </Text>
+                  <Text style={styles.actionMenuItemSubtext}>This cannot be undone</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={styles.actionMenuCloseButton}
+              onPress={() => setShowActionMenu(false)}
+            >
+              <Text style={styles.actionMenuCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        visible={showConfirmModal}
+        title={getModalConfig().title}
+        message={getModalConfig().message}
+        confirmText={getModalConfig().confirmText}
+        cancelText="Go Back"
+        icon={getModalConfig().icon}
+        danger={getModalConfig().danger}
+        isLoading={procesandoAccion}
+        onConfirm={confirmarAccion}
+        onCancel={() => {
+          setShowConfirmModal(false);
+          setAccionPendiente(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -504,6 +780,11 @@ const styles = StyleSheet.create({
     color: colors.neutral[800],
     lineHeight: 22,
   },
+  taskDescription: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+  },
   taskTextCompleted: {
     color: colors.secondary[700],
   },
@@ -543,5 +824,119 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
     textAlign: "center",
     lineHeight: 20,
+  },
+  // Status Banner Styles
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.accent.amber + '10',
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[5],
+  },
+  statusBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusBannerContent: {
+    flex: 1,
+    marginLeft: spacing[3],
+  },
+  statusBannerTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.accent.amber,
+  },
+  statusBannerText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    marginTop: 2,
+  },
+  statusBannerButton: {
+    backgroundColor: colors.accent.amber,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderRadius: radius.lg,
+  },
+  statusBannerButtonText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+  },
+  // Menu Button
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Action Menu Styles
+  actionMenuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+  },
+  actionMenuContainer: {
+    backgroundColor: colors.neutral[0],
+    borderTopLeftRadius: radius["2xl"],
+    borderTopRightRadius: radius["2xl"],
+    paddingBottom: spacing[8],
+  },
+  actionMenuHeader: {
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[5],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+  },
+  actionMenuTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+    textAlign: "center",
+  },
+  actionMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[5],
+  },
+  actionMenuIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing[3],
+  },
+  actionMenuTextContainer: {
+    flex: 1,
+  },
+  actionMenuItemText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[800],
+  },
+  actionMenuItemSubtext: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginTop: 2,
+  },
+  actionMenuCloseButton: {
+    marginTop: spacing[2],
+    marginHorizontal: spacing[5],
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    backgroundColor: colors.neutral[100],
+    alignItems: "center",
+  },
+  actionMenuCloseText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[600],
   },
 });

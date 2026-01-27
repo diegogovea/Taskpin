@@ -39,7 +39,9 @@ from .schema.planSchema import (
     MarcarTareaSchema,
     PlanResponseSchema,
     PlanUsuarioResponseSchema,
-    TareaMarcadaResponseSchema
+    TareaMarcadaResponseSchema,
+    PlanEstadoUpdateSchema,
+    PlanEstadoResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -1360,6 +1362,42 @@ def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener planes del usuario: {str(e)}')
+
+@app.put("/api/planes/{plan_usuario_id}/estado", response_model=PlanEstadoResponseSchema)
+def actualizar_estado_plan(
+    plan_usuario_id: int,
+    data: PlanEstadoUpdateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    PUT /api/planes/1/estado - Cambiar estado de un plan (PROTEGIDO)
+    
+    Estados válidos: activo, pausado, completado, cancelado
+    
+    Transiciones permitidas:
+    - activo → pausado, cancelado, completado
+    - pausado → activo (reanudar), cancelado
+    - completado → ninguno (no modificable)
+    - cancelado → ninguno (no reactivable)
+    """
+    try:
+        planes_conn = PlanesConnection()
+        
+        result = planes_conn.actualizar_estado_plan(
+            plan_usuario_id=plan_usuario_id,
+            user_id=current_user.user_id,
+            nuevo_estado=data.estado
+        )
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['message'])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al actualizar estado del plan: {str(e)}')
 
 @app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
 def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):

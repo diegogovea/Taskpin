@@ -489,3 +489,131 @@ class PlanesConnection:
             import traceback
             print(f"DEBUG TRACEBACK get_planes_usuario: {traceback.format_exc()}")
             return []
+
+    def actualizar_estado_plan(self, plan_usuario_id: int, user_id: int, nuevo_estado: str):
+        """
+        Actualiza el estado de un plan del usuario.
+        
+        Estados válidos: 'activo', 'pausado', 'completado', 'cancelado'
+        
+        Reglas de transición:
+        - activo → pausado, cancelado, completado ✅
+        - pausado → activo (reanudar), cancelado ✅
+        - completado → ninguno ❌
+        - cancelado → ninguno ❌
+        
+        Returns:
+            dict: { success: bool, data: {...}, message: str }
+        """
+        from datetime import datetime
+        
+        # Estados válidos
+        ESTADOS_VALIDOS = ['activo', 'pausado', 'completado', 'cancelado']
+        
+        # Validar nuevo estado
+        if nuevo_estado not in ESTADOS_VALIDOS:
+            return {
+                'success': False, 
+                'message': f'Estado no válido. Debe ser: {", ".join(ESTADOS_VALIDOS)}'
+            }
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar que el plan existe y pertenece al usuario
+                    cur.execute("""
+                        SELECT plan_usuario_id, estado 
+                        FROM planes_usuario 
+                        WHERE plan_usuario_id = %s AND user_id = %s
+                    """, (plan_usuario_id, user_id))
+                    
+                    plan = cur.fetchone()
+                    
+                    if not plan:
+                        return {
+                            'success': False, 
+                            'message': 'Plan no encontrado o no te pertenece'
+                        }
+                    
+                    estado_actual = plan[1]
+                    
+                    # 2. Validar transiciones permitidas
+                    if estado_actual == 'completado':
+                        return {
+                            'success': False, 
+                            'message': 'No se puede modificar un plan completado'
+                        }
+                    
+                    if estado_actual == 'cancelado':
+                        return {
+                            'success': False, 
+                            'message': 'No se puede reactivar un plan cancelado'
+                        }
+                    
+                    if estado_actual == nuevo_estado:
+                        return {
+                            'success': False, 
+                            'message': f'El plan ya está en estado "{nuevo_estado}"'
+                        }
+                    
+                    # 3. Preparar campos de fecha según el nuevo estado
+                    ahora = datetime.now()
+                    
+                    if nuevo_estado == 'pausado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_pausado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'cancelado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_cancelado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'completado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_completado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'activo':
+                        # Al reanudar, limpiamos fecha_pausado
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_pausado = NULL 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, plan_usuario_id))
+                    
+                    conn.commit()
+                    
+                    # 4. Mensaje según la acción
+                    mensajes = {
+                        'pausado': 'Plan pausado correctamente',
+                        'activo': 'Plan reanudado correctamente',
+                        'cancelado': 'Plan cancelado',
+                        'completado': '¡Felicidades! Plan completado'
+                    }
+                    
+                    print(f"DEBUG actualizar_estado_plan: {estado_actual} → {nuevo_estado}")
+                    
+                    return {
+                        'success': True,
+                        'data': {
+                            'plan_usuario_id': plan_usuario_id,
+                            'estado_anterior': estado_actual,
+                            'estado_nuevo': nuevo_estado
+                        },
+                        'message': mensajes.get(nuevo_estado, 'Estado actualizado')
+                    }
+                    
+        except Exception as e:
+            print(f"Error actualizar_estado_plan: {e}")
+            return {
+                'success': False, 
+                'message': f'Error al actualizar estado: {str(e)}'
+            }
