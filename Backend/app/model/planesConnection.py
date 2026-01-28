@@ -617,3 +617,231 @@ class PlanesConnection:
                 'success': False, 
                 'message': f'Error al actualizar estado: {str(e)}'
             }
+
+    # ============================================
+    # MÉTODOS PARA VINCULAR HÁBITOS A PLANES
+    # ============================================
+
+    def vincular_habito_a_plan(self, plan_usuario_id, habito_usuario_id, objetivo_id=None, obligatorio=False, notas=None):
+        """
+        Vincula un hábito existente del usuario a un plan.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            habito_usuario_id: ID del hábito del usuario
+            objetivo_id: (opcional) Fase específica donde aplica el hábito
+            obligatorio: Si el hábito es requerido para el plan
+            notas: Notas opcionales sobre el vínculo
+        
+        Returns:
+            dict con success, message, y plan_habito_id si fue exitoso
+        """
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar que el plan_usuario existe
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.user_id, pu.estado
+                        FROM planes_usuario pu
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan = cur.fetchone()
+                    if not plan:
+                        return {'success': False, 'message': 'Plan no encontrado'}
+                    
+                    plan_user_id = plan[1]
+                    plan_estado = plan[2]
+                    
+                    # No permitir vincular a planes cancelados
+                    if plan_estado == 'cancelado':
+                        return {'success': False, 'message': 'No se puede vincular a un plan cancelado'}
+                    
+                    # 2. Verificar que el habito_usuario existe y pertenece al mismo usuario
+                    cur.execute("""
+                        SELECT hu.habito_usuario_id, hu.user_id, hp.nombre
+                        FROM habitos_usuario hu
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        WHERE hu.habito_usuario_id = %s
+                    """, (habito_usuario_id,))
+                    
+                    habito = cur.fetchone()
+                    if not habito:
+                        return {'success': False, 'message': 'Hábito no encontrado'}
+                    
+                    habito_user_id = habito[1]
+                    habito_nombre = habito[2]
+                    
+                    # Verificar que ambos pertenecen al mismo usuario
+                    if plan_user_id != habito_user_id:
+                        return {'success': False, 'message': 'El hábito no pertenece al usuario del plan'}
+                    
+                    # 3. Verificar objetivo_id si se proporciona
+                    if objetivo_id:
+                        cur.execute("""
+                            SELECT oi.objetivo_id 
+                            FROM objetivos_intermedios oi
+                            JOIN planes_usuario pu ON oi.plan_id = pu.plan_id
+                            WHERE oi.objetivo_id = %s AND pu.plan_usuario_id = %s
+                        """, (objetivo_id, plan_usuario_id))
+                        
+                        if not cur.fetchone():
+                            return {'success': False, 'message': 'Fase no válida para este plan'}
+                    
+                    # 4. Insertar vínculo (la constraint UNIQUE manejará duplicados)
+                    try:
+                        cur.execute("""
+                            INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id, objetivo_id, obligatorio, notas)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING plan_habito_id
+                        """, (plan_usuario_id, habito_usuario_id, objetivo_id, obligatorio, notas))
+                        
+                        result = cur.fetchone()
+                        conn.commit()
+                        
+                        print(f"DEBUG vincular_habito: Hábito '{habito_nombre}' vinculado a plan {plan_usuario_id}")
+                        
+                        return {
+                            'success': True,
+                            'message': f'Hábito "{habito_nombre}" vinculado exitosamente',
+                            'plan_habito_id': result[0]
+                        }
+                        
+                    except psycopg.errors.UniqueViolation:
+                        return {'success': False, 'message': 'Este hábito ya está vinculado al plan'}
+                    
+        except Exception as e:
+            print(f"Error vincular_habito_a_plan: {e}")
+            return {'success': False, 'message': f'Error al vincular hábito: {str(e)}'}
+
+    def desvincular_habito_de_plan(self, plan_usuario_id, habito_usuario_id):
+        """
+        Elimina el vínculo entre un hábito y un plan.
+        No elimina el hábito, solo la relación.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            habito_usuario_id: ID del hábito del usuario
+        
+        Returns:
+            dict con success y message
+        """
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # Verificar que el vínculo existe y obtener info para el mensaje
+                    cur.execute("""
+                        SELECT ph.plan_habito_id, hp.nombre
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        WHERE ph.plan_usuario_id = %s AND ph.habito_usuario_id = %s
+                    """, (plan_usuario_id, habito_usuario_id))
+                    
+                    vinculo = cur.fetchone()
+                    if not vinculo:
+                        return {'success': False, 'message': 'Este hábito no está vinculado al plan'}
+                    
+                    habito_nombre = vinculo[1]
+                    
+                    # Eliminar el vínculo
+                    cur.execute("""
+                        DELETE FROM plan_habitos 
+                        WHERE plan_usuario_id = %s AND habito_usuario_id = %s
+                    """, (plan_usuario_id, habito_usuario_id))
+                    
+                    conn.commit()
+                    
+                    print(f"DEBUG desvincular_habito: Hábito '{habito_nombre}' desvinculado de plan {plan_usuario_id}")
+                    
+                    return {
+                        'success': True,
+                        'message': f'Hábito "{habito_nombre}" desvinculado del plan'
+                    }
+                    
+        except Exception as e:
+            print(f"Error desvincular_habito_de_plan: {e}")
+            return {'success': False, 'message': f'Error al desvincular hábito: {str(e)}'}
+
+    def get_habitos_del_plan(self, plan_usuario_id, fecha=None):
+        """
+        Obtiene los hábitos vinculados a un plan con su estado del día.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            fecha: Fecha para verificar el estado (default: hoy)
+        
+        Returns:
+            Lista de hábitos con info y estado del día
+        """
+        from datetime import date
+        
+        if fecha is None:
+            fecha = date.today()
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # Verificar que el plan existe
+                    cur.execute("""
+                        SELECT plan_usuario_id FROM planes_usuario 
+                        WHERE plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    if not cur.fetchone():
+                        return []
+                    
+                    # Obtener hábitos vinculados con estado de hoy
+                    cur.execute("""
+                        SELECT 
+                            ph.plan_habito_id,
+                            ph.habito_usuario_id,
+                            ph.obligatorio,
+                            ph.objetivo_id,
+                            ph.notas,
+                            hu.habito_id,
+                            hp.nombre,
+                            hp.descripcion,
+                            hp.puntos,
+                            ch.nombre as categoria,
+                            sh.completado,
+                            sh.hora_completado
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        JOIN categorias_habitos ch ON hp.categoria_id = ch.categoria_id
+                        LEFT JOIN seguimiento_habitos sh ON hu.habito_usuario_id = sh.habito_usuario_id 
+                            AND sh.fecha = %s
+                        WHERE ph.plan_usuario_id = %s
+                        ORDER BY ph.obligatorio DESC, hp.nombre
+                    """, (fecha, plan_usuario_id))
+                    
+                    habitos = cur.fetchall()
+                    
+                    resultado = []
+                    for h in habitos:
+                        resultado.append({
+                            'plan_habito_id': h[0],
+                            'habito_usuario_id': h[1],
+                            'obligatorio': h[2],
+                            'objetivo_id': h[3],
+                            'notas': h[4],
+                            'habito_id': h[5],
+                            'nombre': h[6],
+                            'descripcion': h[7],
+                            'puntos': h[8],
+                            'categoria': h[9],
+                            'completado_hoy': h[10] if h[10] is not None else False,
+                            'hora_completado': str(h[11]) if h[11] else None
+                        })
+                    
+                    print(f"DEBUG get_habitos_del_plan: {len(resultado)} hábitos encontrados para plan {plan_usuario_id}")
+                    
+                    return resultado
+                    
+        except Exception as e:
+            print(f"Error get_habitos_del_plan: {e}")
+            return []

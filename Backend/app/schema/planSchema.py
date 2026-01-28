@@ -234,3 +234,52 @@ class PlanEstadoResponseSchema(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+# ============================================
+# SCHEMAS PARA HÁBITOS VINCULADOS A PLANES
+# ============================================
+
+class VincularHabitoSchema(BaseModel):
+    """Schema para vincular un hábito a un plan"""
+    habito_usuario_id: int
+    objetivo_id: Optional[int] = None  # Fase específica (opcional)
+    obligatorio: bool = False
+    notas: Optional[str] = None
+    
+    @validator('habito_usuario_id')
+    def validate_habito_id(cls, v):
+        if v <= 0:
+            raise ValueError('habito_usuario_id debe ser mayor a 0')
+        return v
+
+class HabitoPlanResponseSchema(BaseModel):
+    """Schema para respuesta de hábito vinculado"""
+    plan_habito_id: int
+    habito_usuario_id: int
+    habito_id: int
+    nombre: str
+    descripcion: Optional[str] = None
+    categoria: str
+    puntos: int
+    obligatorio: bool
+    objetivo_id: Optional[int] = None
+    notas: Optional[str] = None
+    completado_hoy: bool
+    hora_completado: Optional[str] = None
+
+class ListaHabitosPlanResponseSchema(BaseModel):
+    """Schema para lista de hábitos de un plan"""
+    success: bool
+    data: List[HabitoPlanResponseSchema]
+    total: int
+
+class VincularHabitoResponseSchema(BaseModel):
+    """Schema para respuesta al vincular hábito"""
+    success: bool
+    message: str
+    plan_habito_id: Optional[int] = None
+
+class DesvincularHabitoResponseSchema(BaseModel):
+    """Schema para respuesta al desvincular hábito"""
+    success: bool
+    message: str

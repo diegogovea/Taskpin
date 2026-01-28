@@ -41,7 +41,12 @@ from .schema.planSchema import (
     PlanUsuarioResponseSchema,
     TareaMarcadaResponseSchema,
     PlanEstadoUpdateSchema,
-    PlanEstadoResponseSchema
+    PlanEstadoResponseSchema,
+    VincularHabitoSchema,
+    VincularHabitoResponseSchema,
+    DesvincularHabitoResponseSchema,
+    ListaHabitosPlanResponseSchema,
+    HabitoPlanResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -1476,6 +1481,145 @@ def marcar_tarea_completada(data: MarcarTareaSchema, current_user: TokenData = D
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al marcar tarea: {str(e)}')
+
+# ========================================
+# ENDPOINTS DE HÁBITOS VINCULADOS A PLANES
+# ========================================
+
+@app.post("/api/planes/{plan_usuario_id}/habitos", response_model=VincularHabitoResponseSchema)
+def vincular_habito_a_plan(plan_usuario_id: int, data: VincularHabitoSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/{id}/habitos - Vincular un hábito a un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.vincular_habito_a_plan(
+            plan_usuario_id=plan_usuario_id,
+            habito_usuario_id=data.habito_usuario_id,
+            objetivo_id=data.objetivo_id,
+            obligatorio=data.obligatorio,
+            notas=data.notas
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al vincular hábito')
+            )
+        
+        return VincularHabitoResponseSchema(
+            success=True,
+            message=resultado.get('message'),
+            plan_habito_id=resultado.get('plan_habito_id')
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al vincular hábito: {str(e)}')
+
+@app.delete("/api/planes/{plan_usuario_id}/habitos/{habito_usuario_id}", response_model=DesvincularHabitoResponseSchema)
+def desvincular_habito_de_plan(plan_usuario_id: int, habito_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """DELETE /api/planes/{id}/habitos/{habito_id} - Desvincular un hábito de un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.desvincular_habito_de_plan(
+            plan_usuario_id=plan_usuario_id,
+            habito_usuario_id=habito_usuario_id
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al desvincular hábito')
+            )
+        
+        return DesvincularHabitoResponseSchema(
+            success=True,
+            message=resultado.get('message')
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al desvincular hábito: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/habitos", response_model=ListaHabitosPlanResponseSchema)
+def get_habitos_del_plan(plan_usuario_id: int, fecha: Optional[str] = None, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/{id}/habitos - Obtener hábitos vinculados a un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        # Parsear fecha si se proporciona
+        fecha_obj = None
+        if fecha:
+            from datetime import datetime
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail='Formato de fecha inválido. Use YYYY-MM-DD')
+        
+        habitos = planes_conn.get_habitos_del_plan(plan_usuario_id, fecha_obj)
+        
+        # Convertir a schema
+        habitos_response = [
+            HabitoPlanResponseSchema(
+                plan_habito_id=h['plan_habito_id'],
+                habito_usuario_id=h['habito_usuario_id'],
+                habito_id=h['habito_id'],
+                nombre=h['nombre'],
+                descripcion=h['descripcion'],
+                categoria=h['categoria'],
+                puntos=h['puntos'],
+                obligatorio=h['obligatorio'],
+                objetivo_id=h['objetivo_id'],
+                notas=h['notas'],
+                completado_hoy=h['completado_hoy'],
+                hora_completado=h['hora_completado']
+            )
+            for h in habitos
+        ]
+        
+        return ListaHabitosPlanResponseSchema(
+            success=True,
+            data=habitos_response,
+            total=len(habitos_response)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener hábitos del plan: {str(e)}')
 
 # ========================================
 # ENDPOINTS DE PRUEBA
