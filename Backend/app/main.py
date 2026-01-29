@@ -60,6 +60,15 @@ from .schema.estadisticasSchema import (
     EstadisticasResponseSchema
 )
 
+# IMPORTACIONES PARA REFLEXIONES DIARIAS
+from .model.reflexionesConnection import ReflexionesConnection
+from .schema.reflexionSchema import (
+    CrearReflexionSchema,
+    ReflexionHoyResponseSchema,
+    HistorialReflexionesResponseSchema,
+    CrearReflexionResponseSchema
+)
+
 # Usar configuración desde config.py
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -1266,6 +1275,78 @@ def get_estadisticas_usuario(user_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+
+# ============================================
+# ENDPOINTS DE REFLEXIONES DIARIAS
+# ============================================
+
+reflexiones_conn = ReflexionesConnection()
+
+@app.post("/api/usuario/{user_id}/reflexion", response_model=CrearReflexionResponseSchema)
+def crear_reflexion(user_id: int, data: CrearReflexionSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/usuario/{user_id}/reflexion - Crear o actualizar reflexión del día (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        resultado = reflexiones_conn.crear_o_actualizar_reflexion(
+            user_id=user_id,
+            estado_animo=data.estado_animo,
+            que_salio_bien=data.que_salio_bien,
+            que_mejorar=data.que_mejorar
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(status_code=400, detail=resultado.get('message', 'Error al guardar reflexión'))
+        
+        return CrearReflexionResponseSchema(
+            success=True,
+            message=resultado.get('message'),
+            reflexion_id=resultado.get('reflexion_id'),
+            es_nueva=resultado.get('es_nueva', True)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al crear reflexión: {str(e)}')
+
+@app.get("/api/usuario/{user_id}/reflexion/hoy", response_model=ReflexionHoyResponseSchema)
+def get_reflexion_hoy(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/usuario/{user_id}/reflexion/hoy - Obtener reflexión del día (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        resultado = reflexiones_conn.get_reflexion_hoy(user_id)
+        
+        return ReflexionHoyResponseSchema(**resultado)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener reflexión: {str(e)}')
+
+@app.get("/api/usuario/{user_id}/reflexiones", response_model=HistorialReflexionesResponseSchema)
+def get_historial_reflexiones(user_id: int, limite: int = 30, current_user: TokenData = Depends(verify_token)):
+    """GET /api/usuario/{user_id}/reflexiones - Obtener historial de reflexiones (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        resultado = reflexiones_conn.get_historial_reflexiones(user_id, limite)
+        
+        return HistorialReflexionesResponseSchema(**resultado)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener historial: {str(e)}')
 
 # ============================================
 # ENDPOINTS DE PLANES
