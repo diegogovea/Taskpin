@@ -46,7 +46,10 @@ from .schema.planSchema import (
     VincularHabitoResponseSchema,
     DesvincularHabitoResponseSchema,
     ListaHabitosPlanResponseSchema,
-    HabitoPlanResponseSchema
+    HabitoPlanResponseSchema,
+    AgregarPlanConHabitosSchema,
+    AgregarPlanConHabitosResponseSchema,
+    DashboardPlanResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -1348,6 +1351,45 @@ def agregar_plan_usuario(data: AgregarPlanUsuarioSchema, current_user: TokenData
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al agregar plan: {str(e)}')
 
+@app.post("/api/planes/agregar-con-habitos", response_model=AgregarPlanConHabitosResponseSchema)
+def agregar_plan_con_habitos(data: AgregarPlanConHabitosSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/agregar-con-habitos - Agregar plan con hábitos vinculados (wizard) (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        planes_conn = PlanesConnection()
+        resultado = planes_conn.agregar_plan_con_habitos(
+            user_id=data.user_id,
+            plan_id=data.plan_id,
+            dias_personalizados=data.dias_personalizados,
+            fecha_inicio=data.fecha_inicio,
+            habitos_a_vincular=data.habitos_a_vincular
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al agregar plan')
+            )
+        
+        return AgregarPlanConHabitosResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan creado correctamente'),
+            plan_usuario_id=resultado.get('plan_usuario_id'),
+            habitos_vinculados=resultado.get('habitos_vinculados', 0)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al agregar plan con hábitos: {str(e)}')
+
 @app.get("/api/planes/mis-planes/{user_id}")
 def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):
     """GET /api/planes/mis-planes/1 - Obtener planes del usuario (PROTEGIDO)"""
@@ -1403,6 +1445,43 @@ def actualizar_estado_plan(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al actualizar estado del plan: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/hoy", response_model=DashboardPlanResponseSchema)
+def get_dashboard_plan_hoy(plan_usuario_id: int, fecha: Optional[str] = None, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/1/hoy - Dashboard completo del plan para hoy (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        # Parsear fecha si se proporciona
+        fecha_obj = None
+        if fecha:
+            from datetime import datetime
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail='Formato de fecha inválido. Use YYYY-MM-DD')
+        
+        dashboard = planes_conn.get_dashboard_plan(plan_usuario_id, fecha_obj)
+        
+        if not dashboard:
+            raise HTTPException(status_code=404, detail='Plan no encontrado')
+        
+        return DashboardPlanResponseSchema(**dashboard)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener dashboard del plan: {str(e)}')
 
 @app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
 def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):

@@ -16,97 +16,114 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
-import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmModal from "../../components/modals/ConfirmModal";
 
+// =====================
+// INTERFACES
+// =====================
+
+interface ProgresoGeneral {
+  dias_transcurridos: number;
+  dias_totales: number;
+  porcentaje: number;
+}
+
+interface FaseActual {
+  objetivo_id: number;
+  titulo: string;
+  descripcion: string | null;
+  orden_fase: number;
+  total_fases: number;
+  dia_en_fase: number;
+  duracion_fase: number;
+  porcentaje_fase: number;
+}
+
 interface TareaDiaria {
   tarea_id: number;
-  tarea_usuario_id: number | null;
   titulo: string;
-  descripcion: string;
+  descripcion: string | null;
   tipo: string;
   es_diaria: boolean;
   completada: boolean;
   hora_completada: string | null;
 }
 
-interface FaseActual {
-  objetivo_id: number;
-  titulo: string;
-  descripcion: string;
-  orden_fase: number;
-  duracion_dias: number;
+interface HabitoPlan {
+  habito_usuario_id: number;
+  nombre: string;
+  descripcion: string | null;
+  categoria: string;
+  puntos: number;
+  completado_hoy: boolean;
+  hora_completado: string | null;
 }
 
-interface DailyProgress {
+interface DashboardData {
   plan_usuario_id: number;
   meta_principal: string;
   dificultad: string;
+  estado: string;
   fecha: string;
-  dias_transcurridos: number;
+  progreso_general: ProgresoGeneral;
   fase_actual: FaseActual;
-  tareas: TareaDiaria[];
+  tareas_hoy: TareaDiaria[];
+  tareas_completadas: number;
+  tareas_total: number;
+  habitos_plan: HabitoPlan[];
+  habitos_completados: number;
+  habitos_total: number;
 }
+
+// =====================
+// MAIN COMPONENT
+// =====================
 
 export default function SeguimientoPlanScreen() {
   const router = useRouter();
   const { planUsuarioId, titulo } = useLocalSearchParams();
   const { user, authFetch } = useAuth();
   
-  const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [togglingTask, setTogglingTask] = useState<number | null>(null);
+  const [togglingHabit, setTogglingHabit] = useState<number | null>(null);
   
   // Estados para gestión del plan
-  const [estadoPlan, setEstadoPlan] = useState<string>("activo");
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [accionPendiente, setAccionPendiente] = useState<"pausar" | "reanudar" | "cancelar" | null>(null);
   const [procesandoAccion, setProcesandoAccion] = useState(false);
 
-  const fetchTareasDiarias = async () => {
+  // =====================
+  // FETCH DATA
+  // =====================
+
+  const fetchDashboard = async () => {
     try {
-      const response = await authFetch(`/api/planes/tareas-diarias/${planUsuarioId}`);
+      const response = await authFetch(`/api/planes/${planUsuarioId}/hoy`);
       const data = await response.json();
       
-      // El backend devuelve directamente el objeto, no { success, data }
       if (data && data.plan_usuario_id) {
-        setDailyProgress(data);
-      } else if (data.success && data.data) {
-        // Fallback por si se cambia el formato
-        setDailyProgress(data.data);
+        setDashboard(data);
+      } else if (data.detail) {
+        console.error("Error:", data.detail);
       }
     } catch (error) {
-      console.error("Error fetching tareas:", error);
-      Alert.alert("Error", "Could not load tasks");
+      console.error("Error fetching dashboard:", error);
+      Alert.alert("Error", "Could not load plan data");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Obtener el estado actual del plan
-  const fetchEstadoPlan = async () => {
-    if (!user?.user_id) return;
-    try {
-      const response = await authFetch(`/api/planes/mis-planes/${user.user_id}`);
-      const data = await response.json();
-      if (data.success && data.planes) {
-        const planActual = data.planes.find(
-          (p: any) => p.plan_usuario_id === Number(planUsuarioId)
-        );
-        if (planActual) {
-          setEstadoPlan(planActual.estado || "activo");
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching estado plan:", error);
-    }
-  };
+  // =====================
+  // HANDLERS
+  // =====================
 
-  // Cambiar estado del plan
   const cambiarEstadoPlan = async (nuevoEstado: string) => {
     setProcesandoAccion(true);
     try {
@@ -118,7 +135,6 @@ export default function SeguimientoPlanScreen() {
       const data = await response.json();
       
       if (data.success) {
-        setEstadoPlan(nuevoEstado);
         setShowConfirmModal(false);
         setAccionPendiente(null);
         
@@ -128,29 +144,27 @@ export default function SeguimientoPlanScreen() {
           ]);
         } else if (nuevoEstado === "pausado") {
           Alert.alert("Plan Paused", "You can resume this plan anytime.");
+          fetchDashboard();
         } else if (nuevoEstado === "activo") {
           Alert.alert("Plan Resumed", "Your plan is active again!");
-          fetchTareasDiarias();
+          fetchDashboard();
         }
       } else {
         Alert.alert("Error", data.message || "Could not update plan status");
       }
     } catch (error) {
-      console.error("Error cambiando estado:", error);
       Alert.alert("Error", "Connection error");
     } finally {
       setProcesandoAccion(false);
     }
   };
 
-  // Manejar acción del menú
   const handleAccion = (accion: "pausar" | "reanudar" | "cancelar") => {
     setShowActionMenu(false);
     setAccionPendiente(accion);
     setShowConfirmModal(true);
   };
 
-  // Confirmar acción
   const confirmarAccion = () => {
     if (!accionPendiente) return;
     const nuevoEstado = accionPendiente === "pausar" ? "pausado" 
@@ -159,7 +173,6 @@ export default function SeguimientoPlanScreen() {
     cambiarEstadoPlan(nuevoEstado);
   };
 
-  // Obtener configuración del modal según la acción
   const getModalConfig = () => {
     switch (accionPendiente) {
       case "pausar":
@@ -187,13 +200,7 @@ export default function SeguimientoPlanScreen() {
           danger: true,
         };
       default:
-        return {
-          title: "",
-          message: "",
-          confirmText: "Confirm",
-          icon: "help-circle" as const,
-          danger: false,
-        };
+        return { title: "", message: "", confirmText: "Confirm", icon: "help-circle" as const, danger: false };
     }
   };
 
@@ -214,14 +221,19 @@ export default function SeguimientoPlanScreen() {
       const result = await response.json();
 
       if (result.success) {
-        setDailyProgress((prev) => {
+        setDashboard((prev) => {
           if (!prev) return prev;
-          const updatedTareas = prev.tareas.map((tarea) =>
+          const updatedTareas = prev.tareas_hoy.map((tarea) =>
             tarea.tarea_id === tareaId
               ? { ...tarea, completada: result.completada }
               : tarea
           );
-          return { ...prev, tareas: updatedTareas };
+          const completadas = updatedTareas.filter(t => t.completada).length;
+          return { 
+            ...prev, 
+            tareas_hoy: updatedTareas,
+            tareas_completadas: completadas
+          };
         });
       } else {
         Alert.alert("Error", result.message || "Could not update task");
@@ -233,30 +245,73 @@ export default function SeguimientoPlanScreen() {
     }
   };
 
+  const toggleHabito = async (habitoUsuarioId: number) => {
+    if (togglingHabit || !user?.user_id) return;
+    setTogglingHabit(habitoUsuarioId);
+
+    try {
+      const response = await authFetch(`/api/usuario/${user.user_id}/habito/${habitoUsuarioId}/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setDashboard((prev) => {
+          if (!prev) return prev;
+          const updatedHabitos = prev.habitos_plan.map((habito) =>
+            habito.habito_usuario_id === habitoUsuarioId
+              ? { ...habito, completado_hoy: result.data?.completado ?? !habito.completado_hoy }
+              : habito
+          );
+          const completados = updatedHabitos.filter(h => h.completado_hoy).length;
+          return { 
+            ...prev, 
+            habitos_plan: updatedHabitos,
+            habitos_completados: completados
+          };
+        });
+      } else {
+        Alert.alert("Error", result.message || "Could not update habit");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Connection error");
+    } finally {
+      setTogglingHabit(null);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
-    fetchTareasDiarias();
+    fetchDashboard();
   };
+
+  const goBack = () => {
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
+  };
+
+  // =====================
+  // EFFECTS
+  // =====================
 
   useEffect(() => {
     if (planUsuarioId) {
-      fetchTareasDiarias();
-      fetchEstadoPlan();
+      fetchDashboard();
     }
   }, [planUsuarioId]);
 
   useFocusEffect(
     useCallback(() => {
       if (planUsuarioId) {
-        fetchTareasDiarias();
-        fetchEstadoPlan();
+        fetchDashboard();
       }
     }, [planUsuarioId])
   );
 
-  const goBack = () => {
-    router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
-  };
+  // =====================
+  // LOADING STATES
+  // =====================
 
   if (loading) {
     return (
@@ -269,7 +324,7 @@ export default function SeguimientoPlanScreen() {
     );
   }
 
-  if (!dailyProgress) {
+  if (!dashboard) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -280,10 +335,14 @@ export default function SeguimientoPlanScreen() {
     );
   }
 
-  const completedToday = dailyProgress.tareas.filter((t) => t.completada).length;
-  const totalToday = dailyProgress.tareas.length;
-  const allCompleted = completedToday === totalToday && totalToday > 0;
-  const progresoCalculado = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
+  const estadoPlan = dashboard.estado;
+  const allTasksCompleted = dashboard.tareas_completadas === dashboard.tareas_total && dashboard.tareas_total > 0;
+  const allHabitsCompleted = dashboard.habitos_completados === dashboard.habitos_total && dashboard.habitos_total > 0;
+  const allCompleted = allTasksCompleted && (dashboard.habitos_total === 0 || allHabitsCompleted);
+
+  // =====================
+  // RENDER
+  // =====================
 
   return (
     <SafeAreaView style={styles.container}>
@@ -294,15 +353,11 @@ export default function SeguimientoPlanScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {titulo ? decodeURIComponent(titulo as string) : "Plan Progress"}
+            {titulo ? decodeURIComponent(titulo as string) : dashboard.meta_principal}
           </Text>
         </View>
-        {/* Menu Button - only show if plan is not completed or cancelled */}
         {estadoPlan !== "completado" && estadoPlan !== "cancelado" ? (
-          <TouchableOpacity 
-            style={styles.menuButton} 
-            onPress={() => setShowActionMenu(true)}
-          >
+          <TouchableOpacity style={styles.menuButton} onPress={() => setShowActionMenu(true)}>
             <Ionicons name="ellipsis-vertical" size={22} color={colors.neutral[700]} />
           </TouchableOpacity>
         ) : (
@@ -324,12 +379,9 @@ export default function SeguimientoPlanScreen() {
             </View>
             <View style={styles.statusBannerContent}>
               <Text style={styles.statusBannerTitle}>Plan Paused</Text>
-              <Text style={styles.statusBannerText}>Your progress is saved. Resume anytime!</Text>
+              <Text style={styles.statusBannerText}>Your progress is saved</Text>
             </View>
-            <TouchableOpacity 
-              style={styles.statusBannerButton}
-              onPress={() => handleAccion("reanudar")}
-            >
+            <TouchableOpacity style={styles.statusBannerButton} onPress={() => handleAccion("reanudar")}>
               <Text style={styles.statusBannerButtonText}>Resume</Text>
             </TouchableOpacity>
           </View>
@@ -341,111 +393,105 @@ export default function SeguimientoPlanScreen() {
               <Ionicons name="close-circle" size={24} color={colors.semantic.error} />
             </View>
             <View style={styles.statusBannerContent}>
-              <Text style={[styles.statusBannerTitle, { color: colors.semantic.error }]}>
-                Plan Cancelled
-              </Text>
+              <Text style={[styles.statusBannerTitle, { color: colors.semantic.error }]}>Plan Cancelled</Text>
               <Text style={styles.statusBannerText}>This plan is no longer active</Text>
             </View>
           </View>
         )}
 
-        {/* Progress Card */}
-        <View style={styles.progressCard}>
+        {/* ===================== */}
+        {/* PHASE BANNER (2D.3 + 2D.7) */}
+        {/* ===================== */}
+        <View style={styles.phaseBanner}>
           <LinearGradient
             colors={colors.gradients.primary}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.progressCardGradient}
+            style={styles.phaseBannerGradient}
           >
-            <View style={styles.progressHeader}>
-              <View>
-                <Text style={styles.progressLabel}>Today's Progress</Text>
-                <Text style={styles.progressValue}>{progresoCalculado}%</Text>
-              </View>
-              <View style={styles.dayBadge}>
-                <Text style={styles.dayBadgeText}>
-                  Day {dailyProgress.dias_transcurridos}
+            <View style={styles.phaseBannerHeader}>
+              <View style={styles.phaseBadge}>
+                <Text style={styles.phaseBadgeText}>
+                  Phase {dashboard.fase_actual.orden_fase}/{dashboard.fase_actual.total_fases}
                 </Text>
               </View>
+              <View style={styles.dayBadge}>
+                <Ionicons name="calendar-outline" size={14} color={colors.neutral[0]} />
+                <Text style={styles.dayBadgeText}>Day {dashboard.progreso_general.dias_transcurridos}</Text>
+              </View>
             </View>
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBg}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${progresoCalculado}%` },
-                  ]}
+
+            <Text style={styles.phaseBannerTitle}>{dashboard.fase_actual.titulo}</Text>
+            {dashboard.fase_actual.descripcion && (
+              <Text style={styles.phaseBannerSubtitle} numberOfLines={2}>
+                {dashboard.fase_actual.descripcion}
+              </Text>
+            )}
+
+            {/* Phase Progress Bar */}
+            <View style={styles.phaseProgressContainer}>
+              <View style={styles.phaseProgressInfo}>
+                <Text style={styles.phaseProgressText}>
+                  Day {dashboard.fase_actual.dia_en_fase} of {dashboard.fase_actual.duracion_fase}
+                </Text>
+                <Text style={styles.phaseProgressPercent}>{dashboard.fase_actual.porcentaje_fase}%</Text>
+              </View>
+              <View style={styles.phaseProgressBarBg}>
+                <View 
+                  style={[styles.phaseProgressBarFill, { width: `${dashboard.fase_actual.porcentaje_fase}%` }]} 
                 />
               </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Current Phase */}
-        <View style={styles.phaseCard}>
-          <View style={styles.phaseIcon}>
-            <Ionicons name="layers" size={20} color={colors.primary[600]} />
-          </View>
-          <View style={styles.phaseInfo}>
-            <Text style={styles.phaseLabel}>Current Phase</Text>
-            <Text style={styles.phaseName}>{dailyProgress.fase_actual.titulo}</Text>
-            {dailyProgress.fase_actual.descripcion && (
-              <Text style={styles.phaseDescription}>{dailyProgress.fase_actual.descripcion}</Text>
-            )}
-          </View>
-        </View>
-
-        {/* Today's Tasks */}
-        <View style={styles.tasksSection}>
-          <View style={styles.tasksSectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Tasks</Text>
-            <Text style={styles.tasksCount}>
-              {completedToday}/{totalToday} completed
-            </Text>
+        {/* ===================== */}
+        {/* TASKS SECTION (2D.4) */}
+        {/* ===================== */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="checkbox-outline" size={20} color={colors.primary[600]} />
+              <Text style={styles.sectionTitle}>Today's Tasks</Text>
+            </View>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>
+                {dashboard.tareas_completadas}/{dashboard.tareas_total}
+              </Text>
+            </View>
           </View>
 
-          {dailyProgress.tareas.length === 0 ? (
+          {dashboard.tareas_hoy.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="checkmark-done-circle" size={48} color={colors.secondary[500]} />
+              <Ionicons name="checkmark-done-circle" size={40} color={colors.secondary[400]} />
               <Text style={styles.emptyTitle}>No tasks for today</Text>
-              <Text style={styles.emptySubtitle}>Come back tomorrow for new tasks</Text>
             </View>
           ) : (
-            <View style={styles.tasksList}>
-              {dailyProgress.tareas.map((tarea) => (
+            <View style={styles.itemsList}>
+              {dashboard.tareas_hoy.map((tarea) => (
                 <TouchableOpacity
                   key={tarea.tarea_id}
-                  style={[styles.taskCard, tarea.completada && styles.taskCardCompleted]}
+                  style={[styles.itemCard, tarea.completada && styles.itemCardCompleted]}
                   activeOpacity={0.8}
                   onPress={() => toggleTarea(tarea.tarea_id)}
                   disabled={togglingTask === tarea.tarea_id}
                 >
-                  <View
-                    style={[styles.taskCheckbox, tarea.completada && styles.taskCheckboxCompleted]}
-                  >
+                  <View style={[styles.itemCheckbox, tarea.completada && styles.itemCheckboxCompleted]}>
                     {togglingTask === tarea.tarea_id ? (
                       <ActivityIndicator size="small" color={colors.neutral[0]} />
                     ) : tarea.completada ? (
                       <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
                     ) : null}
                   </View>
-                  <View style={styles.taskContent}>
-                    <Text
-                      style={[styles.taskText, tarea.completada && styles.taskTextCompleted]}
-                    >
+                  <View style={styles.itemContent}>
+                    <Text style={[styles.itemText, tarea.completada && styles.itemTextCompleted]}>
                       {tarea.titulo}
                     </Text>
                     {tarea.descripcion && (
-                      <Text style={styles.taskDescription}>{tarea.descripcion}</Text>
+                      <Text style={styles.itemDescription} numberOfLines={2}>{tarea.descripcion}</Text>
                     )}
                     {tarea.completada && tarea.hora_completada && (
-                      <Text style={styles.taskCompletedTime}>
-                        Completed at{" "}
-                        {new Date(`2000-01-01T${tarea.hora_completada}`).toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
+                      <Text style={styles.itemTime}>✓ {tarea.hora_completada}</Text>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -454,7 +500,63 @@ export default function SeguimientoPlanScreen() {
           )}
         </View>
 
-        {/* Completion Message */}
+        {/* ===================== */}
+        {/* HABITS SECTION (2D.5 + 2D.6) */}
+        {/* ===================== */}
+        {dashboard.habitos_plan.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <Ionicons name="refresh" size={20} color={colors.secondary[600]} />
+                <Text style={styles.sectionTitle}>Plan Habits</Text>
+              </View>
+              <View style={[styles.sectionBadge, { backgroundColor: colors.secondary[100] }]}>
+                <Text style={[styles.sectionBadgeText, { color: colors.secondary[600] }]}>
+                  {dashboard.habitos_completados}/{dashboard.habitos_total}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.itemsList}>
+              {dashboard.habitos_plan.map((habito) => (
+                <TouchableOpacity
+                  key={habito.habito_usuario_id}
+                  style={[styles.habitCard, habito.completado_hoy && styles.habitCardCompleted]}
+                  activeOpacity={0.8}
+                  onPress={() => toggleHabito(habito.habito_usuario_id)}
+                  disabled={togglingHabit === habito.habito_usuario_id}
+                >
+                  <View style={[styles.itemCheckbox, habito.completado_hoy && styles.habitCheckboxCompleted]}>
+                    {togglingHabit === habito.habito_usuario_id ? (
+                      <ActivityIndicator size="small" color={colors.neutral[0]} />
+                    ) : habito.completado_hoy ? (
+                      <Ionicons name="checkmark" size={16} color={colors.neutral[0]} />
+                    ) : null}
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={[styles.itemText, habito.completado_hoy && styles.habitTextCompleted]}>
+                      {habito.nombre}
+                    </Text>
+                    <Text style={styles.habitCategory}>{habito.categoria}</Text>
+                  </View>
+                  <View style={styles.habitPoints}>
+                    <Text style={styles.habitPointsText}>+{habito.puntos}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* No Habits Linked Message */}
+        {dashboard.habitos_plan.length === 0 && (
+          <View style={styles.noHabitsCard}>
+            <Ionicons name="leaf-outline" size={24} color={colors.neutral[400]} />
+            <Text style={styles.noHabitsText}>No habits linked to this plan</Text>
+          </View>
+        )}
+
+        {/* Completion Card */}
         {allCompleted && (
           <View style={styles.completionCard}>
             <LinearGradient
@@ -463,13 +565,9 @@ export default function SeguimientoPlanScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.completionGradient}
             >
-              <View style={styles.completionIcon}>
-                <Ionicons name="trophy" size={28} color={colors.neutral[0]} />
-              </View>
-              <Text style={styles.completionTitle}>Great job! 🎉</Text>
-              <Text style={styles.completionText}>
-                You've completed all tasks for today. Keep up the amazing work!
-              </Text>
+              <Ionicons name="trophy" size={32} color={colors.neutral[0]} />
+              <Text style={styles.completionTitle}>Great job today! 🎉</Text>
+              <Text style={styles.completionText}>You've completed all tasks and habits</Text>
             </LinearGradient>
           </View>
         )}
@@ -478,26 +576,15 @@ export default function SeguimientoPlanScreen() {
       </ScrollView>
 
       {/* Action Menu Modal */}
-      <Modal
-        visible={showActionMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowActionMenu(false)}
-      >
-        <Pressable 
-          style={styles.actionMenuOverlay} 
-          onPress={() => setShowActionMenu(false)}
-        >
+      <Modal visible={showActionMenu} transparent animationType="fade" onRequestClose={() => setShowActionMenu(false)}>
+        <Pressable style={styles.actionMenuOverlay} onPress={() => setShowActionMenu(false)}>
           <View style={styles.actionMenuContainer}>
             <View style={styles.actionMenuHeader}>
               <Text style={styles.actionMenuTitle}>Plan Options</Text>
             </View>
             
             {estadoPlan === "activo" && (
-              <TouchableOpacity 
-                style={styles.actionMenuItem}
-                onPress={() => handleAccion("pausar")}
-              >
+              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("pausar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.accent.amber + '15' }]}>
                   <Ionicons name="pause-circle" size={22} color={colors.accent.amber} />
                 </View>
@@ -509,10 +596,7 @@ export default function SeguimientoPlanScreen() {
             )}
             
             {estadoPlan === "pausado" && (
-              <TouchableOpacity 
-                style={styles.actionMenuItem}
-                onPress={() => handleAccion("reanudar")}
-              >
+              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("reanudar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.secondary[500] + '15' }]}>
                   <Ionicons name="play-circle" size={22} color={colors.secondary[500]} />
                 </View>
@@ -524,26 +608,18 @@ export default function SeguimientoPlanScreen() {
             )}
             
             {(estadoPlan === "activo" || estadoPlan === "pausado") && (
-              <TouchableOpacity 
-                style={styles.actionMenuItem}
-                onPress={() => handleAccion("cancelar")}
-              >
+              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("cancelar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.semantic.error + '15' }]}>
                   <Ionicons name="close-circle" size={22} color={colors.semantic.error} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>
-                    Cancel Plan
-                  </Text>
+                  <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>Cancel Plan</Text>
                   <Text style={styles.actionMenuItemSubtext}>This cannot be undone</Text>
                 </View>
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity 
-              style={styles.actionMenuCloseButton}
-              onPress={() => setShowActionMenu(false)}
-            >
+            <TouchableOpacity style={styles.actionMenuCloseButton} onPress={() => setShowActionMenu(false)}>
               <Text style={styles.actionMenuCloseText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -561,14 +637,15 @@ export default function SeguimientoPlanScreen() {
         danger={getModalConfig().danger}
         isLoading={procesandoAccion}
         onConfirm={confirmarAccion}
-        onCancel={() => {
-          setShowConfirmModal(false);
-          setAccionPendiente(null);
-        }}
+        onCancel={() => { setShowConfirmModal(false); setAccionPendiente(null); }}
       />
     </SafeAreaView>
   );
 }
+
+// =====================
+// STYLES
+// =====================
 
 const styles = StyleSheet.create({
   container: {
@@ -612,6 +689,14 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     color: colors.neutral[900],
   },
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollView: {
     flex: 1,
   },
@@ -619,213 +704,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[5],
     paddingTop: spacing[5],
   },
-  progressCard: {
-    borderRadius: radius["2xl"],
-    overflow: "hidden",
-    marginBottom: spacing[5],
-    ...shadows.lg,
-    shadowColor: colors.primary[600],
-  },
-  progressCardGradient: {
-    padding: spacing[5],
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: spacing[4],
-  },
-  progressLabel: {
-    fontSize: typography.size.sm,
-    color: "rgba(255,255,255,0.8)",
-    marginBottom: spacing[1],
-  },
-  progressValue: {
-    fontSize: typography.size["3xl"],
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[0],
-  },
-  dayBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: radius.full,
-  },
-  dayBadgeText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[0],
-  },
-  progressBarContainer: {
-    marginTop: spacing[2],
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: colors.neutral[0],
-    borderRadius: 4,
-  },
-  phaseCard: {
-    flexDirection: "row",
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    marginBottom: spacing[6],
-    ...shadows.sm,
-  },
-  phaseIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primary[100],
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: spacing[3],
-  },
-  phaseInfo: {
-    flex: 1,
-  },
-  phaseLabel: {
-    fontSize: typography.size.xs,
-    color: colors.neutral[500],
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: spacing[1],
-  },
-  phaseName: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[800],
-    marginBottom: spacing[1],
-  },
-  phaseDescription: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[500],
-    lineHeight: 18,
-  },
-  tasksSection: {
-    marginBottom: spacing[6],
-  },
-  tasksSectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing[4],
-  },
-  sectionTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[900],
-  },
-  tasksCount: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[500],
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: spacing[10],
-  },
-  emptyTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[700],
-    marginTop: spacing[3],
-    marginBottom: spacing[1],
-  },
-  emptySubtitle: {
-    fontSize: typography.size.base,
-    color: colors.neutral[500],
-  },
-  tasksList: {
-    gap: spacing[3],
-  },
-  taskCard: {
-    flexDirection: "row",
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    ...shadows.sm,
-  },
-  taskCardCompleted: {
-    backgroundColor: colors.secondary[50],
-    borderWidth: 1,
-    borderColor: colors.secondary[200],
-  },
-  taskCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.neutral[300],
-    marginRight: spacing[3],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  taskCheckboxCompleted: {
-    backgroundColor: colors.secondary[500],
-    borderColor: colors.secondary[500],
-  },
-  taskContent: {
-    flex: 1,
-  },
-  taskText: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[800],
-    lineHeight: 22,
-  },
-  taskDescription: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[500],
-    marginTop: spacing[1],
-  },
-  taskTextCompleted: {
-    color: colors.secondary[700],
-  },
-  taskCompletedTime: {
-    fontSize: typography.size.xs,
-    color: colors.secondary[600],
-    marginTop: spacing[1],
-  },
-  completionCard: {
-    borderRadius: radius["2xl"],
-    overflow: "hidden",
-    marginBottom: spacing[4],
-    ...shadows.md,
-    shadowColor: colors.secondary[600],
-  },
-  completionGradient: {
-    padding: spacing[6],
-    alignItems: "center",
-  },
-  completionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing[3],
-  },
-  completionTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[0],
-    marginBottom: spacing[1],
-  },
-  completionText: {
-    fontSize: typography.size.sm,
-    color: "rgba(255,255,255,0.9)",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  // Status Banner Styles
+
+  // Status Banner
   statusBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -866,16 +746,268 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
   },
-  // Menu Button
-  menuButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: colors.neutral[100],
+
+  // Phase Banner (2D.3 + 2D.7)
+  phaseBanner: {
+    borderRadius: radius["2xl"],
+    overflow: "hidden",
+    marginBottom: spacing[5],
+    ...shadows.lg,
+    shadowColor: colors.primary[600],
+  },
+  phaseBannerGradient: {
+    padding: spacing[5],
+  },
+  phaseBannerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  phaseBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.full,
+  },
+  phaseBadgeText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+  },
+  dayBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.full,
+    gap: 4,
+  },
+  dayBadgeText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+  },
+  phaseBannerTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    marginBottom: spacing[1],
+  },
+  phaseBannerSubtitle: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.8)",
+    lineHeight: 20,
+    marginBottom: spacing[4],
+  },
+  phaseProgressContainer: {
+    marginTop: spacing[2],
+  },
+  phaseProgressInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: spacing[2],
+  },
+  phaseProgressText: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.8)",
+  },
+  phaseProgressPercent: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+  },
+  phaseProgressBarBg: {
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  phaseProgressBarFill: {
+    height: "100%",
+    backgroundColor: colors.neutral[0],
+    borderRadius: 4,
+  },
+
+  // Sections
+  section: {
+    marginBottom: spacing[6],
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing[4],
+  },
+  sectionTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+  },
+  sectionTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  sectionBadge: {
+    backgroundColor: colors.primary[100],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: radius.full,
+  },
+  sectionBadgeText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
+  },
+
+  // Items List (Tasks & Habits)
+  itemsList: {
+    gap: spacing[3],
+  },
+  itemCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  itemCardCompleted: {
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  itemCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.neutral[300],
+    marginRight: spacing[3],
     justifyContent: "center",
     alignItems: "center",
   },
-  // Action Menu Styles
+  itemCheckboxCompleted: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[500],
+  },
+  itemContent: {
+    flex: 1,
+  },
+  itemText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[800],
+    lineHeight: 22,
+  },
+  itemTextCompleted: {
+    color: colors.primary[700],
+  },
+  itemDescription: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+    lineHeight: 18,
+  },
+  itemTime: {
+    fontSize: typography.size.xs,
+    color: colors.primary[600],
+    marginTop: spacing[1],
+  },
+
+  // Habit specific
+  habitCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  habitCardCompleted: {
+    backgroundColor: colors.secondary[50],
+    borderWidth: 1,
+    borderColor: colors.secondary[200],
+  },
+  habitCheckboxCompleted: {
+    backgroundColor: colors.secondary[500],
+    borderColor: colors.secondary[500],
+  },
+  habitTextCompleted: {
+    color: colors.secondary[700],
+  },
+  habitCategory: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    marginTop: 2,
+  },
+  habitPoints: {
+    backgroundColor: colors.accent.amber + '20',
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
+  },
+  habitPointsText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    color: colors.accent.amber,
+  },
+
+  // No Habits Card
+  noHabitsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neutral[100],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[6],
+    gap: spacing[2],
+  },
+  noHabitsText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: spacing[8],
+  },
+  emptyTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[500],
+    marginTop: spacing[2],
+  },
+
+  // Completion Card
+  completionCard: {
+    borderRadius: radius["2xl"],
+    overflow: "hidden",
+    marginBottom: spacing[4],
+    ...shadows.md,
+    shadowColor: colors.secondary[600],
+  },
+  completionGradient: {
+    padding: spacing[6],
+    alignItems: "center",
+  },
+  completionTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    marginTop: spacing[2],
+  },
+  completionText: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.9)",
+    marginTop: spacing[1],
+  },
+
+  // Action Menu
   actionMenuOverlay: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.5)",

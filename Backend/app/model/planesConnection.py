@@ -845,3 +845,299 @@ class PlanesConnection:
         except Exception as e:
             print(f"Error get_habitos_del_plan: {e}")
             return []
+
+    def agregar_plan_con_habitos(self, user_id, plan_id, dias_personalizados=None, 
+                                  fecha_inicio=None, habitos_a_vincular=None):
+        """
+        Agregar plan a usuario con hábitos vinculados (wizard).
+        Transacción atómica: crea plan + vincula hábitos en una sola operación.
+        """
+        from datetime import date, timedelta
+        
+        if habitos_a_vincular is None:
+            habitos_a_vincular = []
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar duplicado
+                    cur.execute("""
+                        SELECT plan_usuario_id FROM planes_usuario 
+                        WHERE user_id = %s AND plan_id = %s AND estado != 'cancelado'
+                    """, (user_id, plan_id))
+                    
+                    if cur.fetchone():
+                        return {'success': False, 'message': 'Ya tienes este plan activo'}
+                    
+                    # 2. Calcular fechas
+                    if fecha_inicio is None:
+                        fecha_inicio = date.today()
+                    
+                    fecha_objetivo = None
+                    if dias_personalizados:
+                        fecha_objetivo = fecha_inicio + timedelta(days=dias_personalizados)
+                    
+                    # 3. Insertar plan_usuario
+                    cur.execute("""
+                        INSERT INTO planes_usuario (user_id, plan_id, fecha_inicio, fecha_objetivo, estado, progreso_porcentaje)
+                        VALUES (%s, %s, %s, %s, 'activo', 0)
+                        RETURNING plan_usuario_id
+                    """, (user_id, plan_id, fecha_inicio, fecha_objetivo))
+                    
+                    result = cur.fetchone()
+                    if not result:
+                        return {'success': False, 'message': 'Error al crear el plan'}
+                    
+                    plan_usuario_id = result[0]
+                    
+                    # 4. Crear registros de progreso para cada fase
+                    cur.execute("""
+                        INSERT INTO progreso_planes (plan_usuario_id, objetivo_id, completado, progreso_objetivo_porcentaje)
+                        SELECT %s, objetivo_id, false, 0
+                        FROM objetivos_intermedios 
+                        WHERE plan_id = %s
+                    """, (plan_usuario_id, plan_id))
+                    
+                    # 5. Vincular hábitos (si hay)
+                    habitos_vinculados = 0
+                    errores_habitos = []
+                    
+                    for habito_usuario_id in habitos_a_vincular:
+                        try:
+                            # Verificar que el hábito pertenece al usuario
+                            cur.execute("""
+                                SELECT habito_usuario_id FROM habitos_usuario
+                                WHERE habito_usuario_id = %s AND user_id = %s AND activo = true
+                            """, (habito_usuario_id, user_id))
+                            
+                            if not cur.fetchone():
+                                errores_habitos.append(f"Hábito {habito_usuario_id} no encontrado")
+                                continue
+                            
+                            # Insertar vinculación
+                            cur.execute("""
+                                INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT (plan_usuario_id, habito_usuario_id) DO NOTHING
+                            """, (plan_usuario_id, habito_usuario_id))
+                            
+                            if cur.rowcount > 0:
+                                habitos_vinculados += 1
+                                
+                        except Exception as e:
+                            errores_habitos.append(f"Error hábito {habito_usuario_id}: {str(e)}")
+                    
+                    # 6. Commit de toda la transacción
+                    conn.commit()
+                    
+                    return {
+                        'success': True,
+                        'plan_usuario_id': plan_usuario_id,
+                        'habitos_vinculados': habitos_vinculados,
+                        'errores_habitos': errores_habitos if errores_habitos else None,
+                        'message': f'Plan creado con {habitos_vinculados} hábitos vinculados'
+                    }
+                    
+        except Exception as e:
+            print(f"Error agregar_plan_con_habitos: {e}")
+            return {'success': False, 'message': f'Error interno: {str(e)}'}
+
+    # ============================================
+    # DASHBOARD DEL PLAN (2D)
+    # ============================================
+
+    def get_dashboard_plan(self, plan_usuario_id, fecha=None):
+        """
+        Obtener datos completos del dashboard del plan para una fecha.
+        Combina: info del plan, fase actual, tareas del día, hábitos vinculados.
+        """
+        from datetime import date as date_type
+        
+        if fecha is None:
+            fecha = date_type.today()
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Obtener información básica del plan
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.user_id, pu.plan_id, pu.fecha_inicio,
+                               pu.fecha_objetivo, pu.estado, pu.progreso_porcentaje,
+                               p.meta_principal, p.dificultad, p.plazo_dias_estimado
+                        FROM planes_usuario pu
+                        JOIN planes_predeterminados p ON pu.plan_id = p.plan_id
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan_info = cur.fetchone()
+                    if not plan_info:
+                        return None
+                    
+                    user_id = plan_info[1]
+                    plan_id = plan_info[2]
+                    fecha_inicio = plan_info[3]
+                    fecha_objetivo = plan_info[4]
+                    estado = plan_info[5]
+                    meta_principal = plan_info[7]
+                    dificultad = plan_info[8]
+                    plazo_estimado = plan_info[9]
+                    
+                    # 2. Calcular progreso general
+                    dias_transcurridos = (fecha - fecha_inicio).days + 1
+                    dias_totales = (fecha_objetivo - fecha_inicio).days if fecha_objetivo else plazo_estimado
+                    porcentaje_general = min(100, int((dias_transcurridos / dias_totales) * 100)) if dias_totales > 0 else 0
+                    
+                    # 3. Obtener todas las fases del plan
+                    cur.execute("""
+                        SELECT o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                               COALESCE(SUM(o2.duracion_dias) FILTER (WHERE o2.orden_fase < o.orden_fase), 0) as dias_anteriores
+                        FROM objetivos_intermedios o
+                        LEFT JOIN objetivos_intermedios o2 ON o2.plan_id = o.plan_id
+                        WHERE o.plan_id = %s
+                        GROUP BY o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias
+                        ORDER BY o.orden_fase
+                    """, (plan_id,))
+                    
+                    objetivos = cur.fetchall()
+                    total_fases = len(objetivos)
+                    
+                    # 4. Determinar fase actual
+                    fase_actual = None
+                    dia_en_fase = 1
+                    for objetivo in objetivos:
+                        dias_anteriores = int(objetivo[5]) if objetivo[5] else 0
+                        dia_inicio_fase = dias_anteriores + 1
+                        dia_fin_fase = dias_anteriores + objetivo[4]
+                        
+                        if dia_inicio_fase <= dias_transcurridos <= dia_fin_fase:
+                            fase_actual = objetivo
+                            dia_en_fase = dias_transcurridos - dias_anteriores
+                            break
+                    
+                    # Si se pasó del tiempo, usar última fase
+                    if not fase_actual and objetivos:
+                        fase_actual = objetivos[-1]
+                        dia_en_fase = fase_actual[4]  # Último día de la fase
+                    
+                    if not fase_actual:
+                        return None
+                    
+                    duracion_fase = fase_actual[4]
+                    porcentaje_fase = min(100, int((dia_en_fase / duracion_fase) * 100)) if duracion_fase > 0 else 0
+                    
+                    # 5. Obtener tareas del día (de la fase actual)
+                    cur.execute("""
+                        SELECT t.tarea_id, t.titulo, t.descripcion, t.tipo, t.es_diaria
+                        FROM tareas_predeterminadas t
+                        WHERE t.objetivo_id = %s
+                        ORDER BY t.orden
+                    """, (fase_actual[0],))
+                    
+                    tareas_raw = cur.fetchall()
+                    tareas_hoy = []
+                    tareas_completadas = 0
+                    
+                    for tarea in tareas_raw:
+                        cur.execute("""
+                            SELECT completada, hora_completada
+                            FROM tareas_usuario
+                            WHERE plan_usuario_id = %s AND tarea_id = %s AND fecha_asignada = %s
+                        """, (plan_usuario_id, tarea[0], fecha))
+                        
+                        estado_tarea = cur.fetchone()
+                        completada = estado_tarea[0] if estado_tarea else False
+                        hora = str(estado_tarea[1])[:5] if estado_tarea and estado_tarea[1] else None
+                        
+                        if completada:
+                            tareas_completadas += 1
+                        
+                        tareas_hoy.append({
+                            'tarea_id': tarea[0],
+                            'titulo': tarea[1],
+                            'descripcion': tarea[2],
+                            'tipo': tarea[3],
+                            'es_diaria': tarea[4],
+                            'completada': completada,
+                            'hora_completada': hora
+                        })
+                    
+                    # 6. Obtener hábitos vinculados al plan
+                    cur.execute("""
+                        SELECT ph.habito_usuario_id, hp.nombre, hp.descripcion, 
+                               ch.nombre as categoria, hp.puntos_base,
+                               COALESCE(sh.completado, false) as completado_hoy,
+                               sh.hora_completado
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        JOIN categorias_habitos ch ON hp.categoria_id = ch.categoria_id
+                        LEFT JOIN seguimiento_habitos sh ON (
+                            sh.habito_usuario_id = ph.habito_usuario_id 
+                            AND sh.fecha = %s
+                        )
+                        WHERE ph.plan_usuario_id = %s AND hu.activo = true
+                        ORDER BY hp.nombre
+                    """, (fecha, plan_usuario_id))
+                    
+                    habitos_raw = cur.fetchall()
+                    habitos_plan = []
+                    habitos_completados = 0
+                    
+                    for habito in habitos_raw:
+                        completado = habito[5] if habito[5] else False
+                        hora = str(habito[6])[:5] if habito[6] else None
+                        
+                        if completado:
+                            habitos_completados += 1
+                        
+                        habitos_plan.append({
+                            'habito_usuario_id': habito[0],
+                            'nombre': habito[1],
+                            'descripcion': habito[2],
+                            'categoria': habito[3],
+                            'puntos': habito[4],
+                            'completado_hoy': completado,
+                            'hora_completado': hora
+                        })
+                    
+                    # 7. Construir respuesta completa
+                    return {
+                        'plan_usuario_id': plan_usuario_id,
+                        'meta_principal': meta_principal,
+                        'dificultad': dificultad,
+                        'estado': estado,
+                        'fecha': fecha.isoformat(),
+                        
+                        'progreso_general': {
+                            'dias_transcurridos': dias_transcurridos,
+                            'dias_totales': dias_totales,
+                            'porcentaje': porcentaje_general
+                        },
+                        
+                        'fase_actual': {
+                            'objetivo_id': fase_actual[0],
+                            'titulo': fase_actual[1],
+                            'descripcion': fase_actual[2],
+                            'orden_fase': fase_actual[3],
+                            'total_fases': total_fases,
+                            'dia_en_fase': dia_en_fase,
+                            'duracion_fase': duracion_fase,
+                            'porcentaje_fase': porcentaje_fase
+                        },
+                        
+                        'tareas_hoy': tareas_hoy,
+                        'tareas_completadas': tareas_completadas,
+                        'tareas_total': len(tareas_hoy),
+                        
+                        'habitos_plan': habitos_plan,
+                        'habitos_completados': habitos_completados,
+                        'habitos_total': len(habitos_plan)
+                    }
+                    
+        except Exception as e:
+            print(f"Error get_dashboard_plan: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return None

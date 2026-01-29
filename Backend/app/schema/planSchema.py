@@ -283,3 +283,94 @@ class DesvincularHabitoResponseSchema(BaseModel):
     """Schema para respuesta al desvincular hábito"""
     success: bool
     message: str
+
+# ============================================
+# SCHEMAS PARA WIZARD DE CREACIÓN DE PLAN
+# ============================================
+
+class AgregarPlanConHabitosSchema(BaseModel):
+    """Schema para agregar plan con hábitos vinculados (wizard)"""
+    user_id: int
+    plan_id: int
+    dias_personalizados: Optional[int] = None
+    fecha_inicio: Optional[date] = None  # Por defecto: hoy
+    habitos_a_vincular: List[int] = []   # Lista de habito_usuario_id
+    
+    @validator('user_id', 'plan_id')
+    def validate_ids(cls, v):
+        if v <= 0:
+            raise ValueError('IDs deben ser mayores a 0')
+        return v
+    
+    @validator('dias_personalizados')
+    def validate_dias(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('Días personalizados debe ser mayor a 0')
+        return v
+
+class AgregarPlanConHabitosResponseSchema(BaseModel):
+    """Schema para respuesta al agregar plan con hábitos"""
+    success: bool
+    message: str
+    plan_usuario_id: Optional[int] = None
+    habitos_vinculados: int = 0
+
+# ============================================
+# SCHEMAS PARA DASHBOARD DEL PLAN (2D)
+# ============================================
+
+class ProgresoGeneralSchema(BaseModel):
+    """Progreso general del plan"""
+    dias_transcurridos: int
+    dias_totales: int
+    porcentaje: int
+
+class FaseActualDashboardSchema(BaseModel):
+    """Información de la fase actual para el dashboard"""
+    objetivo_id: int
+    titulo: str
+    descripcion: Optional[str] = None
+    orden_fase: int
+    total_fases: int
+    dia_en_fase: int
+    duracion_fase: int
+    porcentaje_fase: int
+
+class TareaDashboardSchema(BaseModel):
+    """Tarea para el dashboard"""
+    tarea_id: int
+    titulo: str
+    descripcion: Optional[str] = None
+    tipo: str
+    es_diaria: bool
+    completada: bool
+    hora_completada: Optional[str] = None
+
+class HabitoDashboardSchema(BaseModel):
+    """Hábito vinculado al plan para el dashboard"""
+    habito_usuario_id: int
+    nombre: str
+    descripcion: Optional[str] = None
+    categoria: str
+    puntos: int
+    completado_hoy: bool
+    hora_completado: Optional[str] = None
+
+class DashboardPlanResponseSchema(BaseModel):
+    """Schema completo para el dashboard del plan"""
+    plan_usuario_id: int
+    meta_principal: str
+    dificultad: str
+    estado: str
+    fecha: str
+    
+    progreso_general: ProgresoGeneralSchema
+    fase_actual: FaseActualDashboardSchema
+    
+    tareas_hoy: List[TareaDashboardSchema]
+    tareas_completadas: int
+    tareas_total: int
+    
+    habitos_plan: List[HabitoDashboardSchema]
+    habitos_completados: int
+    habitos_total: int
