@@ -1878,6 +1878,249 @@ def get_habitos_del_plan(plan_usuario_id: int, fecha: Optional[str] = None, curr
         raise HTTPException(status_code=500, detail=f'Error al obtener hábitos del plan: {str(e)}')
 
 # ========================================
+# ENDPOINTS DE INTELIGENCIA ARTIFICIAL
+# ========================================
+
+from .ai import HabitRecommender, HabitPredictor
+from .schema.aiSchema import (
+    RecomendacionesResponseSchema,
+    RecomendacionHabitoSchema,
+    UsuariosSimilaresResponseSchema,
+    UsuarioSimilarSchema,
+    PrediccionesHoyResponseSchema,
+    PrediccionHabitoSchema,
+    PrediccionIndividualResponseSchema,
+    ModeloInfoSchema,
+    EntrenarModeloResponseSchema
+)
+
+# Inicializar componentes de IA
+recommender = HabitRecommender()
+predictor = HabitPredictor()
+
+
+@app.get("/api/ai/usuario/{user_id}/recomendaciones", response_model=RecomendacionesResponseSchema)
+def get_ai_recomendaciones(
+    user_id: int, 
+    limit: int = 5,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener recomendaciones de hábitos personalizadas usando IA.
+    
+    El sistema usa filtrado colaborativo con similitud coseno para
+    encontrar usuarios con patrones similares y recomendar hábitos
+    que ellos tienen pero el usuario actual no.
+    
+    Args:
+        user_id: ID del usuario
+        limit: Número máximo de recomendaciones (default: 5)
+    
+    Returns:
+        Lista de hábitos recomendados con score y razón
+    """
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Obtener recomendaciones
+        recomendaciones = recommender.get_recommendations(user_id, limit=limit)
+        
+        return RecomendacionesResponseSchema(
+            success=True,
+            user_id=user_id,
+            total_recomendaciones=len(recomendaciones),
+            recomendaciones=[
+                RecomendacionHabitoSchema(**r) for r in recomendaciones
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener recomendaciones: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/usuarios-similares", response_model=UsuariosSimilaresResponseSchema)
+def get_usuarios_similares(
+    user_id: int,
+    limit: int = 10,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener usuarios con patrones de hábitos similares.
+    
+    Útil para debugging y para mostrar "usuarios como tú".
+    
+    Args:
+        user_id: ID del usuario
+        limit: Número máximo de usuarios similares
+    
+    Returns:
+        Lista de usuarios similares con su score de similitud
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        similares = recommender.find_similar_users(user_id, top_n=limit)
+        
+        return UsuariosSimilaresResponseSchema(
+            success=True,
+            user_id=user_id,
+            total_similares=len(similares),
+            usuarios_similares=[
+                UsuarioSimilarSchema(**s) for s in similares
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener usuarios similares: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/predicciones/hoy", response_model=PrediccionesHoyResponseSchema)
+def get_predicciones_hoy(
+    user_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener predicciones de completado para todos los hábitos del usuario hoy.
+    
+    El modelo Random Forest predice la probabilidad de que el usuario
+    complete cada hábito basándose en:
+    - Día de la semana
+    - Racha actual
+    - Tasa de éxito reciente
+    - Si completó ayer
+    - Antigüedad del hábito
+    
+    Args:
+        user_id: ID del usuario
+    
+    Returns:
+        Lista de predicciones ordenadas por probabilidad (mayor primero)
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el modelo está entrenado
+        if not predictor.is_trained:
+            raise HTTPException(
+                status_code=503, 
+                detail="Modelo de predicción no disponible. Ejecute /api/ai/entrenar primero."
+            )
+        
+        predicciones = predictor.predict_all_habits(user_id)
+        
+        return PrediccionesHoyResponseSchema(
+            success=True,
+            user_id=user_id,
+            fecha=date.today().isoformat(),
+            total_habitos=len(predicciones),
+            predicciones=[
+                PrediccionHabitoSchema(**p) for p in predicciones
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener predicciones: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/prediccion/{habito_usuario_id}", response_model=PrediccionIndividualResponseSchema)
+def get_prediccion_habito(
+    user_id: int,
+    habito_usuario_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener predicción de completado para un hábito específico.
+    
+    Args:
+        user_id: ID del usuario
+        habito_usuario_id: ID del hábito del usuario
+    
+    Returns:
+        Predicción con probabilidad, factores y features usadas
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        if not predictor.is_trained:
+            raise HTTPException(
+                status_code=503,
+                detail="Modelo de predicción no disponible"
+            )
+        
+        pred = predictor.predict(user_id, habito_usuario_id)
+        
+        if not pred:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return PrediccionIndividualResponseSchema(
+            success=True,
+            habito_usuario_id=habito_usuario_id,
+            probabilidad=pred['probabilidad'],
+            factores_positivos=pred['factores_positivos'],
+            factores_negativos=pred['factores_negativos'],
+            features=pred['features']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener predicción: {str(e)}")
+
+
+@app.get("/api/ai/modelo/info", response_model=ModeloInfoSchema)
+def get_modelo_info():
+    """
+    Obtener información sobre el estado del modelo de IA.
+    
+    No requiere autenticación - info pública sobre el sistema.
+    """
+    info = predictor.get_model_info()
+    return ModeloInfoSchema(
+        is_trained=info['is_trained'],
+        model_exists=info['model_exists'],
+        training_accuracy=info['training_accuracy'],
+        feature_names=info['feature_names']
+    )
+
+
+@app.post("/api/ai/entrenar", response_model=EntrenarModeloResponseSchema)
+def entrenar_modelo_ia(current_user: TokenData = Depends(verify_token)):
+    """
+    Entrenar/re-entrenar el modelo de predicción.
+    
+    Requiere autenticación. Solo usuarios autenticados pueden
+    disparar el entrenamiento.
+    
+    El modelo se entrena con todos los datos históricos disponibles.
+    """
+    try:
+        result = predictor.train(save=True)
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Error de entrenamiento'))
+        
+        return EntrenarModeloResponseSchema(
+            success=True,
+            message="Modelo entrenado exitosamente",
+            total_records=result['total_records'],
+            accuracy=result['accuracy'],
+            feature_importance=result['feature_importance']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al entrenar modelo: {str(e)}")
+
+
+# ========================================
 # ENDPOINTS DE PRUEBA
 # ========================================
 

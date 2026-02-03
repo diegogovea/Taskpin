@@ -104,6 +104,14 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="ai"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="sparkles" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="perfil"
         options={{
           tabBarIcon: ({ focused }) => (
