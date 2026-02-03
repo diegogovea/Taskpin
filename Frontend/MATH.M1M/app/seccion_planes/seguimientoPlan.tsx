@@ -445,6 +445,39 @@ export default function SeguimientoPlanScreen() {
           </LinearGradient>
         </View>
 
+        {/* Quick Actions Row */}
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity 
+            style={styles.quickActionBtn}
+            onPress={() => router.push(`/seccion_planes/timelinePlan?planUsuarioId=${planUsuarioId}` as any)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.primary[100] }]}>
+              <Ionicons name="git-branch-outline" size={18} color={colors.primary[600]} />
+            </View>
+            <Text style={styles.quickActionText}>Timeline</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionBtn}
+            onPress={() => Alert.alert('Coming Soon', 'Plan statistics will be available in a future update.')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
+              <Ionicons name="stats-chart-outline" size={18} color={colors.secondary[600]} />
+            </View>
+            <Text style={styles.quickActionText}>Stats</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionBtn}
+            onPress={() => setShowActionMenu(true)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.neutral[100] }]}>
+              <Ionicons name="settings-outline" size={18} color={colors.neutral[600]} />
+            </View>
+            <Text style={styles.quickActionText}>Options</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ===================== */}
         {/* TASKS SECTION (2D.4) */}
         {/* ===================== */}
@@ -1064,6 +1097,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[4],
     borderRadius: radius.xl,
     backgroundColor: colors.neutral[100],
+  },
+  // Quick Actions Row
+  quickActionsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing[5],
+    gap: spacing[3],
+    marginBottom: spacing[5],
+  },
+  quickActionBtn: {
+    flex: 1,
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[3],
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+  },
+  quickActionText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[600],
     alignItems: "center",
   },
   actionMenuCloseText: {

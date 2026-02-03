@@ -49,7 +49,8 @@ from .schema.planSchema import (
     HabitoPlanResponseSchema,
     AgregarPlanConHabitosSchema,
     AgregarPlanConHabitosResponseSchema,
-    DashboardPlanResponseSchema
+    DashboardPlanResponseSchema,
+    TimelineResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -1563,6 +1564,34 @@ def get_dashboard_plan_hoy(plan_usuario_id: int, fecha: Optional[str] = None, cu
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener dashboard del plan: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/timeline", response_model=TimelineResponseSchema)
+def get_timeline_plan(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/1/timeline - Timeline visual del plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        timeline = planes_conn.get_timeline_plan(plan_usuario_id)
+        
+        if not timeline:
+            raise HTTPException(status_code=404, detail='Plan no encontrado')
+        
+        return TimelineResponseSchema(**timeline)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener timeline del plan: {str(e)}')
 
 @app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
 def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):

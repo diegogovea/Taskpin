@@ -1141,3 +1141,134 @@ class PlanesConnection:
             import traceback
             print(f"Traceback: {traceback.format_exc()}")
             return None
+
+    # ============================================
+    # TIMELINE DEL PLAN (2F)
+    # ============================================
+
+    def get_timeline_plan(self, plan_usuario_id):
+        """
+        Obtener timeline visual del plan con todas las fases y su progreso.
+        Retorna datos para renderizar un Gantt chart.
+        """
+        from datetime import date as date_type
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Info básica del plan
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.fecha_inicio, pu.fecha_objetivo,
+                               pu.estado, pu.progreso_porcentaje,
+                               p.meta_principal, p.plazo_dias_estimado
+                        FROM planes_usuario pu
+                        JOIN planes_predeterminados p ON pu.plan_id = p.plan_id
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan_info = cur.fetchone()
+                    if not plan_info:
+                        return None
+                    
+                    fecha_inicio = plan_info[1]
+                    fecha_objetivo = plan_info[2]
+                    estado = plan_info[3]
+                    progreso_porcentaje = plan_info[4]
+                    meta_principal = plan_info[5]
+                    plazo_estimado = plan_info[6]
+                    
+                    # Calcular días
+                    hoy = date_type.today()
+                    dias_transcurridos = max(0, (hoy - fecha_inicio).days + 1)
+                    dias_totales = (fecha_objetivo - fecha_inicio).days if fecha_objetivo else plazo_estimado
+                    dias_restantes = max(0, dias_totales - dias_transcurridos + 1)
+                    
+                    # 2. Obtener todas las fases con días acumulados
+                    cur.execute("""
+                        SELECT o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                               COALESCE(SUM(o2.duracion_dias) FILTER (WHERE o2.orden_fase < o.orden_fase), 0) as dias_anteriores,
+                               pp.completado, pp.progreso_objetivo_porcentaje
+                        FROM objetivos_intermedios o
+                        JOIN planes_usuario pu ON o.plan_id = pu.plan_id
+                        LEFT JOIN objetivos_intermedios o2 ON o2.plan_id = o.plan_id
+                        LEFT JOIN progreso_planes pp ON pp.objetivo_id = o.objetivo_id 
+                                                     AND pp.plan_usuario_id = %s
+                        WHERE pu.plan_usuario_id = %s
+                        GROUP BY o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                                 pp.completado, pp.progreso_objetivo_porcentaje
+                        ORDER BY o.orden_fase
+                    """, (plan_usuario_id, plan_usuario_id))
+                    
+                    objetivos = cur.fetchall()
+                    
+                    fases = []
+                    for obj in objetivos:
+                        objetivo_id = obj[0]
+                        dias_anteriores = int(obj[5]) if obj[5] else 0
+                        duracion = obj[4]
+                        dia_inicio = dias_anteriores + 1
+                        dia_fin = dias_anteriores + duracion
+                        completado = obj[6] if obj[6] else False
+                        porcentaje = obj[7] if obj[7] else 0
+                        
+                        # Determinar estado de la fase
+                        if completado:
+                            estado_fase = 'completada'
+                        elif dias_transcurridos >= dia_inicio and dias_transcurridos <= dia_fin:
+                            estado_fase = 'en_progreso'
+                        elif dias_transcurridos > dia_fin:
+                            estado_fase = 'atrasada'  # Ya pasó pero no completada
+                        else:
+                            estado_fase = 'pendiente'
+                        
+                        # Contar tareas completadas de esta fase
+                        cur.execute("""
+                            SELECT COUNT(*) as total,
+                                   COUNT(CASE WHEN tu.completada = true THEN 1 END) as completadas
+                            FROM tareas_predeterminadas tp
+                            LEFT JOIN tareas_usuario tu ON tp.tarea_id = tu.tarea_id 
+                                                        AND tu.plan_usuario_id = %s
+                            WHERE tp.objetivo_id = %s
+                        """, (plan_usuario_id, objetivo_id))
+                        
+                        tareas_stats = cur.fetchone()
+                        tareas_total = tareas_stats[0] if tareas_stats else 0
+                        tareas_completadas = tareas_stats[1] if tareas_stats else 0
+                        
+                        fases.append({
+                            'objetivo_id': objetivo_id,
+                            'titulo': obj[1],
+                            'descripcion': obj[2],
+                            'orden_fase': obj[3],
+                            'dia_inicio': dia_inicio,
+                            'dia_fin': dia_fin,
+                            'duracion_dias': duracion,
+                            'estado': estado_fase,
+                            'porcentaje_completado': porcentaje,
+                            'tareas_completadas': tareas_completadas,
+                            'tareas_total': tareas_total
+                        })
+                    
+                    return {
+                        'success': True,
+                        'plan_info': {
+                            'plan_usuario_id': plan_usuario_id,
+                            'meta_principal': meta_principal,
+                            'estado': estado,
+                            'fecha_inicio': fecha_inicio.isoformat(),
+                            'fecha_objetivo': fecha_objetivo.isoformat() if fecha_objetivo else None,
+                            'dias_totales': dias_totales,
+                            'dia_actual': dias_transcurridos,
+                            'dias_restantes': dias_restantes,
+                            'progreso_porcentaje': progreso_porcentaje
+                        },
+                        'fases': fases,
+                        'total_fases': len(fases)
+                    }
+                    
+        except Exception as e:
+            print(f"Error get_timeline_plan: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return None

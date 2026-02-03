@@ -374,3 +374,40 @@ class DashboardPlanResponseSchema(BaseModel):
     habitos_plan: List[HabitoDashboardSchema]
     habitos_completados: int
     habitos_total: int
+
+# ============================================
+# SCHEMAS PARA TIMELINE (2F)
+# ============================================
+
+class TimelinePlanInfoSchema(BaseModel):
+    """Info básica del plan para el timeline"""
+    plan_usuario_id: int
+    meta_principal: str
+    estado: str
+    fecha_inicio: str
+    fecha_objetivo: Optional[str] = None
+    dias_totales: int
+    dia_actual: int
+    dias_restantes: int
+    progreso_porcentaje: int
+
+class TimelineFaseSchema(BaseModel):
+    """Fase del plan para el timeline"""
+    objetivo_id: int
+    titulo: str
+    descripcion: Optional[str] = None
+    orden_fase: int
+    dia_inicio: int
+    dia_fin: int
+    duracion_dias: int
+    estado: str  # completada, en_progreso, atrasada, pendiente
+    porcentaje_completado: int
+    tareas_completadas: int
+    tareas_total: int
+
+class TimelineResponseSchema(BaseModel):
+    """Schema completo para el timeline del plan"""
+    success: bool
+    plan_info: TimelinePlanInfoSchema
+    fases: List[TimelineFaseSchema]
+    total_fases: int
