@@ -1272,3 +1272,132 @@ class PlanesConnection:
             import traceback
             print(f"Traceback: {traceback.format_exc()}")
             return None
+
+    # ============================================
+    # PLANES PERSONALIZADOS (2H)
+    # ============================================
+
+    def crear_plan_personalizado(self, user_id, meta_principal, plazo_dias_estimado, 
+                                  dificultad, fases, descripcion=None, 
+                                  categoria_plan_id=None, habitos_a_vincular=None,
+                                  es_publico=False, iniciar_automaticamente=True):
+        """
+        Crear un plan personalizado completo con fases y tareas.
+        Opcionalmente inicia el plan automáticamente para el usuario.
+        """
+        from datetime import date as date_type, timedelta
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Validar que la suma de días de fases no exceda el plazo
+                    total_dias_fases = sum(fase['duracion_dias'] for fase in fases)
+                    if total_dias_fases > plazo_dias_estimado:
+                        return {
+                            'success': False,
+                            'message': f'La suma de días de las fases ({total_dias_fases}) excede el plazo total ({plazo_dias_estimado})'
+                        }
+                    
+                    # Usar categoría "My Custom Plans" (4) por defecto si no se especifica
+                    if categoria_plan_id is None:
+                        categoria_plan_id = 4  # My Custom Plans
+                    
+                    # 2. Crear el plan en planes_predeterminados
+                    cur.execute("""
+                        INSERT INTO planes_predeterminados 
+                        (meta_principal, descripcion, plazo_dias_estimado, dificultad, 
+                         categoria_plan_id, es_personalizado, creado_por_user_id, es_publico, created_at)
+                        VALUES (%s, %s, %s, %s, %s, true, %s, %s, NOW())
+                        RETURNING plan_id
+                    """, (meta_principal, descripcion, plazo_dias_estimado, dificultad,
+                          categoria_plan_id, user_id, es_publico))
+                    
+                    plan_id = cur.fetchone()[0]
+                    
+                    # 3. Crear las fases (objetivos_intermedios)
+                    total_tareas = 0
+                    for fase in fases:
+                        cur.execute("""
+                            INSERT INTO objetivos_intermedios 
+                            (plan_id, titulo, descripcion, orden_fase, duracion_dias)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING objetivo_id
+                        """, (plan_id, fase['titulo'], fase.get('descripcion'), 
+                              fase['orden_fase'], fase['duracion_dias']))
+                        
+                        objetivo_id = cur.fetchone()[0]
+                        
+                        # 4. Crear las tareas de esta fase
+                        tareas = fase.get('tareas', [])
+                        for i, tarea in enumerate(tareas):
+                            es_diaria = tarea.get('tipo', 'diaria') == 'diaria'
+                            orden = tarea.get('orden', i + 1)
+                            
+                            cur.execute("""
+                                INSERT INTO tareas_predeterminadas 
+                                (objetivo_id, titulo, descripcion, tipo, orden, es_diaria)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (objetivo_id, tarea['titulo'], tarea.get('descripcion'),
+                                  tarea.get('tipo', 'diaria'), orden, es_diaria))
+                            
+                            total_tareas += 1
+                    
+                    # 5. Opcionalmente iniciar el plan para el usuario
+                    plan_usuario_id = None
+                    if iniciar_automaticamente:
+                        fecha_inicio = date_type.today()
+                        fecha_objetivo = fecha_inicio + timedelta(days=plazo_dias_estimado)
+                        
+                        cur.execute("""
+                            INSERT INTO planes_usuario 
+                            (user_id, plan_id, fecha_inicio, fecha_objetivo, estado, progreso_porcentaje)
+                            VALUES (%s, %s, %s, %s, 'activo', 0)
+                            RETURNING plan_usuario_id
+                        """, (user_id, plan_id, fecha_inicio, fecha_objetivo))
+                        
+                        plan_usuario_id = cur.fetchone()[0]
+                        
+                        # Crear registros de progreso para cada fase
+                        cur.execute("""
+                            INSERT INTO progreso_planes (plan_usuario_id, objetivo_id, completado, progreso_objetivo_porcentaje)
+                            SELECT %s, objetivo_id, false, 0
+                            FROM objetivos_intermedios 
+                            WHERE plan_id = %s
+                        """, (plan_usuario_id, plan_id))
+                        
+                        # 6. Vincular hábitos si se especificaron
+                        habitos_vinculados = 0
+                        if habitos_a_vincular and len(habitos_a_vincular) > 0:
+                            for habito_id in habitos_a_vincular:
+                                # Verificar que el hábito pertenece al usuario
+                                cur.execute("""
+                                    SELECT habito_usuario_id FROM habitos_usuario
+                                    WHERE habito_usuario_id = %s AND user_id = %s AND activo = true
+                                """, (habito_id, user_id))
+                                
+                                if cur.fetchone():
+                                    cur.execute("""
+                                        INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id)
+                                        VALUES (%s, %s)
+                                        ON CONFLICT DO NOTHING
+                                    """, (plan_usuario_id, habito_id))
+                                    habitos_vinculados += 1
+                    
+                    conn.commit()
+                    
+                    return {
+                        'success': True,
+                        'message': 'Plan personalizado creado exitosamente',
+                        'plan_id': plan_id,
+                        'plan_usuario_id': plan_usuario_id,
+                        'total_fases': len(fases),
+                        'total_tareas': total_tareas,
+                        'habitos_vinculados': habitos_vinculados if iniciar_automaticamente else 0
+                    }
+                    
+        except Exception as e:
+            print(f"Error crear_plan_personalizado: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return {'success': False, 'message': f'Error interno: {str(e)}'}

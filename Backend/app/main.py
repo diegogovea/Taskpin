@@ -50,7 +50,9 @@ from .schema.planSchema import (
     AgregarPlanConHabitosSchema,
     AgregarPlanConHabitosResponseSchema,
     DashboardPlanResponseSchema,
-    TimelineResponseSchema
+    TimelineResponseSchema,
+    CrearPlanCustomSchema,
+    CrearPlanCustomResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -1471,6 +1473,71 @@ def agregar_plan_con_habitos(data: AgregarPlanConHabitosSchema, current_user: To
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al agregar plan con hábitos: {str(e)}')
+
+@app.post("/api/planes/custom", response_model=CrearPlanCustomResponseSchema)
+def crear_plan_personalizado(data: CrearPlanCustomSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/custom - Crear un plan personalizado completo (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Convertir las fases de Pydantic a dict
+        fases_dict = []
+        for fase in data.fases:
+            fase_data = {
+                'titulo': fase.titulo,
+                'descripcion': fase.descripcion,
+                'duracion_dias': fase.duracion_dias,
+                'orden_fase': fase.orden_fase,
+                'tareas': [
+                    {
+                        'titulo': t.titulo,
+                        'descripcion': t.descripcion,
+                        'tipo': t.tipo,
+                        'orden': t.orden
+                    } for t in fase.tareas
+                ]
+            }
+            fases_dict.append(fase_data)
+        
+        planes_conn = PlanesConnection()
+        resultado = planes_conn.crear_plan_personalizado(
+            user_id=data.user_id,
+            meta_principal=data.meta_principal,
+            descripcion=data.descripcion,
+            plazo_dias_estimado=data.plazo_dias_estimado,
+            dificultad=data.dificultad,
+            categoria_plan_id=data.categoria_plan_id,
+            fases=fases_dict,
+            habitos_a_vincular=data.habitos_a_vincular,
+            es_publico=data.es_publico,
+            iniciar_automaticamente=True
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al crear plan personalizado')
+            )
+        
+        return CrearPlanCustomResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan creado correctamente'),
+            plan_id=resultado.get('plan_id'),
+            plan_usuario_id=resultado.get('plan_usuario_id'),
+            total_fases=resultado.get('total_fases', 0),
+            total_tareas=resultado.get('total_tareas', 0)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al crear plan personalizado: {str(e)}')
 
 @app.get("/api/planes/mis-planes/{user_id}")
 def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):

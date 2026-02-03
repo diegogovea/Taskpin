@@ -411,3 +411,93 @@ class TimelineResponseSchema(BaseModel):
     plan_info: TimelinePlanInfoSchema
     fases: List[TimelineFaseSchema]
     total_fases: int
+
+# ============================================
+# SCHEMAS PARA PLANES PERSONALIZADOS (2H)
+# ============================================
+
+class TareaCustomSchema(BaseModel):
+    """Tarea dentro de una fase personalizada"""
+    titulo: str
+    descripcion: Optional[str] = None
+    tipo: str = 'diaria'  # diaria, semanal, única
+    orden: Optional[int] = None
+    
+    @validator('titulo')
+    def validate_titulo(cls, v):
+        if len(v.strip()) < 3:
+            raise ValueError('El título de la tarea debe tener al menos 3 caracteres')
+        return v.strip()
+    
+    @validator('tipo')
+    def validate_tipo(cls, v):
+        if v not in ['diaria', 'semanal', 'única']:
+            raise ValueError('El tipo debe ser: diaria, semanal o única')
+        return v
+
+class FaseCustomSchema(BaseModel):
+    """Fase de un plan personalizado"""
+    titulo: str
+    descripcion: Optional[str] = None
+    duracion_dias: int
+    orden_fase: int
+    tareas: List[TareaCustomSchema] = []
+    
+    @validator('titulo')
+    def validate_titulo(cls, v):
+        if len(v.strip()) < 3:
+            raise ValueError('El título de la fase debe tener al menos 3 caracteres')
+        return v.strip()
+    
+    @validator('duracion_dias')
+    def validate_duracion(cls, v):
+        if v < 1 or v > 365:
+            raise ValueError('La duración debe estar entre 1 y 365 días')
+        return v
+
+class CrearPlanCustomSchema(BaseModel):
+    """Schema para crear un plan personalizado"""
+    user_id: int
+    meta_principal: str
+    descripcion: Optional[str] = None
+    plazo_dias_estimado: int
+    dificultad: str = 'intermedio'
+    categoria_plan_id: Optional[int] = None
+    fases: List[FaseCustomSchema]
+    habitos_a_vincular: Optional[List[int]] = None
+    es_publico: bool = False
+    
+    @validator('meta_principal')
+    def validate_meta(cls, v):
+        if len(v.strip()) < 5:
+            raise ValueError('La meta principal debe tener al menos 5 caracteres')
+        return v.strip()
+    
+    @validator('plazo_dias_estimado')
+    def validate_plazo(cls, v):
+        if v < 7 or v > 365:
+            raise ValueError('El plazo debe estar entre 7 y 365 días')
+        return v
+    
+    @validator('dificultad')
+    def validate_dificultad(cls, v):
+        if v not in ['fácil', 'intermedio', 'difícil']:
+            raise ValueError('La dificultad debe ser: fácil, intermedio o difícil')
+        return v
+    
+    @validator('fases')
+    def validate_fases(cls, v):
+        if len(v) < 1:
+            raise ValueError('El plan debe tener al menos 1 fase')
+        if len(v) > 10:
+            raise ValueError('El plan no puede tener más de 10 fases')
+        return v
+
+class CrearPlanCustomResponseSchema(BaseModel):
+    """Respuesta al crear un plan personalizado"""
+    success: bool
+    message: str
+    plan_id: Optional[int] = None
+    plan_usuario_id: Optional[int] = None
+    total_fases: int = 0
+    total_tareas: int = 0
