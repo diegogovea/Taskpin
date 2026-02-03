@@ -489,3 +489,915 @@ class PlanesConnection:
             import traceback
             print(f"DEBUG TRACEBACK get_planes_usuario: {traceback.format_exc()}")
             return []
+
+    def actualizar_estado_plan(self, plan_usuario_id: int, user_id: int, nuevo_estado: str):
+        """
+        Actualiza el estado de un plan del usuario.
+        
+        Estados válidos: 'activo', 'pausado', 'completado', 'cancelado'
+        
+        Reglas de transición:
+        - activo → pausado, cancelado, completado ✅
+        - pausado → activo (reanudar), cancelado ✅
+        - completado → ninguno ❌
+        - cancelado → ninguno ❌
+        
+        Returns:
+            dict: { success: bool, data: {...}, message: str }
+        """
+        from datetime import datetime
+        
+        # Estados válidos
+        ESTADOS_VALIDOS = ['activo', 'pausado', 'completado', 'cancelado']
+        
+        # Validar nuevo estado
+        if nuevo_estado not in ESTADOS_VALIDOS:
+            return {
+                'success': False, 
+                'message': f'Estado no válido. Debe ser: {", ".join(ESTADOS_VALIDOS)}'
+            }
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar que el plan existe y pertenece al usuario
+                    cur.execute("""
+                        SELECT plan_usuario_id, estado 
+                        FROM planes_usuario 
+                        WHERE plan_usuario_id = %s AND user_id = %s
+                    """, (plan_usuario_id, user_id))
+                    
+                    plan = cur.fetchone()
+                    
+                    if not plan:
+                        return {
+                            'success': False, 
+                            'message': 'Plan no encontrado o no te pertenece'
+                        }
+                    
+                    estado_actual = plan[1]
+                    
+                    # 2. Validar transiciones permitidas
+                    if estado_actual == 'completado':
+                        return {
+                            'success': False, 
+                            'message': 'No se puede modificar un plan completado'
+                        }
+                    
+                    if estado_actual == 'cancelado':
+                        return {
+                            'success': False, 
+                            'message': 'No se puede reactivar un plan cancelado'
+                        }
+                    
+                    if estado_actual == nuevo_estado:
+                        return {
+                            'success': False, 
+                            'message': f'El plan ya está en estado "{nuevo_estado}"'
+                        }
+                    
+                    # 3. Preparar campos de fecha según el nuevo estado
+                    ahora = datetime.now()
+                    
+                    if nuevo_estado == 'pausado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_pausado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'cancelado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_cancelado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'completado':
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_completado = %s 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, ahora, plan_usuario_id))
+                        
+                    elif nuevo_estado == 'activo':
+                        # Al reanudar, limpiamos fecha_pausado
+                        cur.execute("""
+                            UPDATE planes_usuario 
+                            SET estado = %s, fecha_pausado = NULL 
+                            WHERE plan_usuario_id = %s
+                        """, (nuevo_estado, plan_usuario_id))
+                    
+                    conn.commit()
+                    
+                    # 4. Mensaje según la acción
+                    mensajes = {
+                        'pausado': 'Plan pausado correctamente',
+                        'activo': 'Plan reanudado correctamente',
+                        'cancelado': 'Plan cancelado',
+                        'completado': '¡Felicidades! Plan completado'
+                    }
+                    
+                    print(f"DEBUG actualizar_estado_plan: {estado_actual} → {nuevo_estado}")
+                    
+                    return {
+                        'success': True,
+                        'data': {
+                            'plan_usuario_id': plan_usuario_id,
+                            'estado_anterior': estado_actual,
+                            'estado_nuevo': nuevo_estado
+                        },
+                        'message': mensajes.get(nuevo_estado, 'Estado actualizado')
+                    }
+                    
+        except Exception as e:
+            print(f"Error actualizar_estado_plan: {e}")
+            return {
+                'success': False, 
+                'message': f'Error al actualizar estado: {str(e)}'
+            }
+
+    # ============================================
+    # MÉTODOS PARA VINCULAR HÁBITOS A PLANES
+    # ============================================
+
+    def vincular_habito_a_plan(self, plan_usuario_id, habito_usuario_id, objetivo_id=None, obligatorio=False, notas=None):
+        """
+        Vincula un hábito existente del usuario a un plan.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            habito_usuario_id: ID del hábito del usuario
+            objetivo_id: (opcional) Fase específica donde aplica el hábito
+            obligatorio: Si el hábito es requerido para el plan
+            notas: Notas opcionales sobre el vínculo
+        
+        Returns:
+            dict con success, message, y plan_habito_id si fue exitoso
+        """
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar que el plan_usuario existe
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.user_id, pu.estado
+                        FROM planes_usuario pu
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan = cur.fetchone()
+                    if not plan:
+                        return {'success': False, 'message': 'Plan no encontrado'}
+                    
+                    plan_user_id = plan[1]
+                    plan_estado = plan[2]
+                    
+                    # No permitir vincular a planes cancelados
+                    if plan_estado == 'cancelado':
+                        return {'success': False, 'message': 'No se puede vincular a un plan cancelado'}
+                    
+                    # 2. Verificar que el habito_usuario existe y pertenece al mismo usuario
+                    cur.execute("""
+                        SELECT hu.habito_usuario_id, hu.user_id, hp.nombre
+                        FROM habitos_usuario hu
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        WHERE hu.habito_usuario_id = %s
+                    """, (habito_usuario_id,))
+                    
+                    habito = cur.fetchone()
+                    if not habito:
+                        return {'success': False, 'message': 'Hábito no encontrado'}
+                    
+                    habito_user_id = habito[1]
+                    habito_nombre = habito[2]
+                    
+                    # Verificar que ambos pertenecen al mismo usuario
+                    if plan_user_id != habito_user_id:
+                        return {'success': False, 'message': 'El hábito no pertenece al usuario del plan'}
+                    
+                    # 3. Verificar objetivo_id si se proporciona
+                    if objetivo_id:
+                        cur.execute("""
+                            SELECT oi.objetivo_id 
+                            FROM objetivos_intermedios oi
+                            JOIN planes_usuario pu ON oi.plan_id = pu.plan_id
+                            WHERE oi.objetivo_id = %s AND pu.plan_usuario_id = %s
+                        """, (objetivo_id, plan_usuario_id))
+                        
+                        if not cur.fetchone():
+                            return {'success': False, 'message': 'Fase no válida para este plan'}
+                    
+                    # 4. Insertar vínculo (la constraint UNIQUE manejará duplicados)
+                    try:
+                        cur.execute("""
+                            INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id, objetivo_id, obligatorio, notas)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING plan_habito_id
+                        """, (plan_usuario_id, habito_usuario_id, objetivo_id, obligatorio, notas))
+                        
+                        result = cur.fetchone()
+                        conn.commit()
+                        
+                        print(f"DEBUG vincular_habito: Hábito '{habito_nombre}' vinculado a plan {plan_usuario_id}")
+                        
+                        return {
+                            'success': True,
+                            'message': f'Hábito "{habito_nombre}" vinculado exitosamente',
+                            'plan_habito_id': result[0]
+                        }
+                        
+                    except psycopg.errors.UniqueViolation:
+                        return {'success': False, 'message': 'Este hábito ya está vinculado al plan'}
+                    
+        except Exception as e:
+            print(f"Error vincular_habito_a_plan: {e}")
+            return {'success': False, 'message': f'Error al vincular hábito: {str(e)}'}
+
+    def desvincular_habito_de_plan(self, plan_usuario_id, habito_usuario_id):
+        """
+        Elimina el vínculo entre un hábito y un plan.
+        No elimina el hábito, solo la relación.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            habito_usuario_id: ID del hábito del usuario
+        
+        Returns:
+            dict con success y message
+        """
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # Verificar que el vínculo existe y obtener info para el mensaje
+                    cur.execute("""
+                        SELECT ph.plan_habito_id, hp.nombre
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        WHERE ph.plan_usuario_id = %s AND ph.habito_usuario_id = %s
+                    """, (plan_usuario_id, habito_usuario_id))
+                    
+                    vinculo = cur.fetchone()
+                    if not vinculo:
+                        return {'success': False, 'message': 'Este hábito no está vinculado al plan'}
+                    
+                    habito_nombre = vinculo[1]
+                    
+                    # Eliminar el vínculo
+                    cur.execute("""
+                        DELETE FROM plan_habitos 
+                        WHERE plan_usuario_id = %s AND habito_usuario_id = %s
+                    """, (plan_usuario_id, habito_usuario_id))
+                    
+                    conn.commit()
+                    
+                    print(f"DEBUG desvincular_habito: Hábito '{habito_nombre}' desvinculado de plan {plan_usuario_id}")
+                    
+                    return {
+                        'success': True,
+                        'message': f'Hábito "{habito_nombre}" desvinculado del plan'
+                    }
+                    
+        except Exception as e:
+            print(f"Error desvincular_habito_de_plan: {e}")
+            return {'success': False, 'message': f'Error al desvincular hábito: {str(e)}'}
+
+    def get_habitos_del_plan(self, plan_usuario_id, fecha=None):
+        """
+        Obtiene los hábitos vinculados a un plan con su estado del día.
+        
+        Args:
+            plan_usuario_id: ID del plan del usuario
+            fecha: Fecha para verificar el estado (default: hoy)
+        
+        Returns:
+            Lista de hábitos con info y estado del día
+        """
+        from datetime import date
+        
+        if fecha is None:
+            fecha = date.today()
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # Verificar que el plan existe
+                    cur.execute("""
+                        SELECT plan_usuario_id FROM planes_usuario 
+                        WHERE plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    if not cur.fetchone():
+                        return []
+                    
+                    # Obtener hábitos vinculados con estado de hoy
+                    cur.execute("""
+                        SELECT 
+                            ph.plan_habito_id,
+                            ph.habito_usuario_id,
+                            ph.obligatorio,
+                            ph.objetivo_id,
+                            ph.notas,
+                            hu.habito_id,
+                            hp.nombre,
+                            hp.descripcion,
+                            hp.puntos,
+                            ch.nombre as categoria,
+                            sh.completado,
+                            sh.hora_completado
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        JOIN categorias_habitos ch ON hp.categoria_id = ch.categoria_id
+                        LEFT JOIN seguimiento_habitos sh ON hu.habito_usuario_id = sh.habito_usuario_id 
+                            AND sh.fecha = %s
+                        WHERE ph.plan_usuario_id = %s
+                        ORDER BY ph.obligatorio DESC, hp.nombre
+                    """, (fecha, plan_usuario_id))
+                    
+                    habitos = cur.fetchall()
+                    
+                    resultado = []
+                    for h in habitos:
+                        resultado.append({
+                            'plan_habito_id': h[0],
+                            'habito_usuario_id': h[1],
+                            'obligatorio': h[2],
+                            'objetivo_id': h[3],
+                            'notas': h[4],
+                            'habito_id': h[5],
+                            'nombre': h[6],
+                            'descripcion': h[7],
+                            'puntos': h[8],
+                            'categoria': h[9],
+                            'completado_hoy': h[10] if h[10] is not None else False,
+                            'hora_completado': str(h[11]) if h[11] else None
+                        })
+                    
+                    print(f"DEBUG get_habitos_del_plan: {len(resultado)} hábitos encontrados para plan {plan_usuario_id}")
+                    
+                    return resultado
+                    
+        except Exception as e:
+            print(f"Error get_habitos_del_plan: {e}")
+            return []
+
+    def agregar_plan_con_habitos(self, user_id, plan_id, dias_personalizados=None, 
+                                  fecha_inicio=None, habitos_a_vincular=None):
+        """
+        Agregar plan a usuario con hábitos vinculados (wizard).
+        Transacción atómica: crea plan + vincula hábitos en una sola operación.
+        """
+        from datetime import date, timedelta
+        
+        if habitos_a_vincular is None:
+            habitos_a_vincular = []
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Verificar duplicado
+                    cur.execute("""
+                        SELECT plan_usuario_id FROM planes_usuario 
+                        WHERE user_id = %s AND plan_id = %s AND estado != 'cancelado'
+                    """, (user_id, plan_id))
+                    
+                    if cur.fetchone():
+                        return {'success': False, 'message': 'Ya tienes este plan activo'}
+                    
+                    # 2. Calcular fechas
+                    if fecha_inicio is None:
+                        fecha_inicio = date.today()
+                    
+                    fecha_objetivo = None
+                    if dias_personalizados:
+                        fecha_objetivo = fecha_inicio + timedelta(days=dias_personalizados)
+                    
+                    # 3. Insertar plan_usuario
+                    cur.execute("""
+                        INSERT INTO planes_usuario (user_id, plan_id, fecha_inicio, fecha_objetivo, estado, progreso_porcentaje)
+                        VALUES (%s, %s, %s, %s, 'activo', 0)
+                        RETURNING plan_usuario_id
+                    """, (user_id, plan_id, fecha_inicio, fecha_objetivo))
+                    
+                    result = cur.fetchone()
+                    if not result:
+                        return {'success': False, 'message': 'Error al crear el plan'}
+                    
+                    plan_usuario_id = result[0]
+                    
+                    # 4. Crear registros de progreso para cada fase
+                    cur.execute("""
+                        INSERT INTO progreso_planes (plan_usuario_id, objetivo_id, completado, progreso_objetivo_porcentaje)
+                        SELECT %s, objetivo_id, false, 0
+                        FROM objetivos_intermedios 
+                        WHERE plan_id = %s
+                    """, (plan_usuario_id, plan_id))
+                    
+                    # 5. Vincular hábitos (si hay)
+                    habitos_vinculados = 0
+                    errores_habitos = []
+                    
+                    for habito_usuario_id in habitos_a_vincular:
+                        try:
+                            # Verificar que el hábito pertenece al usuario
+                            cur.execute("""
+                                SELECT habito_usuario_id FROM habitos_usuario
+                                WHERE habito_usuario_id = %s AND user_id = %s AND activo = true
+                            """, (habito_usuario_id, user_id))
+                            
+                            if not cur.fetchone():
+                                errores_habitos.append(f"Hábito {habito_usuario_id} no encontrado")
+                                continue
+                            
+                            # Insertar vinculación
+                            cur.execute("""
+                                INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT (plan_usuario_id, habito_usuario_id) DO NOTHING
+                            """, (plan_usuario_id, habito_usuario_id))
+                            
+                            if cur.rowcount > 0:
+                                habitos_vinculados += 1
+                                
+                        except Exception as e:
+                            errores_habitos.append(f"Error hábito {habito_usuario_id}: {str(e)}")
+                    
+                    # 6. Commit de toda la transacción
+                    conn.commit()
+                    
+                    return {
+                        'success': True,
+                        'plan_usuario_id': plan_usuario_id,
+                        'habitos_vinculados': habitos_vinculados,
+                        'errores_habitos': errores_habitos if errores_habitos else None,
+                        'message': f'Plan creado con {habitos_vinculados} hábitos vinculados'
+                    }
+                    
+        except Exception as e:
+            print(f"Error agregar_plan_con_habitos: {e}")
+            return {'success': False, 'message': f'Error interno: {str(e)}'}
+
+    # ============================================
+    # DASHBOARD DEL PLAN (2D)
+    # ============================================
+
+    def get_dashboard_plan(self, plan_usuario_id, fecha=None):
+        """
+        Obtener datos completos del dashboard del plan para una fecha.
+        Combina: info del plan, fase actual, tareas del día, hábitos vinculados.
+        """
+        from datetime import date as date_type
+        
+        if fecha is None:
+            fecha = date_type.today()
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Obtener información básica del plan
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.user_id, pu.plan_id, pu.fecha_inicio,
+                               pu.fecha_objetivo, pu.estado, pu.progreso_porcentaje,
+                               p.meta_principal, p.dificultad, p.plazo_dias_estimado
+                        FROM planes_usuario pu
+                        JOIN planes_predeterminados p ON pu.plan_id = p.plan_id
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan_info = cur.fetchone()
+                    if not plan_info:
+                        return None
+                    
+                    user_id = plan_info[1]
+                    plan_id = plan_info[2]
+                    fecha_inicio = plan_info[3]
+                    fecha_objetivo = plan_info[4]
+                    estado = plan_info[5]
+                    meta_principal = plan_info[7]
+                    dificultad = plan_info[8]
+                    plazo_estimado = plan_info[9]
+                    
+                    # 2. Calcular progreso general
+                    dias_transcurridos = (fecha - fecha_inicio).days + 1
+                    dias_totales = (fecha_objetivo - fecha_inicio).days if fecha_objetivo else plazo_estimado
+                    porcentaje_general = min(100, int((dias_transcurridos / dias_totales) * 100)) if dias_totales > 0 else 0
+                    
+                    # 3. Obtener todas las fases del plan
+                    cur.execute("""
+                        SELECT o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                               COALESCE(SUM(o2.duracion_dias) FILTER (WHERE o2.orden_fase < o.orden_fase), 0) as dias_anteriores
+                        FROM objetivos_intermedios o
+                        LEFT JOIN objetivos_intermedios o2 ON o2.plan_id = o.plan_id
+                        WHERE o.plan_id = %s
+                        GROUP BY o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias
+                        ORDER BY o.orden_fase
+                    """, (plan_id,))
+                    
+                    objetivos = cur.fetchall()
+                    total_fases = len(objetivos)
+                    
+                    # 4. Determinar fase actual
+                    fase_actual = None
+                    dia_en_fase = 1
+                    for objetivo in objetivos:
+                        dias_anteriores = int(objetivo[5]) if objetivo[5] else 0
+                        dia_inicio_fase = dias_anteriores + 1
+                        dia_fin_fase = dias_anteriores + objetivo[4]
+                        
+                        if dia_inicio_fase <= dias_transcurridos <= dia_fin_fase:
+                            fase_actual = objetivo
+                            dia_en_fase = dias_transcurridos - dias_anteriores
+                            break
+                    
+                    # Si se pasó del tiempo, usar última fase
+                    if not fase_actual and objetivos:
+                        fase_actual = objetivos[-1]
+                        dia_en_fase = fase_actual[4]  # Último día de la fase
+                    
+                    if not fase_actual:
+                        return None
+                    
+                    duracion_fase = fase_actual[4]
+                    porcentaje_fase = min(100, int((dia_en_fase / duracion_fase) * 100)) if duracion_fase > 0 else 0
+                    
+                    # 5. Obtener tareas del día (de la fase actual)
+                    cur.execute("""
+                        SELECT t.tarea_id, t.titulo, t.descripcion, t.tipo, t.es_diaria
+                        FROM tareas_predeterminadas t
+                        WHERE t.objetivo_id = %s
+                        ORDER BY t.orden
+                    """, (fase_actual[0],))
+                    
+                    tareas_raw = cur.fetchall()
+                    tareas_hoy = []
+                    tareas_completadas = 0
+                    
+                    for tarea in tareas_raw:
+                        cur.execute("""
+                            SELECT completada, hora_completada
+                            FROM tareas_usuario
+                            WHERE plan_usuario_id = %s AND tarea_id = %s AND fecha_asignada = %s
+                        """, (plan_usuario_id, tarea[0], fecha))
+                        
+                        estado_tarea = cur.fetchone()
+                        completada = estado_tarea[0] if estado_tarea else False
+                        hora = str(estado_tarea[1])[:5] if estado_tarea and estado_tarea[1] else None
+                        
+                        if completada:
+                            tareas_completadas += 1
+                        
+                        tareas_hoy.append({
+                            'tarea_id': tarea[0],
+                            'titulo': tarea[1],
+                            'descripcion': tarea[2],
+                            'tipo': tarea[3],
+                            'es_diaria': tarea[4],
+                            'completada': completada,
+                            'hora_completada': hora
+                        })
+                    
+                    # 6. Obtener hábitos vinculados al plan
+                    cur.execute("""
+                        SELECT ph.habito_usuario_id, hp.nombre, hp.descripcion, 
+                               ch.nombre as categoria, hp.puntos_base,
+                               COALESCE(sh.completado, false) as completado_hoy,
+                               sh.hora_completado
+                        FROM plan_habitos ph
+                        JOIN habitos_usuario hu ON ph.habito_usuario_id = hu.habito_usuario_id
+                        JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
+                        JOIN categorias_habitos ch ON hp.categoria_id = ch.categoria_id
+                        LEFT JOIN seguimiento_habitos sh ON (
+                            sh.habito_usuario_id = ph.habito_usuario_id 
+                            AND sh.fecha = %s
+                        )
+                        WHERE ph.plan_usuario_id = %s AND hu.activo = true
+                        ORDER BY hp.nombre
+                    """, (fecha, plan_usuario_id))
+                    
+                    habitos_raw = cur.fetchall()
+                    habitos_plan = []
+                    habitos_completados = 0
+                    
+                    for habito in habitos_raw:
+                        completado = habito[5] if habito[5] else False
+                        hora = str(habito[6])[:5] if habito[6] else None
+                        
+                        if completado:
+                            habitos_completados += 1
+                        
+                        habitos_plan.append({
+                            'habito_usuario_id': habito[0],
+                            'nombre': habito[1],
+                            'descripcion': habito[2],
+                            'categoria': habito[3],
+                            'puntos': habito[4],
+                            'completado_hoy': completado,
+                            'hora_completado': hora
+                        })
+                    
+                    # 7. Construir respuesta completa
+                    return {
+                        'plan_usuario_id': plan_usuario_id,
+                        'meta_principal': meta_principal,
+                        'dificultad': dificultad,
+                        'estado': estado,
+                        'fecha': fecha.isoformat(),
+                        
+                        'progreso_general': {
+                            'dias_transcurridos': dias_transcurridos,
+                            'dias_totales': dias_totales,
+                            'porcentaje': porcentaje_general
+                        },
+                        
+                        'fase_actual': {
+                            'objetivo_id': fase_actual[0],
+                            'titulo': fase_actual[1],
+                            'descripcion': fase_actual[2],
+                            'orden_fase': fase_actual[3],
+                            'total_fases': total_fases,
+                            'dia_en_fase': dia_en_fase,
+                            'duracion_fase': duracion_fase,
+                            'porcentaje_fase': porcentaje_fase
+                        },
+                        
+                        'tareas_hoy': tareas_hoy,
+                        'tareas_completadas': tareas_completadas,
+                        'tareas_total': len(tareas_hoy),
+                        
+                        'habitos_plan': habitos_plan,
+                        'habitos_completados': habitos_completados,
+                        'habitos_total': len(habitos_plan)
+                    }
+                    
+        except Exception as e:
+            print(f"Error get_dashboard_plan: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return None
+
+    # ============================================
+    # TIMELINE DEL PLAN (2F)
+    # ============================================
+
+    def get_timeline_plan(self, plan_usuario_id):
+        """
+        Obtener timeline visual del plan con todas las fases y su progreso.
+        Retorna datos para renderizar un Gantt chart.
+        """
+        from datetime import date as date_type
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Info básica del plan
+                    cur.execute("""
+                        SELECT pu.plan_usuario_id, pu.fecha_inicio, pu.fecha_objetivo,
+                               pu.estado, pu.progreso_porcentaje,
+                               p.meta_principal, p.plazo_dias_estimado
+                        FROM planes_usuario pu
+                        JOIN planes_predeterminados p ON pu.plan_id = p.plan_id
+                        WHERE pu.plan_usuario_id = %s
+                    """, (plan_usuario_id,))
+                    
+                    plan_info = cur.fetchone()
+                    if not plan_info:
+                        return None
+                    
+                    fecha_inicio = plan_info[1]
+                    fecha_objetivo = plan_info[2]
+                    estado = plan_info[3]
+                    progreso_porcentaje = plan_info[4]
+                    meta_principal = plan_info[5]
+                    plazo_estimado = plan_info[6]
+                    
+                    # Calcular días
+                    hoy = date_type.today()
+                    dias_transcurridos = max(0, (hoy - fecha_inicio).days + 1)
+                    dias_totales = (fecha_objetivo - fecha_inicio).days if fecha_objetivo else plazo_estimado
+                    dias_restantes = max(0, dias_totales - dias_transcurridos + 1)
+                    
+                    # 2. Obtener todas las fases con días acumulados
+                    cur.execute("""
+                        SELECT o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                               COALESCE(SUM(o2.duracion_dias) FILTER (WHERE o2.orden_fase < o.orden_fase), 0) as dias_anteriores,
+                               pp.completado, pp.progreso_objetivo_porcentaje
+                        FROM objetivos_intermedios o
+                        JOIN planes_usuario pu ON o.plan_id = pu.plan_id
+                        LEFT JOIN objetivos_intermedios o2 ON o2.plan_id = o.plan_id
+                        LEFT JOIN progreso_planes pp ON pp.objetivo_id = o.objetivo_id 
+                                                     AND pp.plan_usuario_id = %s
+                        WHERE pu.plan_usuario_id = %s
+                        GROUP BY o.objetivo_id, o.titulo, o.descripcion, o.orden_fase, o.duracion_dias,
+                                 pp.completado, pp.progreso_objetivo_porcentaje
+                        ORDER BY o.orden_fase
+                    """, (plan_usuario_id, plan_usuario_id))
+                    
+                    objetivos = cur.fetchall()
+                    
+                    fases = []
+                    for obj in objetivos:
+                        objetivo_id = obj[0]
+                        dias_anteriores = int(obj[5]) if obj[5] else 0
+                        duracion = obj[4]
+                        dia_inicio = dias_anteriores + 1
+                        dia_fin = dias_anteriores + duracion
+                        completado = obj[6] if obj[6] else False
+                        porcentaje = obj[7] if obj[7] else 0
+                        
+                        # Determinar estado de la fase
+                        if completado:
+                            estado_fase = 'completada'
+                        elif dias_transcurridos >= dia_inicio and dias_transcurridos <= dia_fin:
+                            estado_fase = 'en_progreso'
+                        elif dias_transcurridos > dia_fin:
+                            estado_fase = 'atrasada'  # Ya pasó pero no completada
+                        else:
+                            estado_fase = 'pendiente'
+                        
+                        # Contar tareas completadas de esta fase
+                        cur.execute("""
+                            SELECT COUNT(*) as total,
+                                   COUNT(CASE WHEN tu.completada = true THEN 1 END) as completadas
+                            FROM tareas_predeterminadas tp
+                            LEFT JOIN tareas_usuario tu ON tp.tarea_id = tu.tarea_id 
+                                                        AND tu.plan_usuario_id = %s
+                            WHERE tp.objetivo_id = %s
+                        """, (plan_usuario_id, objetivo_id))
+                        
+                        tareas_stats = cur.fetchone()
+                        tareas_total = tareas_stats[0] if tareas_stats else 0
+                        tareas_completadas = tareas_stats[1] if tareas_stats else 0
+                        
+                        fases.append({
+                            'objetivo_id': objetivo_id,
+                            'titulo': obj[1],
+                            'descripcion': obj[2],
+                            'orden_fase': obj[3],
+                            'dia_inicio': dia_inicio,
+                            'dia_fin': dia_fin,
+                            'duracion_dias': duracion,
+                            'estado': estado_fase,
+                            'porcentaje_completado': porcentaje,
+                            'tareas_completadas': tareas_completadas,
+                            'tareas_total': tareas_total
+                        })
+                    
+                    return {
+                        'success': True,
+                        'plan_info': {
+                            'plan_usuario_id': plan_usuario_id,
+                            'meta_principal': meta_principal,
+                            'estado': estado,
+                            'fecha_inicio': fecha_inicio.isoformat(),
+                            'fecha_objetivo': fecha_objetivo.isoformat() if fecha_objetivo else None,
+                            'dias_totales': dias_totales,
+                            'dia_actual': dias_transcurridos,
+                            'dias_restantes': dias_restantes,
+                            'progreso_porcentaje': progreso_porcentaje
+                        },
+                        'fases': fases,
+                        'total_fases': len(fases)
+                    }
+                    
+        except Exception as e:
+            print(f"Error get_timeline_plan: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return None
+
+    # ============================================
+    # PLANES PERSONALIZADOS (2H)
+    # ============================================
+
+    def crear_plan_personalizado(self, user_id, meta_principal, plazo_dias_estimado, 
+                                  dificultad, fases, descripcion=None, 
+                                  categoria_plan_id=None, habitos_a_vincular=None,
+                                  es_publico=False, iniciar_automaticamente=True):
+        """
+        Crear un plan personalizado completo con fases y tareas.
+        Opcionalmente inicia el plan automáticamente para el usuario.
+        """
+        from datetime import date as date_type, timedelta
+        
+        pool = get_pool()
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Validar que la suma de días de fases no exceda el plazo
+                    total_dias_fases = sum(fase['duracion_dias'] for fase in fases)
+                    if total_dias_fases > plazo_dias_estimado:
+                        return {
+                            'success': False,
+                            'message': f'La suma de días de las fases ({total_dias_fases}) excede el plazo total ({plazo_dias_estimado})'
+                        }
+                    
+                    # Usar categoría "My Custom Plans" (4) por defecto si no se especifica
+                    if categoria_plan_id is None:
+                        categoria_plan_id = 4  # My Custom Plans
+                    
+                    # 2. Crear el plan en planes_predeterminados
+                    cur.execute("""
+                        INSERT INTO planes_predeterminados 
+                        (meta_principal, descripcion, plazo_dias_estimado, dificultad, 
+                         categoria_plan_id, es_personalizado, creado_por_user_id, es_publico, created_at)
+                        VALUES (%s, %s, %s, %s, %s, true, %s, %s, NOW())
+                        RETURNING plan_id
+                    """, (meta_principal, descripcion, plazo_dias_estimado, dificultad,
+                          categoria_plan_id, user_id, es_publico))
+                    
+                    plan_id = cur.fetchone()[0]
+                    
+                    # 3. Crear las fases (objetivos_intermedios)
+                    total_tareas = 0
+                    for fase in fases:
+                        cur.execute("""
+                            INSERT INTO objetivos_intermedios 
+                            (plan_id, titulo, descripcion, orden_fase, duracion_dias)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING objetivo_id
+                        """, (plan_id, fase['titulo'], fase.get('descripcion'), 
+                              fase['orden_fase'], fase['duracion_dias']))
+                        
+                        objetivo_id = cur.fetchone()[0]
+                        
+                        # 4. Crear las tareas de esta fase
+                        tareas = fase.get('tareas', [])
+                        for i, tarea in enumerate(tareas):
+                            es_diaria = tarea.get('tipo', 'diaria') == 'diaria'
+                            orden = tarea.get('orden', i + 1)
+                            
+                            cur.execute("""
+                                INSERT INTO tareas_predeterminadas 
+                                (objetivo_id, titulo, descripcion, tipo, orden, es_diaria)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (objetivo_id, tarea['titulo'], tarea.get('descripcion'),
+                                  tarea.get('tipo', 'diaria'), orden, es_diaria))
+                            
+                            total_tareas += 1
+                    
+                    # 5. Opcionalmente iniciar el plan para el usuario
+                    plan_usuario_id = None
+                    if iniciar_automaticamente:
+                        fecha_inicio = date_type.today()
+                        fecha_objetivo = fecha_inicio + timedelta(days=plazo_dias_estimado)
+                        
+                        cur.execute("""
+                            INSERT INTO planes_usuario 
+                            (user_id, plan_id, fecha_inicio, fecha_objetivo, estado, progreso_porcentaje)
+                            VALUES (%s, %s, %s, %s, 'activo', 0)
+                            RETURNING plan_usuario_id
+                        """, (user_id, plan_id, fecha_inicio, fecha_objetivo))
+                        
+                        plan_usuario_id = cur.fetchone()[0]
+                        
+                        # Crear registros de progreso para cada fase
+                        cur.execute("""
+                            INSERT INTO progreso_planes (plan_usuario_id, objetivo_id, completado, progreso_objetivo_porcentaje)
+                            SELECT %s, objetivo_id, false, 0
+                            FROM objetivos_intermedios 
+                            WHERE plan_id = %s
+                        """, (plan_usuario_id, plan_id))
+                        
+                        # 6. Vincular hábitos si se especificaron
+                        habitos_vinculados = 0
+                        if habitos_a_vincular and len(habitos_a_vincular) > 0:
+                            for habito_id in habitos_a_vincular:
+                                # Verificar que el hábito pertenece al usuario
+                                cur.execute("""
+                                    SELECT habito_usuario_id FROM habitos_usuario
+                                    WHERE habito_usuario_id = %s AND user_id = %s AND activo = true
+                                """, (habito_id, user_id))
+                                
+                                if cur.fetchone():
+                                    cur.execute("""
+                                        INSERT INTO plan_habitos (plan_usuario_id, habito_usuario_id)
+                                        VALUES (%s, %s)
+                                        ON CONFLICT DO NOTHING
+                                    """, (plan_usuario_id, habito_id))
+                                    habitos_vinculados += 1
+                    
+                    conn.commit()
+                    
+                    return {
+                        'success': True,
+                        'message': 'Plan personalizado creado exitosamente',
+                        'plan_id': plan_id,
+                        'plan_usuario_id': plan_usuario_id,
+                        'total_fases': len(fases),
+                        'total_tareas': total_tareas,
+                        'habitos_vinculados': habitos_vinculados if iniciar_automaticamente else 0
+                    }
+                    
+        except Exception as e:
+            print(f"Error crear_plan_personalizado: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return {'success': False, 'message': f'Error interno: {str(e)}'}

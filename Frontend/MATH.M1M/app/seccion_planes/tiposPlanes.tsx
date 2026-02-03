@@ -96,6 +96,35 @@ export default function TiposPlanesScreen() {
           </Text>
         </View>
 
+        {/* Create Custom Plan Button */}
+        <TouchableOpacity
+          style={styles.customPlanButton}
+          onPress={() => router.push("/seccion_planes/wizardPlanCustom")}
+        >
+          <LinearGradient
+            colors={[colors.primary[600], colors.primary[700]]}
+            style={styles.customPlanGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={styles.customPlanIcon}>
+              <Ionicons name="create" size={24} color={colors.neutral[0]} />
+            </View>
+            <View style={styles.customPlanText}>
+              <Text style={styles.customPlanTitle}>Create Custom Plan</Text>
+              <Text style={styles.customPlanSubtitle}>Design your own plan from scratch</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.neutral[0]} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or browse categories</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
         {/* Categories List */}
         <View style={styles.categoriesContainer}>
           {categories.map((category) => (
@@ -162,27 +191,8 @@ export default function TiposPlanesScreen() {
           ))}
         </View>
 
-        {/* Custom Plan Button - Coming Soon */}
-        <View style={styles.customSection}>
-          <TouchableOpacity 
-            style={[styles.customButton, styles.customButtonDisabled]} 
-            activeOpacity={0.9}
-            onPress={() => Alert.alert("Coming Soon", "Custom plan creation will be available in a future update!")}
-          >
-            <LinearGradient
-              colors={[colors.neutral[400], colors.neutral[500]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.customButtonGradient}
-            >
-              <Ionicons name="create-outline" size={22} color={colors.neutral[0]} />
-              <Text style={styles.customButtonText}>Create Custom Plan</Text>
-              <View style={styles.comingSoonChip}>
-                <Text style={styles.comingSoonChipText}>Soon</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+        {/* Bottom padding */}
+        <View style={{ height: spacing[10] }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -322,5 +332,54 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
+  },
+  // Custom Plan Button (new)
+  customPlanButton: {
+    marginBottom: spacing[4],
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  customPlanGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[4],
+  },
+  customPlanIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing[3],
+  },
+  customPlanText: {
+    flex: 1,
+  },
+  customPlanTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+    marginBottom: 2,
+  },
+  customPlanSubtitle: {
+    fontSize: typography.size.sm,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.neutral[200],
+  },
+  dividerText: {
+    paddingHorizontal: spacing[3],
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
   },
 });

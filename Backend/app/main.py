@@ -39,7 +39,20 @@ from .schema.planSchema import (
     MarcarTareaSchema,
     PlanResponseSchema,
     PlanUsuarioResponseSchema,
-    TareaMarcadaResponseSchema
+    TareaMarcadaResponseSchema,
+    PlanEstadoUpdateSchema,
+    PlanEstadoResponseSchema,
+    VincularHabitoSchema,
+    VincularHabitoResponseSchema,
+    DesvincularHabitoResponseSchema,
+    ListaHabitosPlanResponseSchema,
+    HabitoPlanResponseSchema,
+    AgregarPlanConHabitosSchema,
+    AgregarPlanConHabitosResponseSchema,
+    DashboardPlanResponseSchema,
+    TimelineResponseSchema,
+    CrearPlanCustomSchema,
+    CrearPlanCustomResponseSchema
 )
 
 # IMPORTACIONES PARA ESTADÍSTICAS
@@ -48,6 +61,15 @@ from .schema.estadisticasSchema import (
     EstadisticasUsuarioSchema,
     EstadisticasResumenSchema,
     EstadisticasResponseSchema
+)
+
+# IMPORTACIONES PARA REFLEXIONES DIARIAS
+from .model.reflexionesConnection import ReflexionesConnection
+from .schema.reflexionSchema import (
+    CrearReflexionSchema,
+    ReflexionHoyResponseSchema,
+    HistorialReflexionesResponseSchema,
+    CrearReflexionResponseSchema
 )
 
 # Usar configuración desde config.py
@@ -277,6 +299,9 @@ def register(user_data: UserCreateSchema):
         
         # Insertar usuario y obtener su ID
         user_id = conn.write(data)
+        
+        # Crear registro de estadísticas para el nuevo usuario (puntos, rachas, nivel)
+        stats_conn.crear_estadisticas_usuario(user_id)
         
         return {"message": "Usuario registrado correctamente", "user_id": user_id}
     
@@ -1119,6 +1144,56 @@ def get_user_custom_habitos(
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos personalizados: {str(e)}")
 
 
+@app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/historial", status_code=HTTP_200_OK)
+def get_habito_historial(
+    user_id: int,
+    habito_usuario_id: int,
+    dias: int = 30,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener historial de completado de un hábito - últimos N días (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Limitar días entre 1 y 90
+        dias = max(1, min(dias, 90))
+        
+        historial = habit_conn.get_habito_historial(habito_usuario_id, user_id, dias)
+        
+        if not historial:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return {"success": True, "data": historial}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener historial: {str(e)}")
+
+
+@app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/rachas", status_code=HTTP_200_OK)
+def get_habito_rachas(
+    user_id: int,
+    habito_usuario_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener estadísticas de rachas de un hábito (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        rachas = habit_conn.get_habito_rachas(habito_usuario_id, user_id)
+        
+        if not rachas:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return {"success": True, "data": rachas}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener rachas: {str(e)}")
+
+
 # ============================================
 # ENDPOINTS DE ESTADÍSTICAS (Gamificación)
 # ============================================
@@ -1205,6 +1280,78 @@ def get_estadisticas_usuario(user_id: int):
         raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
 
 # ============================================
+# ENDPOINTS DE REFLEXIONES DIARIAS
+# ============================================
+
+reflexiones_conn = ReflexionesConnection()
+
+@app.post("/api/usuario/{user_id}/reflexion", response_model=CrearReflexionResponseSchema)
+def crear_reflexion(user_id: int, data: CrearReflexionSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/usuario/{user_id}/reflexion - Crear o actualizar reflexión del día (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        resultado = reflexiones_conn.crear_o_actualizar_reflexion(
+            user_id=user_id,
+            estado_animo=data.estado_animo,
+            que_salio_bien=data.que_salio_bien,
+            que_mejorar=data.que_mejorar
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(status_code=400, detail=resultado.get('message', 'Error al guardar reflexión'))
+        
+        return CrearReflexionResponseSchema(
+            success=True,
+            message=resultado.get('message'),
+            reflexion_id=resultado.get('reflexion_id'),
+            es_nueva=resultado.get('es_nueva', True)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al crear reflexión: {str(e)}')
+
+@app.get("/api/usuario/{user_id}/reflexion/hoy", response_model=ReflexionHoyResponseSchema)
+def get_reflexion_hoy(user_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/usuario/{user_id}/reflexion/hoy - Obtener reflexión del día (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        resultado = reflexiones_conn.get_reflexion_hoy(user_id)
+        
+        return ReflexionHoyResponseSchema(**resultado)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener reflexión: {str(e)}')
+
+@app.get("/api/usuario/{user_id}/reflexiones", response_model=HistorialReflexionesResponseSchema)
+def get_historial_reflexiones(user_id: int, limite: int = 30, current_user: TokenData = Depends(verify_token)):
+    """GET /api/usuario/{user_id}/reflexiones - Obtener historial de reflexiones (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        resultado = reflexiones_conn.get_historial_reflexiones(user_id, limite)
+        
+        return HistorialReflexionesResponseSchema(**resultado)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener historial: {str(e)}')
+
+# ============================================
 # ENDPOINTS DE PLANES
 # ============================================
 
@@ -1288,6 +1435,110 @@ def agregar_plan_usuario(data: AgregarPlanUsuarioSchema, current_user: TokenData
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al agregar plan: {str(e)}')
 
+@app.post("/api/planes/agregar-con-habitos", response_model=AgregarPlanConHabitosResponseSchema)
+def agregar_plan_con_habitos(data: AgregarPlanConHabitosSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/agregar-con-habitos - Agregar plan con hábitos vinculados (wizard) (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        planes_conn = PlanesConnection()
+        resultado = planes_conn.agregar_plan_con_habitos(
+            user_id=data.user_id,
+            plan_id=data.plan_id,
+            dias_personalizados=data.dias_personalizados,
+            fecha_inicio=data.fecha_inicio,
+            habitos_a_vincular=data.habitos_a_vincular
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al agregar plan')
+            )
+        
+        return AgregarPlanConHabitosResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan creado correctamente'),
+            plan_usuario_id=resultado.get('plan_usuario_id'),
+            habitos_vinculados=resultado.get('habitos_vinculados', 0)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al agregar plan con hábitos: {str(e)}')
+
+@app.post("/api/planes/custom", response_model=CrearPlanCustomResponseSchema)
+def crear_plan_personalizado(data: CrearPlanCustomSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/custom - Crear un plan personalizado completo (PROTEGIDO)"""
+    try:
+        # Verificar acceso
+        verify_user_access(data.user_id, current_user)
+        
+        # Verificar que el usuario existe
+        existing_user = conn.read_one(data.user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Convertir las fases de Pydantic a dict
+        fases_dict = []
+        for fase in data.fases:
+            fase_data = {
+                'titulo': fase.titulo,
+                'descripcion': fase.descripcion,
+                'duracion_dias': fase.duracion_dias,
+                'orden_fase': fase.orden_fase,
+                'tareas': [
+                    {
+                        'titulo': t.titulo,
+                        'descripcion': t.descripcion,
+                        'tipo': t.tipo,
+                        'orden': t.orden
+                    } for t in fase.tareas
+                ]
+            }
+            fases_dict.append(fase_data)
+        
+        planes_conn = PlanesConnection()
+        resultado = planes_conn.crear_plan_personalizado(
+            user_id=data.user_id,
+            meta_principal=data.meta_principal,
+            descripcion=data.descripcion,
+            plazo_dias_estimado=data.plazo_dias_estimado,
+            dificultad=data.dificultad,
+            categoria_plan_id=data.categoria_plan_id,
+            fases=fases_dict,
+            habitos_a_vincular=data.habitos_a_vincular,
+            es_publico=data.es_publico,
+            iniciar_automaticamente=True
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al crear plan personalizado')
+            )
+        
+        return CrearPlanCustomResponseSchema(
+            success=True,
+            message=resultado.get('message', 'Plan creado correctamente'),
+            plan_id=resultado.get('plan_id'),
+            plan_usuario_id=resultado.get('plan_usuario_id'),
+            total_fases=resultado.get('total_fases', 0),
+            total_tareas=resultado.get('total_tareas', 0)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al crear plan personalizado: {str(e)}')
+
 @app.get("/api/planes/mis-planes/{user_id}")
 def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)):
     """GET /api/planes/mis-planes/1 - Obtener planes del usuario (PROTEGIDO)"""
@@ -1307,6 +1558,107 @@ def get_mis_planes(user_id: int, current_user: TokenData = Depends(verify_token)
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener planes del usuario: {str(e)}')
+
+@app.put("/api/planes/{plan_usuario_id}/estado", response_model=PlanEstadoResponseSchema)
+def actualizar_estado_plan(
+    plan_usuario_id: int,
+    data: PlanEstadoUpdateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    PUT /api/planes/1/estado - Cambiar estado de un plan (PROTEGIDO)
+    
+    Estados válidos: activo, pausado, completado, cancelado
+    
+    Transiciones permitidas:
+    - activo → pausado, cancelado, completado
+    - pausado → activo (reanudar), cancelado
+    - completado → ninguno (no modificable)
+    - cancelado → ninguno (no reactivable)
+    """
+    try:
+        planes_conn = PlanesConnection()
+        
+        result = planes_conn.actualizar_estado_plan(
+            plan_usuario_id=plan_usuario_id,
+            user_id=current_user.user_id,
+            nuevo_estado=data.estado
+        )
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['message'])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al actualizar estado del plan: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/hoy", response_model=DashboardPlanResponseSchema)
+def get_dashboard_plan_hoy(plan_usuario_id: int, fecha: Optional[str] = None, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/1/hoy - Dashboard completo del plan para hoy (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        # Parsear fecha si se proporciona
+        fecha_obj = None
+        if fecha:
+            from datetime import datetime
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail='Formato de fecha inválido. Use YYYY-MM-DD')
+        
+        dashboard = planes_conn.get_dashboard_plan(plan_usuario_id, fecha_obj)
+        
+        if not dashboard:
+            raise HTTPException(status_code=404, detail='Plan no encontrado')
+        
+        return DashboardPlanResponseSchema(**dashboard)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener dashboard del plan: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/timeline", response_model=TimelineResponseSchema)
+def get_timeline_plan(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/1/timeline - Timeline visual del plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        timeline = planes_conn.get_timeline_plan(plan_usuario_id)
+        
+        if not timeline:
+            raise HTTPException(status_code=404, detail='Plan no encontrado')
+        
+        return TimelineResponseSchema(**timeline)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener timeline del plan: {str(e)}')
 
 @app.get("/api/planes/tareas-diarias/{plan_usuario_id}", response_model=TareasDiariasResponseSchema)
 def get_tareas_diarias(plan_usuario_id: int, current_user: TokenData = Depends(verify_token)):
@@ -1385,6 +1737,145 @@ def marcar_tarea_completada(data: MarcarTareaSchema, current_user: TokenData = D
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al marcar tarea: {str(e)}')
+
+# ========================================
+# ENDPOINTS DE HÁBITOS VINCULADOS A PLANES
+# ========================================
+
+@app.post("/api/planes/{plan_usuario_id}/habitos", response_model=VincularHabitoResponseSchema)
+def vincular_habito_a_plan(plan_usuario_id: int, data: VincularHabitoSchema, current_user: TokenData = Depends(verify_token)):
+    """POST /api/planes/{id}/habitos - Vincular un hábito a un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.vincular_habito_a_plan(
+            plan_usuario_id=plan_usuario_id,
+            habito_usuario_id=data.habito_usuario_id,
+            objetivo_id=data.objetivo_id,
+            obligatorio=data.obligatorio,
+            notas=data.notas
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al vincular hábito')
+            )
+        
+        return VincularHabitoResponseSchema(
+            success=True,
+            message=resultado.get('message'),
+            plan_habito_id=resultado.get('plan_habito_id')
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al vincular hábito: {str(e)}')
+
+@app.delete("/api/planes/{plan_usuario_id}/habitos/{habito_usuario_id}", response_model=DesvincularHabitoResponseSchema)
+def desvincular_habito_de_plan(plan_usuario_id: int, habito_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+    """DELETE /api/planes/{id}/habitos/{habito_id} - Desvincular un hábito de un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        resultado = planes_conn.desvincular_habito_de_plan(
+            plan_usuario_id=plan_usuario_id,
+            habito_usuario_id=habito_usuario_id
+        )
+        
+        if not resultado.get('success'):
+            raise HTTPException(
+                status_code=400, 
+                detail=resultado.get('message', 'Error al desvincular hábito')
+            )
+        
+        return DesvincularHabitoResponseSchema(
+            success=True,
+            message=resultado.get('message')
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al desvincular hábito: {str(e)}')
+
+@app.get("/api/planes/{plan_usuario_id}/habitos", response_model=ListaHabitosPlanResponseSchema)
+def get_habitos_del_plan(plan_usuario_id: int, fecha: Optional[str] = None, current_user: TokenData = Depends(verify_token)):
+    """GET /api/planes/{id}/habitos - Obtener hábitos vinculados a un plan (PROTEGIDO)"""
+    try:
+        planes_conn = PlanesConnection()
+        
+        # Verificar que el plan pertenece al usuario actual
+        planes_usuario = planes_conn.get_planes_usuario(current_user.user_id)
+        plan_encontrado = any(p['plan_usuario_id'] == plan_usuario_id for p in planes_usuario)
+        
+        if not plan_encontrado:
+            raise HTTPException(
+                status_code=403, 
+                detail='No tienes permiso para acceder a este plan'
+            )
+        
+        # Parsear fecha si se proporciona
+        fecha_obj = None
+        if fecha:
+            from datetime import datetime
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail='Formato de fecha inválido. Use YYYY-MM-DD')
+        
+        habitos = planes_conn.get_habitos_del_plan(plan_usuario_id, fecha_obj)
+        
+        # Convertir a schema
+        habitos_response = [
+            HabitoPlanResponseSchema(
+                plan_habito_id=h['plan_habito_id'],
+                habito_usuario_id=h['habito_usuario_id'],
+                habito_id=h['habito_id'],
+                nombre=h['nombre'],
+                descripcion=h['descripcion'],
+                categoria=h['categoria'],
+                puntos=h['puntos'],
+                obligatorio=h['obligatorio'],
+                objetivo_id=h['objetivo_id'],
+                notas=h['notas'],
+                completado_hoy=h['completado_hoy'],
+                hora_completado=h['hora_completado']
+            )
+            for h in habitos
+        ]
+        
+        return ListaHabitosPlanResponseSchema(
+            success=True,
+            data=habitos_response,
+            total=len(habitos_response)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Error al obtener hábitos del plan: {str(e)}')
 
 # ========================================
 # ENDPOINTS DE PRUEBA

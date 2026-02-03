@@ -9,13 +9,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
-import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
+import { useAuth } from "../../contexts/AuthContext";
+import ReflectionModal from "../../components/ui/ReflectionModal";
 
 const { width } = Dimensions.get("window");
 
@@ -53,6 +55,39 @@ interface ResumenUsuario {
   racha_maxima: number;     // ← Nuevo campo del backend
 }
 
+interface ReflexionHoy {
+  reflexion_id: number;
+  fecha: string;
+  estado_animo: string;
+  que_salio_bien?: string | null;
+  que_mejorar?: string | null;
+}
+
+// Configuración de colores para estados de ánimo
+const MOOD_COLORS: Record<string, string> = {
+  great: '#22C55E',
+  good: '#84CC16',
+  neutral: '#F59E0B',
+  low: '#F97316',
+  bad: '#EF4444',
+};
+
+const MOOD_ICONS: Record<string, string> = {
+  great: 'sunny',
+  good: 'partly-sunny',
+  neutral: 'cloudy',
+  low: 'rainy',
+  bad: 'thunderstorm',
+};
+
+const MOOD_LABELS: Record<string, string> = {
+  great: 'Great',
+  good: 'Good',
+  neutral: 'Neutral',
+  low: 'Low',
+  bad: 'Bad',
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   
@@ -76,6 +111,10 @@ export default function HomeScreen() {
     nivel_actual: 1,
     racha_maxima: 0,
   });
+  
+  // Estado para reflexiones
+  const [reflexionHoy, setReflexionHoy] = useState<ReflexionHoy | null>(null);
+  const [showReflectionModal, setShowReflectionModal] = useState(false);
 
   // ✅ Funciones que usan authFetch (incluye token automáticamente)
 
@@ -127,6 +166,50 @@ export default function HomeScreen() {
     }
   };
 
+  const loadReflexionHoy = async (userId: number) => {
+    try {
+      const response = await authFetch(`/api/usuario/${userId}/reflexion/hoy`);
+      const data = await response.json();
+      
+      if (data.tiene_reflexion && data.reflexion) {
+        setReflexionHoy(data.reflexion);
+      } else {
+        setReflexionHoy(null);
+      }
+    } catch (error) {
+      console.error("Error loading reflexion:", error);
+      setReflexionHoy(null);
+    }
+  };
+
+  const handleSaveReflection = async (reflectionData: {
+    estado_animo: string;
+    que_salio_bien?: string;
+    que_mejorar?: string;
+  }) => {
+    if (!user?.user_id) return;
+    
+    try {
+      const response = await authFetch(`/api/usuario/${user.user_id}/reflexion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reflectionData),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Recargar la reflexión
+        await loadReflexionHoy(user.user_id);
+      } else {
+        Alert.alert('Error', data.message || 'Could not save reflection');
+      }
+    } catch (error) {
+      console.error("Error saving reflection:", error);
+      Alert.alert('Error', 'Could not save reflection');
+    }
+  };
+
   // ✅ SIMPLIFICADO: Ya no llamamos a getCurrentUser, usamos user del contexto
   const loadAllData = async () => {
     try {
@@ -135,7 +218,8 @@ export default function HomeScreen() {
       await Promise.all([
         loadHabitosHoy(user.user_id),
         loadMisPlanes(user.user_id),
-        loadResumenUsuario(user.user_id)
+        loadResumenUsuario(user.user_id),
+        loadReflexionHoy(user.user_id)
       ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -461,6 +545,86 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Daily Reflection Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Daily Reflection</Text>
+            <TouchableOpacity
+              style={styles.seeAllButton}
+              onPress={() => router.push("/seccion_reflexiones/historialReflexiones")}
+            >
+              <Text style={styles.seeAllText}>History</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
+            </TouchableOpacity>
+          </View>
+
+          {reflexionHoy ? (
+            // Reflexión completada
+            <TouchableOpacity
+              style={styles.reflectionCard}
+              onPress={() => setShowReflectionModal(true)}
+            >
+              <View style={styles.reflectionHeader}>
+                <View style={[
+                  styles.reflectionMoodBadge,
+                  { backgroundColor: MOOD_COLORS[reflexionHoy.estado_animo] + '20' }
+                ]}>
+                  <Ionicons
+                    name={MOOD_ICONS[reflexionHoy.estado_animo] as any}
+                    size={20}
+                    color={MOOD_COLORS[reflexionHoy.estado_animo]}
+                  />
+                  <Text style={[
+                    styles.reflectionMoodText,
+                    { color: MOOD_COLORS[reflexionHoy.estado_animo] }
+                  ]}>
+                    {MOOD_LABELS[reflexionHoy.estado_animo]}
+                  </Text>
+                </View>
+                <Ionicons name="create-outline" size={18} color={colors.neutral[400]} />
+              </View>
+              
+              {reflexionHoy.que_salio_bien && (
+                <View style={styles.reflectionTextSection}>
+                  <Text style={styles.reflectionTextLabel}>What went well</Text>
+                  <Text style={styles.reflectionTextContent} numberOfLines={2}>
+                    {reflexionHoy.que_salio_bien}
+                  </Text>
+                </View>
+              )}
+              
+              {reflexionHoy.que_mejorar && (
+                <View style={styles.reflectionTextSection}>
+                  <Text style={styles.reflectionTextLabel}>To improve</Text>
+                  <Text style={styles.reflectionTextContent} numberOfLines={2}>
+                    {reflexionHoy.que_mejorar}
+                  </Text>
+                </View>
+              )}
+              
+              <Text style={styles.reflectionTapHint}>Tap to edit</Text>
+            </TouchableOpacity>
+          ) : (
+            // Sin reflexión - CTA para crear
+            <TouchableOpacity
+              style={styles.reflectionEmptyCard}
+              onPress={() => setShowReflectionModal(true)}
+            >
+              <View style={styles.reflectionEmptyIcon}>
+                <Ionicons name="journal-outline" size={32} color={colors.primary[600]} />
+              </View>
+              <Text style={styles.reflectionEmptyTitle}>How was your day?</Text>
+              <Text style={styles.reflectionEmptySubtitle}>
+                Take a moment to reflect on your progress
+              </Text>
+              <View style={styles.reflectionCTA}>
+                <Text style={styles.reflectionCTAText}>Add Reflection</Text>
+                <Ionicons name="add" size={18} color={colors.primary[600]} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -498,6 +662,14 @@ export default function HomeScreen() {
         {/* Bottom Padding for Tab Bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Reflection Modal */}
+      <ReflectionModal
+        visible={showReflectionModal}
+        onClose={() => setShowReflectionModal(false)}
+        onSave={handleSaveReflection}
+        existingReflection={reflexionHoy}
+      />
     </SafeAreaView>
   );
 }
@@ -862,5 +1034,92 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     fontWeight: typography.weight.medium,
     color: colors.neutral[700],
+  },
+  // Reflection Section Styles
+  reflectionCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    ...shadows.sm,
+  },
+  reflectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  reflectionMoodBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.lg,
+    gap: spacing[2],
+  },
+  reflectionMoodText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+  },
+  reflectionTextSection: {
+    marginBottom: spacing[3],
+  },
+  reflectionTextLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: colors.neutral[500],
+    marginBottom: spacing[1],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reflectionTextContent: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[700],
+    lineHeight: 20,
+  },
+  reflectionTapHint: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+    textAlign: 'center',
+    marginTop: spacing[2],
+  },
+  reflectionEmptyCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[6],
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderStyle: 'dashed',
+  },
+  reflectionEmptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  reflectionEmptyTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[1],
+  },
+  reflectionEmptySubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    marginBottom: spacing[4],
+  },
+  reflectionCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+  },
+  reflectionCTAText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
 });

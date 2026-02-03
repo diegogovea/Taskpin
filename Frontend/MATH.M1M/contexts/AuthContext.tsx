@@ -258,6 +258,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function authFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
     
+    console.log('[authFetch] endpoint:', endpoint, 'token exists:', !!token);
+    
     const headers = {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),

@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { ConfirmModal } from "../../components/modals";
-import { Toast } from "../../components/ui";
+import { Toast, HabitCalendar } from "../../components/ui";
 
 interface HabitoDetalle {
   habito_usuario_id: number;
@@ -33,6 +33,29 @@ interface HabitoDetalle {
   estadisticas: {
     dias_completados: number;
     racha_actual: number;
+  };
+}
+
+interface HistorialDia {
+  fecha: string;
+  completado: boolean;
+  hora_completado: string | null;
+}
+
+interface HistorialResumen {
+  total_dias: number;
+  dias_completados: number;
+  porcentaje_completado: number;
+}
+
+interface RachasData {
+  racha_actual: number;
+  racha_maxima: number;
+  fecha_inicio_racha_actual: string | null;
+  estadisticas: {
+    total_rachas: number;
+    promedio_racha: number;
+    dias_desde_primera_actividad: number;
   };
 }
 
@@ -64,6 +87,11 @@ export default function DetalleHabitoScreen() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
+  // Historial & Rachas states
+  const [historial, setHistorial] = useState<HistorialDia[]>([]);
+  const [historialResumen, setHistorialResumen] = useState<HistorialResumen | null>(null);
+  const [rachas, setRachas] = useState<RachasData | null>(null);
+  
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [toast, setToast] = useState({
@@ -92,8 +120,51 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  const fetchHistorial = async () => {
+    if (!user?.user_id || !habito_usuario_id) return;
+    
+    try {
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habito_usuario_id}/historial?dias=30`
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setHistorial(data.data.dias);
+        setHistorialResumen(data.data.resumen);
+      }
+    } catch (error) {
+      console.error("Error fetching historial:", error);
+    }
+  };
+
+  const fetchRachas = async () => {
+    if (!user?.user_id || !habito_usuario_id) return;
+    
+    try {
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habito_usuario_id}/rachas`
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setRachas(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching rachas:", error);
+    }
+  };
+
   useEffect(() => {
-    fetchHabitoDetalle().finally(() => setLoading(false));
+    const loadAllData = async () => {
+      await Promise.all([
+        fetchHabitoDetalle(),
+        fetchHistorial(),
+        fetchRachas(),
+      ]);
+      setLoading(false);
+    };
+    loadAllData();
   }, [user?.user_id, habito_usuario_id]);
 
   const goBack = () => {
@@ -277,6 +348,60 @@ export default function DetalleHabitoScreen() {
             <Text style={styles.statLabel}>Days Done</Text>
           </View>
         </View>
+
+        {/* History Calendar */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>History</Text>
+          <View style={styles.calendarContainer}>
+            <HabitCalendar historial={historial} />
+          </View>
+        </View>
+
+        {/* Month Stats */}
+        {historialResumen && (
+          <View style={styles.monthStatsCard}>
+            <View style={styles.monthStatItem}>
+              <Text style={styles.monthStatValue}>
+                {historialResumen.dias_completados}/{historialResumen.total_dias}
+              </Text>
+              <Text style={styles.monthStatLabel}>days this month</Text>
+            </View>
+            <View style={styles.monthStatDivider} />
+            <View style={styles.monthStatItem}>
+              <Text style={styles.monthStatValue}>
+                {historialResumen.porcentaje_completado}%
+              </Text>
+              <Text style={styles.monthStatLabel}>success rate</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Streaks Stats */}
+        {rachas && (
+          <View style={styles.streaksCard}>
+            <View style={styles.streakItem}>
+              <Ionicons name="trophy" size={20} color={colors.accent.amber} />
+              <View>
+                <Text style={styles.streakValue}>{rachas.racha_maxima} days</Text>
+                <Text style={styles.streakLabel}>Best Streak</Text>
+              </View>
+            </View>
+            <View style={styles.streakItem}>
+              <Ionicons name="analytics" size={20} color={colors.primary[600]} />
+              <View>
+                <Text style={styles.streakValue}>{rachas.estadisticas.promedio_racha} days</Text>
+                <Text style={styles.streakLabel}>Avg Streak</Text>
+              </View>
+            </View>
+            <View style={styles.streakItem}>
+              <Ionicons name="layers" size={20} color={colors.secondary[600]} />
+              <View>
+                <Text style={styles.streakValue}>{rachas.estadisticas.total_rachas}</Text>
+                <Text style={styles.streakLabel}>Total Streaks</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Frequency Selector */}
         <View style={styles.section}>
@@ -570,5 +695,58 @@ const styles = StyleSheet.create({
     fontSize: typography.size.base,
     fontWeight: typography.weight.semibold,
     color: colors.semantic.error,
+  },
+  calendarContainer: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  monthStatsCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+  },
+  monthStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  monthStatValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[800],
+  },
+  monthStatLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+  },
+  monthStatDivider: {
+    width: 1,
+    backgroundColor: colors.neutral[200],
+    marginHorizontal: spacing[3],
+  },
+  streaksCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.neutral[50],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[6],
+    justifyContent: 'space-between',
+  },
+  streakItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  streakValue: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[800],
+  },
+  streakLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
   },
 });

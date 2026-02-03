@@ -15,13 +15,12 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
-import { useAuth } from "../../contexts/AuthContext";
 
 interface PlanDetalle {
   plan_id: number;
   meta_principal: string;
   descripcion: string;
-  duracion_estimada_dias: number;
+  plazo_dias_estimado: number;
   dificultad: "fácil" | "intermedio" | "difícil";
   categoria_nombre: string;
   total_fases: number;
@@ -46,11 +45,9 @@ interface Tarea {
 export default function DetallePlanScreen() {
   const router = useRouter();
   const { planId } = useLocalSearchParams();
-  const { user } = useAuth();
   
   const [plan, setPlan] = useState<PlanDetalle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
   const [customDuration, setCustomDuration] = useState("");
   const [showCustomDuration, setShowCustomDuration] = useState(false);
 
@@ -60,7 +57,7 @@ export default function DetallePlanScreen() {
       const data = await response.json();
       if (data.success) {
         setPlan(data.plan);
-        setCustomDuration(data.plan.duracion_estimada_dias.toString());
+        setCustomDuration(data.plan.plazo_dias_estimado.toString());
       }
     } catch (error) {
       console.error("Error fetching plan:", error);
@@ -80,43 +77,9 @@ export default function DetallePlanScreen() {
     router.canGoBack() ? router.back() : router.replace("/(tabs)/planes");
   };
 
-  const agregarPlan = async () => {
+  const iniciarWizard = () => {
     if (!plan) return;
-
-    setAdding(true);
-
-    try {
-      if (!user?.user_id) {
-        Alert.alert("Error", "Could not identify user");
-        return;
-      }
-
-      const duration = showCustomDuration ? parseInt(customDuration) : plan.duracion_estimada_dias;
-
-      const response = await fetch(`${API_BASE_URL}/api/planes/agregar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user.user_id,
-          plan_id: plan.plan_id,
-          duracion_dias: duration,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        Alert.alert("Success!", "Plan added to your profile", [
-          { text: "OK", onPress: () => router.replace("/(tabs)/planes") },
-        ]);
-      } else {
-        Alert.alert("Error", result.message || "Could not add plan");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Connection error");
-    } finally {
-      setAdding(false);
-    }
+    router.push(`/seccion_planes/wizardPlan?planId=${plan.plan_id}` as any);
   };
 
   const getDifficultyColor = (dificultad: string) => {
@@ -214,7 +177,7 @@ export default function DetallePlanScreen() {
             <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
               <Ionicons name="calendar" size={18} color={colors.primary[600]} />
             </View>
-            <Text style={styles.statValue}>{plan.duracion_estimada_dias}</Text>
+            <Text style={styles.statValue}>{plan.plazo_dias_estimado}</Text>
             <Text style={styles.statLabel}>Days</Text>
           </View>
           <View style={styles.statItem}>
@@ -298,8 +261,7 @@ export default function DetallePlanScreen() {
       <View style={styles.floatingButtonContainer}>
         <TouchableOpacity
           style={styles.floatingButton}
-          onPress={agregarPlan}
-          disabled={adding}
+          onPress={iniciarWizard}
           activeOpacity={0.9}
         >
           <LinearGradient
@@ -308,14 +270,8 @@ export default function DetallePlanScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.floatingButtonGradient}
           >
-            {adding ? (
-              <ActivityIndicator color={colors.neutral[0]} size="small" />
-            ) : (
-              <>
-                <Ionicons name="add-circle" size={22} color={colors.neutral[0]} />
-                <Text style={styles.floatingButtonText}>Add This Plan</Text>
-              </>
-            )}
+            <Ionicons name="play-circle" size={22} color={colors.neutral[0]} />
+            <Text style={styles.floatingButtonText}>Start This Plan</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

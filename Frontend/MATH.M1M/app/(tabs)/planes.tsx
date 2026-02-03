@@ -38,6 +38,7 @@ export default function PlanesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
 
   // ✅ Usa authFetch (incluye token automáticamente)
   const fetchMisPlanes = async () => {
@@ -205,10 +206,24 @@ export default function PlanesScreen() {
 
   const activePlans = planes.filter((p) => p.estado === "activo");
   const completedPlans = planes.filter((p) => p.estado === "completado");
+  const pausedPlans = planes.filter((p) => p.estado === "pausado");
   const avgProgress =
     activePlans.length > 0
       ? Math.round(activePlans.reduce((sum, p) => sum + p.progreso_porcentaje, 0) / activePlans.length)
       : 0;
+
+  // Conteos para los filtros
+  const conteos: { [key: string]: number } = {
+    todos: planes.length,
+    activo: activePlans.length,
+    pausado: pausedPlans.length,
+    completado: completedPlans.length,
+  };
+
+  // Planes filtrados según el filtro seleccionado
+  const planesFiltrados = filtroEstado === "todos" 
+    ? planes 
+    : planes.filter((p) => p.estado === filtroEstado);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -271,11 +286,44 @@ export default function PlanesScreen() {
               </View>
             </View>
 
+            {/* Filter Chips */}
+            <View style={styles.filterContainer}>
+              {[
+                { key: "todos", label: "All" },
+                { key: "activo", label: "Active" },
+                { key: "pausado", label: "Paused" },
+                { key: "completado", label: "Completed" },
+              ].map((filtro) => (
+                <TouchableOpacity
+                  key={filtro.key}
+                  style={[
+                    styles.filterChip,
+                    filtroEstado === filtro.key && styles.filterChipActive
+                  ]}
+                  onPress={() => setFiltroEstado(filtro.key)}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    filtroEstado === filtro.key && styles.filterChipTextActive
+                  ]}>
+                    {filtro.label} ({conteos[filtro.key]})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             {/* Plans List */}
             <View style={styles.plansSection}>
-              {planes.map((plan) => (
-                <PlanCard key={plan.plan_usuario_id} plan={plan} />
-              ))}
+              {planesFiltrados.length === 0 ? (
+                <View style={styles.emptyFilterState}>
+                  <Ionicons name="filter-outline" size={32} color={colors.neutral[300]} />
+                  <Text style={styles.emptyFilterText}>No {filtroEstado} plans</Text>
+                </View>
+              ) : (
+                planesFiltrados.map((plan) => (
+                  <PlanCard key={plan.plan_usuario_id} plan={plan} />
+                ))
+              )}
             </View>
 
             {/* Add More Button */}
@@ -416,7 +464,42 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: "row",
     gap: spacing[3],
-    marginBottom: spacing[6],
+    marginBottom: spacing[4],
+  },
+  filterContainer: {
+    flexDirection: "row",
+    gap: spacing[2],
+    marginBottom: spacing[4],
+    flexWrap: "wrap",
+  },
+  filterChip: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.full,
+    backgroundColor: colors.neutral[100],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary[50],
+    borderColor: colors.primary[500],
+  },
+  filterChipText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+  },
+  filterChipTextActive: {
+    color: colors.primary[600],
+    fontWeight: typography.weight.semibold,
+  },
+  emptyFilterState: {
+    alignItems: "center",
+    paddingVertical: spacing[8],
+    gap: spacing[2],
+  },
+  emptyFilterText: {
+    fontSize: typography.size.base,
+    color: colors.neutral[400],
   },
   statCard: {
     flex: 1,
