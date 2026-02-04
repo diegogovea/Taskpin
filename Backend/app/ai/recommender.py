@@ -17,11 +17,22 @@ Donde:
 
 El sistema encuentra usuarios con patrones similares de hábitos
 y recomienda los hábitos que ellos tienen pero el usuario actual no.
+
+CACHE: Las recomendaciones se cachean en Redis por 1 hora.
 """
 
 import numpy as np
+import time
 from typing import Dict, List, Tuple, Optional
 from .feature_extractor import FeatureExtractor
+
+# Import Redis client (graceful fallback if not available)
+try:
+    from ..core.redis_client import redis_client
+    REDIS_AVAILABLE = redis_client.is_connected
+except ImportError:
+    redis_client = None
+    REDIS_AVAILABLE = False
 
 
 class HabitRecommender:
@@ -131,7 +142,7 @@ class HabitRecommender:
         # Retornar top N
         return similarities[:top_n]
     
-    def get_recommendations(self, user_id: int, limit: int = 5) -> List[Dict]:
+    def get_recommendations(self, user_id: int, limit: int = 5, use_cache: bool = True) -> List[Dict]:
         """
         Genera recomendaciones de hábitos para un usuario.
         
@@ -142,13 +153,27 @@ class HabitRecommender:
         4. Calcular score = (usuarios con hábito / total similares)
         5. Ordenar por score y retornar top N
         
+        CACHE: Resultados cacheados en Redis por 1 hora (3600 segundos).
+        
         Args:
             user_id: ID del usuario
             limit: Número máximo de recomendaciones
+            use_cache: Si usar cache de Redis (default True)
             
         Returns:
             Lista de recomendaciones con habito_id, nombre, score, razon
         """
+        # Intentar obtener de cache
+        cache_key = f"recommendations:user:{user_id}:limit:{limit}"
+        
+        if use_cache and REDIS_AVAILABLE and redis_client:
+            cached = redis_client.get_json(cache_key)
+            if cached is not None:
+                print(f"[Cache HIT] Recommendations for user {user_id}")
+                return cached
+        
+        start_time = time.time()
+        
         # Obtener usuarios similares
         similar_users = self.find_similar_users(user_id, top_n=15)
         
@@ -228,6 +253,12 @@ class HabitRecommender:
                 'score': round(score, 3),
                 'razon': f"{percentage}% de usuarios similares tienen este hábito"
             })
+        
+        # Guardar en cache (1 hora = 3600 segundos)
+        if use_cache and REDIS_AVAILABLE and redis_client:
+            redis_client.set_json(cache_key, recommendations, ttl=3600)
+            elapsed = time.time() - start_time
+            print(f"[Cache SET] Recommendations for user {user_id} ({elapsed:.3f}s)")
         
         return recommendations
     

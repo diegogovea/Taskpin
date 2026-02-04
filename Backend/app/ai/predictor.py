@@ -21,10 +21,13 @@ Features utilizadas:
 - dias_desde_agregado: antigüedad del hábito
 
 El modelo se entrena con datos históricos de seguimiento_habitos.
+
+CACHE: Las predicciones se cachean en Redis por 30 minutos.
 """
 
 import numpy as np
 import joblib
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from sklearn.ensemble import RandomForestClassifier
@@ -32,6 +35,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
 from .feature_extractor import FeatureExtractor
+
+# Import Redis client (graceful fallback if not available)
+try:
+    from ..core.redis_client import redis_client
+    REDIS_AVAILABLE = redis_client.is_connected
+except ImportError:
+    redis_client = None
+    REDIS_AVAILABLE = False
 
 
 class HabitPredictor:
@@ -211,16 +222,31 @@ class HabitPredictor:
             'factores_negativos': factores_negativos
         }
     
-    def predict_all_habits(self, user_id: int) -> List[Dict]:
+    def predict_all_habits(self, user_id: int, use_cache: bool = True) -> List[Dict]:
         """
         Predice probabilidad para TODOS los hábitos activos del usuario.
         
+        CACHE: Resultados cacheados en Redis por 30 minutos (1800 segundos).
+        Se invalida automáticamente cuando el usuario completa un hábito.
+        
         Args:
             user_id: ID del usuario
+            use_cache: Si usar cache de Redis (default True)
             
         Returns:
             Lista de predicciones ordenadas por probabilidad (mayor primero)
         """
+        # Intentar obtener de cache
+        cache_key = f"predictions:user:{user_id}"
+        
+        if use_cache and REDIS_AVAILABLE and redis_client:
+            cached = redis_client.get_json(cache_key)
+            if cached is not None:
+                print(f"[Cache HIT] Predictions for user {user_id}")
+                return cached
+        
+        start_time = time.time()
+        
         if not self.is_trained:
             if not self.load_model():
                 return []
@@ -263,6 +289,12 @@ class HabitPredictor:
         
         # Ordenar por probabilidad descendente
         predictions.sort(key=lambda x: x['probabilidad'], reverse=True)
+        
+        # Guardar en cache (30 minutos = 1800 segundos)
+        if use_cache and REDIS_AVAILABLE and redis_client:
+            redis_client.set_json(cache_key, predictions, ttl=1800)
+            elapsed = time.time() - start_time
+            print(f"[Cache SET] Predictions for user {user_id} ({elapsed:.3f}s)")
         
         return predictions
     

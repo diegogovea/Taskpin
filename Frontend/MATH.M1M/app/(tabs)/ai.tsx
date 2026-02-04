@@ -112,7 +112,11 @@ export default function AIScreen() {
       const response = await authFetch(`/api/usuario/${user.user_id}/habitos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ habito_id: habitoId, frecuencia_personal: "diario" }),
+        body: JSON.stringify({ 
+          user_id: user.user_id,
+          habito_id: habitoId, 
+          frecuencia_personal: "diario" 
+        }),
       });
       const data = await response.json();
       if (data.success || data.habito_usuario_id) {

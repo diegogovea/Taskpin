@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -79,6 +80,8 @@ export default function WizardPlanScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<number[]>([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [config, setConfig] = useState<WizardConfig>({
     fechaInicio: new Date(),
@@ -221,11 +224,11 @@ export default function WizardPlanScreen() {
       const result = await response.json();
 
       if (result.success) {
-        Alert.alert(
-          "Plan Started!",
-          `Your plan has been created${result.habitos_vinculados > 0 ? ` with ${result.habitos_vinculados} linked habits` : ""}.`,
-          [{ text: "Let's go!", onPress: () => router.replace("/(tabs)/planes") }]
-        );
+        const msg = result.habitos_vinculados > 0 
+          ? `Your plan has been created with ${result.habitos_vinculados} linked habits.`
+          : "Your plan has been created successfully.";
+        setSuccessMessage(msg);
+        setShowSuccessModal(true);
       } else {
         Alert.alert("Error", result.message || result.detail || "Could not create plan");
       }
@@ -671,6 +674,47 @@ export default function WizardPlanScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <LinearGradient
+                colors={colors.gradients.secondary}
+                style={styles.modalIconGradient}
+              >
+                <Ionicons name="checkmark" size={40} color={colors.neutral[0]} />
+              </LinearGradient>
+            </View>
+            <Text style={styles.modalTitle}>Plan Started!</Text>
+            <Text style={styles.modalMessage}>{successMessage}</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.replace("/(tabs)/planes");
+              }}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={colors.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.modalButtonGradient}
+              >
+                <Text style={styles.modalButtonText}>Let's Go!</Text>
+                <Ionicons name="arrow-forward" size={18} color={colors.neutral[0]} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1087,6 +1131,65 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   nextButtonText: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
+  },
+
+  // Success Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing[6],
+  },
+  modalContent: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius["2xl"],
+    padding: spacing[8],
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 340,
+    ...shadows.xl,
+  },
+  modalIconContainer: {
+    marginBottom: spacing[5],
+  },
+  modalIconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: typography.size["2xl"],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[2],
+  },
+  modalMessage: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    textAlign: "center",
+    marginBottom: spacing[6],
+    lineHeight: 24,
+  },
+  modalButton: {
+    width: "100%",
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    ...shadows.md,
+  },
+  modalButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing[4],
+    gap: spacing[2],
+  },
+  modalButtonText: {
     fontSize: typography.size.md,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
