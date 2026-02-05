@@ -10,9 +10,11 @@ import {
   Platform,
   ScrollView,
   Animated,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
@@ -117,6 +119,15 @@ export default function LoginScreen() {
             },
           ]}
         >
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../components/images/iconoLogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Welcome back</Text>
@@ -262,13 +273,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[100],
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: spacing[8],
+    marginBottom: spacing[6],
   },
   content: {
     flex: 1,
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: spacing[6],
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    shadowColor: colors.primary[600],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   header: {
-    marginBottom: spacing[10],
+    marginBottom: spacing[8],
   },
   title: {
     fontSize: typography.size["3xl"],

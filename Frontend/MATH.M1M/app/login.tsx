@@ -52,16 +52,11 @@ export default function LoginScreen() {
         >
           {/* Logo */}
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={colors.gradients.primary}
-              style={styles.logoGradient}
-            >
-              <Image
-                source={require("../components/images/iconoLogo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </LinearGradient>
+            <Image
+              source={require("../components/images/iconoLogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Brand */}
@@ -134,19 +129,12 @@ const styles = StyleSheet.create({
   logoContainer: {
     marginBottom: spacing[8],
   },
-  logoGradient: {
+  logo: {
     width: 100,
     height: 100,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 50,
     ...shadows.xl,
     shadowColor: colors.primary[600],
-  },
-  logo: {
-    width: 56,
-    height: 56,
-    tintColor: colors.neutral[0],
   },
   brandName: {
     fontSize: 48,

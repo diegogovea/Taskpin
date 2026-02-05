@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -95,14 +96,13 @@ export default function BienvenidaScreen() {
             },
           ]}
         >
-          {/* Animated Icon */}
+          {/* Logo */}
           <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={colors.gradients.primary}
-              style={styles.iconGradient}
-            >
-              <Ionicons name="sparkles" size={40} color={colors.neutral[0]} />
-            </LinearGradient>
+            <Image
+              source={require("../components/images/iconoLogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Greeting */}
@@ -186,12 +186,10 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginBottom: spacing[8],
   },
-  iconGradient: {
+  logo: {
     width: 88,
     height: 88,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 44,
     ...shadows.lg,
     shadowColor: colors.primary[600],
   },
