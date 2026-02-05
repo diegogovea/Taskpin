@@ -22,6 +22,8 @@ import { colors, typography, spacing, radius, shadows } from "../constants/theme
 import { API_BASE_URL } from "../constants/api";
 import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
 
+const ONBOARDING_KEY = "@taskpin_onboarding_completed";
+
 interface UserData {
   user_id: string | null;
   nombre: string;
@@ -117,6 +119,20 @@ export default function ConfiguracionScreen() {
 
   const goBack = () => {
     router.canGoBack() ? router.back() : router.replace("/(tabs)/home");
+  };
+
+  // Para pruebas: borra la clave de onboarding y vuelve a Loading → verás onboarding de nuevo
+  const handleResetOnboarding = async () => {
+    try {
+      await AsyncStorage.removeItem(ONBOARDING_KEY);
+      Alert.alert(
+        "Onboarding reset",
+        "Next time you open the app you'll see the onboarding screens again. Going to loading now.",
+        [{ text: "OK", onPress: () => router.replace("/loading") }]
+      );
+    } catch {
+      Alert.alert("Error", "Could not reset onboarding");
+    }
   };
 
   const SettingItem = ({
@@ -235,6 +251,13 @@ export default function ConfiguracionScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.sectionCard}>
+            <SettingItem
+              icon="play-circle-outline"
+              title="Ver onboarding de nuevo (pruebas)"
+              onPress={handleResetOnboarding}
+              showChevron={false}
+            />
+            <View style={styles.settingDivider} />
             <SettingItem
               icon="log-out"
               title="Sign Out"

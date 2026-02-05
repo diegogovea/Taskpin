@@ -18,6 +18,8 @@ import { colors, typography, spacing, radius, shadows } from "../../constants/th
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
 import ReflectionModal from "../../components/ui/ReflectionModal";
+import { useWebSocket, HabitCompletedEvent, HabitUncompletedEvent } from "../../hooks/useWebSocket";
+import WSNotification from "../../components/ui/WSNotification";
 
 const { width } = Dimensions.get("window");
 
@@ -115,6 +117,47 @@ export default function HomeScreen() {
   // Estado para reflexiones
   const [reflexionHoy, setReflexionHoy] = useState<ReflexionHoy | null>(null);
   const [showReflectionModal, setShowReflectionModal] = useState(false);
+
+  // WebSocket notification state
+  const [wsNotification, setWsNotification] = useState<{
+    visible: boolean;
+    type: 'habit_completed' | 'habit_uncompleted' | 'info';
+    message: string;
+    points?: number;
+    streak?: number;
+  }>({ visible: false, type: 'info', message: '' });
+
+  // WebSocket connection for real-time updates
+  const { status: wsStatus, isConnected } = useWebSocket({
+    onHabitCompleted: (event: HabitCompletedEvent) => {
+      console.log('[Home] Habit completed event:', event);
+      setWsNotification({
+        visible: true,
+        type: 'habit_completed',
+        message: event.data.nombre,
+        points: event.data.puntos,
+        streak: event.data.racha_actual,
+      });
+      // Refresh data to show updated stats
+      if (user?.user_id) {
+        loadResumenUsuario(user.user_id);
+        loadHabitosHoy(user.user_id);
+      }
+    },
+    onHabitUncompleted: (event: HabitUncompletedEvent) => {
+      console.log('[Home] Habit uncompleted event:', event);
+      setWsNotification({
+        visible: true,
+        type: 'habit_uncompleted',
+        message: `Unmarked: ${event.data.nombre}`,
+      });
+      // Refresh data
+      if (user?.user_id) {
+        loadResumenUsuario(user.user_id);
+        loadHabitosHoy(user.user_id);
+      }
+    },
+  });
 
   // ✅ Funciones que usan authFetch (incluye token automáticamente)
 
@@ -625,40 +668,6 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/seccion_habitos/tiposHabitos")}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.primary[100] }]}>
-                <Ionicons name="add" size={22} color={colors.primary[600]} />
-              </View>
-              <Text style={styles.quickActionText}>New Habit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/seccion_planes/tiposPlanes")}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
-                <Ionicons name="document-text" size={20} color={colors.secondary[600]} />
-              </View>
-              <Text style={styles.quickActionText}>New Plan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/(tabs)/perfil")}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.accent.amber + "20" }]}>
-                <Ionicons name="stats-chart" size={20} color={colors.accent.amber} />
-              </View>
-              <Text style={styles.quickActionText}>Stats</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Bottom Padding for Tab Bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -670,6 +679,23 @@ export default function HomeScreen() {
         onSave={handleSaveReflection}
         existingReflection={reflexionHoy}
       />
+
+      {/* WebSocket Notification */}
+      <WSNotification
+        visible={wsNotification.visible}
+        type={wsNotification.type}
+        message={wsNotification.message}
+        points={wsNotification.points}
+        streak={wsNotification.streak}
+        onHide={() => setWsNotification(prev => ({ ...prev, visible: false }))}
+      />
+
+      {/* WebSocket Status Indicator (bottom right) */}
+      {isConnected && (
+        <View style={styles.wsIndicator}>
+          <View style={styles.wsIndicatorDot} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1006,35 +1032,6 @@ const styles = StyleSheet.create({
     minWidth: 36,
     textAlign: "right",
   },
-  quickActionsSection: {
-    marginBottom: spacing[6],
-  },
-  quickActionsGrid: {
-    flexDirection: "row",
-    gap: spacing[3],
-    marginTop: spacing[4],
-  },
-  quickActionButton: {
-    flex: 1,
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    alignItems: "center",
-    ...shadows.sm,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing[2],
-  },
-  quickActionText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[700],
-  },
   // Reflection Section Styles
   reflectionCard: {
     backgroundColor: colors.neutral[0],
@@ -1121,5 +1118,20 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     fontWeight: typography.weight.semibold,
     color: colors.primary[600],
+  },
+  // WebSocket indicator styles
+  wsIndicator: {
+    position: 'absolute',
+    bottom: 100,
+    right: spacing[4],
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    padding: spacing[2],
+    borderRadius: 20,
+  },
+  wsIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
   },
 });

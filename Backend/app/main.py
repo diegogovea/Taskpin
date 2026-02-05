@@ -72,6 +72,22 @@ from .schema.reflexionSchema import (
     CrearReflexionResponseSchema
 )
 
+# IMPORTACIONES PARA SISTEMA DISTRIBUIDO
+from .core.redis_client import redis_client
+from .websocket import ws_manager, WSEvent, create_event
+from .websocket.events import event_habit_completed, event_habit_uncompleted, event_cache_invalidated
+from fastapi import WebSocket, WebSocketDisconnect, BackgroundTasks
+import asyncio
+
+# Celery tasks (importar con manejo de errores por si worker no está corriendo)
+try:
+    from .tasks import train_model_task, generate_recommendations_task, generate_predictions_task
+    from .tasks.celery_app import celery_app
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    celery_app = None
+
 # Usar configuración desde config.py
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -692,7 +708,11 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
         raise HTTPException(status_code=500, detail=f"Error al obtener hábitos del día: {str(e)}")
 
 @app.post("/api/usuario/{user_id}/habito/{habito_usuario_id}/toggle", status_code=HTTP_200_OK)
-def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: TokenData = Depends(verify_token)):
+async def toggle_habit_completion(
+    user_id: int, 
+    habito_usuario_id: int, 
+    current_user: TokenData = Depends(verify_token)
+):
     """Alternar el completado de un hábito para hoy (PROTEGIDO)"""
     try:
         # Verificar acceso
@@ -707,9 +727,11 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         pool = get_pool()
         with pool.connection() as db_conn:
             with db_conn.cursor() as cur:
-                # Verificar que el hábito pertenece al usuario y obtener puntos_base
+                # Verificar que el hábito pertenece al usuario y obtener puntos_base y nombre
                 cur.execute("""
-                    SELECT hu.habito_usuario_id, COALESCE(hp.puntos_base, 10) as puntos_base
+                    SELECT hu.habito_usuario_id, 
+                           COALESCE(hp.puntos_base, 10) as puntos_base,
+                           COALESCE(hp.nombre, 'Hábito personalizado') as nombre
                     FROM habitos_usuario hu
                     LEFT JOIN habitos_predeterminados hp ON hu.habito_id = hp.habito_id
                     WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
@@ -720,6 +742,7 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
                     raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
                 
                 puntos_habito = habito_data[1]  # puntos_base del hábito
+                nombre_habito = habito_data[2]  # nombre del hábito
                 
                 # Verificar si ya existe un registro para hoy
                 cur.execute("""
@@ -874,6 +897,36 @@ def toggle_habit_completion(user_id: int, habito_usuario_id: int, current_user: 
         # Agregar info de nivel
         if nivel_info:
             response_data["nivel"] = nivel_info
+        
+        # ========================================
+        # SISTEMA DISTRIBUIDO: Cache + WebSocket
+        # ========================================
+        
+        # Invalidar cache de predicciones (porque el estado cambió)
+        redis_client.invalidate_user_cache(user_id)
+        
+        # Enviar evento WebSocket si hay conexiones activas
+        if ws_manager.is_user_connected(user_id):
+            try:
+                racha = racha_info["racha_actual"] if racha_info else 0
+                if new_status:
+                    event = event_habit_completed(
+                        habito_usuario_id=habito_usuario_id,
+                        nombre=nombre_habito,
+                        puntos=puntos_habito,
+                        racha_actual=racha
+                    )
+                else:
+                    event = event_habit_uncompleted(
+                        habito_usuario_id=habito_usuario_id,
+                        nombre=nombre_habito
+                    )
+                
+                # Enviar evento (ahora podemos usar await porque el endpoint es async)
+                await ws_manager.send_to_user(user_id, event)
+                print(f"[WS] Event sent to user {user_id}: {event[:50]}...")
+            except Exception as ws_error:
+                print(f"[WS] Error sending event: {ws_error}")
         
         return {
             "success": True,
@@ -1876,6 +1929,495 @@ def get_habitos_del_plan(plan_usuario_id: int, fecha: Optional[str] = None, curr
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al obtener hábitos del plan: {str(e)}')
+
+# ========================================
+# ENDPOINTS DE INTELIGENCIA ARTIFICIAL
+# ========================================
+
+from .ai import HabitRecommender, HabitPredictor
+from .schema.aiSchema import (
+    RecomendacionesResponseSchema,
+    RecomendacionHabitoSchema,
+    UsuariosSimilaresResponseSchema,
+    UsuarioSimilarSchema,
+    PrediccionesHoyResponseSchema,
+    PrediccionHabitoSchema,
+    PrediccionIndividualResponseSchema,
+    ModeloInfoSchema,
+    EntrenarModeloResponseSchema
+)
+
+# Inicializar componentes de IA
+recommender = HabitRecommender()
+predictor = HabitPredictor()
+
+
+@app.get("/api/ai/usuario/{user_id}/recomendaciones", response_model=RecomendacionesResponseSchema)
+def get_ai_recomendaciones(
+    user_id: int, 
+    limit: int = 5,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener recomendaciones de hábitos personalizadas usando IA.
+    
+    El sistema usa filtrado colaborativo con similitud coseno para
+    encontrar usuarios con patrones similares y recomendar hábitos
+    que ellos tienen pero el usuario actual no.
+    
+    Args:
+        user_id: ID del usuario
+        limit: Número máximo de recomendaciones (default: 5)
+    
+    Returns:
+        Lista de hábitos recomendados con score y razón
+    """
+    try:
+        # Verificar acceso
+        verify_user_access(user_id, current_user)
+        
+        # Obtener recomendaciones
+        recomendaciones = recommender.get_recommendations(user_id, limit=limit)
+        
+        return RecomendacionesResponseSchema(
+            success=True,
+            user_id=user_id,
+            total_recomendaciones=len(recomendaciones),
+            recomendaciones=[
+                RecomendacionHabitoSchema(**r) for r in recomendaciones
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener recomendaciones: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/usuarios-similares", response_model=UsuariosSimilaresResponseSchema)
+def get_usuarios_similares(
+    user_id: int,
+    limit: int = 10,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener usuarios con patrones de hábitos similares.
+    
+    Útil para debugging y para mostrar "usuarios como tú".
+    
+    Args:
+        user_id: ID del usuario
+        limit: Número máximo de usuarios similares
+    
+    Returns:
+        Lista de usuarios similares con su score de similitud
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        similares = recommender.find_similar_users(user_id, top_n=limit)
+        
+        return UsuariosSimilaresResponseSchema(
+            success=True,
+            user_id=user_id,
+            total_similares=len(similares),
+            usuarios_similares=[
+                UsuarioSimilarSchema(**s) for s in similares
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener usuarios similares: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/predicciones/hoy", response_model=PrediccionesHoyResponseSchema)
+def get_predicciones_hoy(
+    user_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener predicciones de completado para todos los hábitos del usuario hoy.
+    
+    El modelo Random Forest predice la probabilidad de que el usuario
+    complete cada hábito basándose en:
+    - Día de la semana
+    - Racha actual
+    - Tasa de éxito reciente
+    - Si completó ayer
+    - Antigüedad del hábito
+    
+    Args:
+        user_id: ID del usuario
+    
+    Returns:
+        Lista de predicciones ordenadas por probabilidad (mayor primero)
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        # Verificar que el modelo está entrenado
+        if not predictor.is_trained:
+            raise HTTPException(
+                status_code=503, 
+                detail="Modelo de predicción no disponible. Ejecute /api/ai/entrenar primero."
+            )
+        
+        predicciones = predictor.predict_all_habits(user_id)
+        
+        return PrediccionesHoyResponseSchema(
+            success=True,
+            user_id=user_id,
+            fecha=date.today().isoformat(),
+            total_habitos=len(predicciones),
+            predicciones=[
+                PrediccionHabitoSchema(**p) for p in predicciones
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener predicciones: {str(e)}")
+
+
+@app.get("/api/ai/usuario/{user_id}/prediccion/{habito_usuario_id}", response_model=PrediccionIndividualResponseSchema)
+def get_prediccion_habito(
+    user_id: int,
+    habito_usuario_id: int,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Obtener predicción de completado para un hábito específico.
+    
+    Args:
+        user_id: ID del usuario
+        habito_usuario_id: ID del hábito del usuario
+    
+    Returns:
+        Predicción con probabilidad, factores y features usadas
+    """
+    try:
+        verify_user_access(user_id, current_user)
+        
+        if not predictor.is_trained:
+            raise HTTPException(
+                status_code=503,
+                detail="Modelo de predicción no disponible"
+            )
+        
+        pred = predictor.predict(user_id, habito_usuario_id)
+        
+        if not pred:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+        
+        return PrediccionIndividualResponseSchema(
+            success=True,
+            habito_usuario_id=habito_usuario_id,
+            probabilidad=pred['probabilidad'],
+            factores_positivos=pred['factores_positivos'],
+            factores_negativos=pred['factores_negativos'],
+            features=pred['features']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener predicción: {str(e)}")
+
+
+@app.get("/api/ai/modelo/info", response_model=ModeloInfoSchema)
+def get_modelo_info():
+    """
+    Obtener información sobre el estado del modelo de IA.
+    
+    No requiere autenticación - info pública sobre el sistema.
+    """
+    info = predictor.get_model_info()
+    return ModeloInfoSchema(
+        is_trained=info['is_trained'],
+        model_exists=info['model_exists'],
+        training_accuracy=info['training_accuracy'],
+        feature_names=info['feature_names']
+    )
+
+
+@app.post("/api/ai/entrenar", response_model=EntrenarModeloResponseSchema)
+def entrenar_modelo_ia(current_user: TokenData = Depends(verify_token)):
+    """
+    Entrenar/re-entrenar el modelo de predicción.
+    
+    Requiere autenticación. Solo usuarios autenticados pueden
+    disparar el entrenamiento.
+    
+    El modelo se entrena con todos los datos históricos disponibles.
+    """
+    try:
+        result = predictor.train(save=True)
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Error de entrenamiento'))
+        
+        return EntrenarModeloResponseSchema(
+            success=True,
+            message="Modelo entrenado exitosamente",
+            total_records=result['total_records'],
+            accuracy=result['accuracy'],
+            feature_importance=result['feature_importance']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al entrenar modelo: {str(e)}")
+
+
+# ========================================
+# ENDPOINTS DE SISTEMA DISTRIBUIDO
+# ========================================
+
+@app.get("/api/system/redis/status")
+def get_redis_status():
+    """
+    Obtener estado de la conexión Redis.
+    
+    Retorna información sobre la conexión, memoria usada,
+    y cantidad de keys de Taskpin.
+    """
+    stats = redis_client.get_stats()
+    return {
+        "success": True,
+        "redis": stats
+    }
+
+
+@app.get("/api/system/health")
+def get_system_health():
+    """
+    Health check general del sistema.
+    
+    Verifica conexión a PostgreSQL y Redis.
+    """
+    health = {
+        "status": "healthy",
+        "services": {}
+    }
+    
+    # Check PostgreSQL
+    try:
+        users = conn.read_all()
+        health["services"]["postgresql"] = {
+            "status": "connected",
+            "test": f"{len(users)} users"
+        }
+    except Exception as e:
+        health["status"] = "degraded"
+        health["services"]["postgresql"] = {
+            "status": "error",
+            "error": str(e)
+        }
+    
+    # Check Redis
+    redis_stats = redis_client.get_stats()
+    if redis_stats.get("connected"):
+        health["services"]["redis"] = {
+            "status": "connected",
+            "db": redis_stats.get("db"),
+            "keys": redis_stats.get("taskpin_keys", 0),
+            "memory": redis_stats.get("used_memory")
+        }
+    else:
+        health["status"] = "degraded"
+        health["services"]["redis"] = {
+            "status": "disconnected",
+            "note": "Running without cache"
+        }
+    
+    # Check Celery (optional service)
+    if CELERY_AVAILABLE:
+        try:
+            inspector = celery_app.control.inspect(timeout=1)
+            ping = inspector.ping()
+            if ping:
+                health["services"]["celery"] = {
+                    "status": "running",
+                    "workers": len(ping)
+                }
+            else:
+                health["services"]["celery"] = {
+                    "status": "no_workers",
+                    "note": "Start worker with: celery -A app.tasks.celery_app worker"
+                }
+        except Exception:
+            health["services"]["celery"] = {
+                "status": "no_workers",
+                "note": "Workers not running (optional)"
+            }
+    
+    return health
+
+
+@app.get("/api/system/websocket/status")
+def get_websocket_status():
+    """
+    Obtener estado de las conexiones WebSocket.
+    """
+    return {
+        "success": True,
+        "websocket": ws_manager.get_stats()
+    }
+
+
+@app.get("/api/system/celery/status")
+def get_celery_status():
+    """
+    Obtener estado de Celery.
+    """
+    if not CELERY_AVAILABLE:
+        return {
+            "success": False,
+            "celery": {"status": "not_configured"}
+        }
+    
+    try:
+        # Intentar inspeccionar workers activos
+        inspector = celery_app.control.inspect()
+        active = inspector.active()
+        
+        if active:
+            workers = list(active.keys())
+            return {
+                "success": True,
+                "celery": {
+                    "status": "running",
+                    "workers": workers,
+                    "active_tasks": sum(len(tasks) for tasks in active.values())
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "celery": {
+                    "status": "no_workers",
+                    "note": "Celery configured but no workers running"
+                }
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "celery": {
+                "status": "error",
+                "error": str(e)
+            }
+        }
+
+
+@app.post("/api/ai/entrenar/async")
+def entrenar_modelo_async(current_user: TokenData = Depends(verify_token)):
+    """
+    Entrenar modelo de forma asíncrona usando Celery.
+    
+    Retorna inmediatamente con un task_id que puede usarse
+    para consultar el progreso.
+    """
+    if not CELERY_AVAILABLE:
+        raise HTTPException(
+            status_code=503, 
+            detail="Celery not available. Use /api/ai/entrenar for sync training."
+        )
+    
+    try:
+        # Lanzar tarea en background
+        task = train_model_task.delay()
+        
+        return {
+            "success": True,
+            "message": "Training started in background",
+            "task_id": task.id,
+            "status_url": f"/api/tasks/{task.id}/status"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting task: {str(e)}")
+
+
+@app.get("/api/tasks/{task_id}/status")
+def get_task_status(task_id: str):
+    """
+    Consultar el estado de una tarea de Celery.
+    
+    Estados posibles:
+    - PENDING: Tarea en cola
+    - STARTED: Tarea iniciada
+    - TRAINING/PROCESSING: En progreso (con meta de progreso)
+    - SUCCESS: Completada exitosamente
+    - FAILURE: Falló
+    """
+    if not CELERY_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Celery not available")
+    
+    from celery.result import AsyncResult
+    
+    result = AsyncResult(task_id, app=celery_app)
+    
+    response = {
+        "task_id": task_id,
+        "status": result.status,
+        "ready": result.ready(),
+    }
+    
+    # Agregar información de progreso si está disponible
+    if result.info:
+        if isinstance(result.info, dict):
+            response["progress"] = result.info.get("progress")
+            response["step"] = result.info.get("step")
+            if "error" in result.info:
+                response["error"] = result.info["error"]
+        elif result.ready():
+            response["result"] = result.info
+    
+    # Si completó, agregar resultado
+    if result.ready() and result.successful():
+        response["result"] = result.result
+    
+    return response
+
+
+# ========================================
+# WEBSOCKET ENDPOINT
+# ========================================
+
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: int):
+    """
+    Endpoint WebSocket para notificaciones en tiempo real.
+    
+    Conectar: ws://localhost:8000/ws/{user_id}
+    
+    Eventos que puede recibir:
+    - connected: Conexión establecida
+    - habit_completed: Usuario completó un hábito
+    - habit_uncompleted: Usuario desmarcó un hábito
+    - cache_invalidated: Cache fue limpiado
+    - notification: Notificación genérica
+    """
+    await ws_manager.connect(user_id, websocket)
+    
+    try:
+        while True:
+            # Mantener conexión abierta, recibir mensajes del cliente
+            data = await websocket.receive_text()
+            
+            # Por ahora solo hacemos echo/ping-pong
+            if data == "ping":
+                await websocket.send_text('{"type": "pong"}')
+            
+    except WebSocketDisconnect:
+        ws_manager.disconnect(user_id, websocket)
+    except Exception as e:
+        print(f"[WS] Error in connection for user {user_id}: {e}")
+        ws_manager.disconnect(user_id, websocket)
+
 
 # ========================================
 # ENDPOINTS DE PRUEBA

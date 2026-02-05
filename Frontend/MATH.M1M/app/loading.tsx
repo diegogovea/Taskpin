@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Image, StyleSheet, Animated } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing } from "../constants/theme";
+
+const ONBOARDING_KEY = "@taskpin_onboarding_completed";
 
 export default function LoadingScreen() {
   const router = useRouter();
@@ -26,13 +29,22 @@ export default function LoadingScreen() {
       }),
     ]).start();
 
-    // Progress bar animation
+    // Progress bar animation → then route to onboarding or login
     Animated.timing(progressAnim, {
       toValue: 1,
       duration: 2200,
       useNativeDriver: false,
-    }).start(() => {
-      router.replace("/login");
+    }).start(async () => {
+      try {
+        const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (completed === "true") {
+          router.replace("/login");
+        } else {
+          router.replace("/onboarding");
+        }
+      } catch {
+        router.replace("/onboarding");
+      }
     });
   }, []);
 
@@ -58,16 +70,11 @@ export default function LoadingScreen() {
         >
           {/* Logo Container */}
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={colors.gradients.primary}
-              style={styles.logoGradient}
-            >
-              <Image
-                source={require("../components/images/iconoLogo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </LinearGradient>
+            <Image
+              source={require("../components/images/iconoLogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Brand Name */}
@@ -114,22 +121,14 @@ const styles = StyleSheet.create({
   logoContainer: {
     marginBottom: spacing[8],
   },
-  logoGradient: {
+  logo: {
     width: 120,
     height: 120,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 60,
     shadowColor: colors.primary[600],
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.3,
     shadowRadius: 24,
-    elevation: 12,
-  },
-  logo: {
-    width: 70,
-    height: 70,
-    tintColor: colors.neutral[0],
   },
   brandName: {
     fontSize: 42,

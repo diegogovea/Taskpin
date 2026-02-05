@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -95,14 +96,13 @@ export default function BienvenidaScreen() {
             },
           ]}
         >
-          {/* Animated Icon */}
+          {/* Logo */}
           <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={colors.gradients.primary}
-              style={styles.iconGradient}
-            >
-              <Ionicons name="sparkles" size={40} color={colors.neutral[0]} />
-            </LinearGradient>
+            <Image
+              source={require("../components/images/iconoLogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Greeting */}
@@ -113,33 +113,6 @@ export default function BienvenidaScreen() {
           <Text style={styles.message}>
             Ready to continue building{"\n"}your habits today?
           </Text>
-
-          {/* Stats Preview */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: colors.accent.amber + "20" }]}>
-                <Ionicons name="flame" size={20} color={colors.accent.amber} />
-              </View>
-              <Text style={styles.statValue}>7</Text>
-              <Text style={styles.statLabel}>Day streak</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
-                <Ionicons name="diamond" size={20} color={colors.primary[600]} />
-              </View>
-              <Text style={styles.statValue}>156</Text>
-              <Text style={styles.statLabel}>Points</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: colors.secondary[100] }]}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.secondary[600]} />
-              </View>
-              <Text style={styles.statValue}>85%</Text>
-              <Text style={styles.statLabel}>Complete</Text>
-            </View>
-          </View>
         </Animated.View>
 
         {/* Buttons */}
@@ -213,12 +186,10 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginBottom: spacing[8],
   },
-  iconGradient: {
+  logo: {
     width: 88,
     height: 88,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 44,
     ...shadows.lg,
     shadowColor: colors.primary[600],
   },
@@ -240,42 +211,7 @@ const styles = StyleSheet.create({
     color: colors.neutral[500],
     textAlign: "center",
     lineHeight: 26,
-    marginBottom: spacing[10],
-  },
-  statsContainer: {
-    flexDirection: "row",
-    backgroundColor: colors.neutral[50],
-    borderRadius: radius["2xl"],
-    padding: spacing[5],
-    alignItems: "center",
-  },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing[2],
-  },
-  statValue: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[900],
-    marginBottom: spacing[1],
-  },
-  statLabel: {
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[500],
-  },
-  statDivider: {
-    width: 1,
-    height: 48,
-    backgroundColor: colors.neutral[200],
+    marginBottom: spacing[6],
   },
   buttonContainer: {
     gap: spacing[3],
