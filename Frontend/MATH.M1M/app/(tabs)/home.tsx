@@ -295,13 +295,13 @@ export default function HomeScreen() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return "Buenos días";
+    if (hour < 18) return "Buenas tardes";
+    return "Buenas noches";
   };
 
   const getCurrentDate = () => {
-    return new Date().toLocaleDateString("en-US", {
+    return new Date().toLocaleDateString("es-ES", {
       weekday: "long",
       month: "short",
       day: "numeric",
@@ -366,7 +366,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading your dashboard...</Text>
+          <Text style={styles.loadingText}>Cargando tu panel...</Text>
         </View>
       </SafeAreaView>
     );
@@ -404,19 +404,19 @@ export default function HomeScreen() {
           <StatCard
             icon="flame"
             value={resumenUsuario.racha_actual}
-            label="Day streak"
+            label="Racha"
             gradient={["#F97316", "#EA580C"]}
           />
           <StatCard
             icon="diamond"
             value={resumenUsuario.puntos_totales}
-            label="Points"
+            label="Puntos"
             gradient={colors.gradients.primary}
           />
           <StatCard
             icon="trophy"
-            value={`Lv.${resumenUsuario.nivel_actual}`}
-            label="Level"
+            value={`Nv.${resumenUsuario.nivel_actual}`}
+            label="Nivel"
             gradient={colors.gradients.secondary}
           />
         </View>
@@ -425,9 +425,9 @@ export default function HomeScreen() {
         <View style={styles.progressCard}>
           <View style={styles.progressCardHeader}>
             <View>
-              <Text style={styles.progressCardTitle}>Today's Progress</Text>
+              <Text style={styles.progressCardTitle}>Progreso de Hoy</Text>
               <Text style={styles.progressCardSubtitle}>
-                {estadisticasHabitos.completados} of {estadisticasHabitos.total} habits completed
+                {estadisticasHabitos.completados} de {estadisticasHabitos.total} hábitos completados
               </Text>
             </View>
             <ProgressRing progress={progresoHoy} />
@@ -447,12 +447,12 @@ export default function HomeScreen() {
         {/* Habits Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Habits</Text>
+            <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/(tabs)/habitos")}
             >
-              <Text style={styles.seeAllText}>See all</Text>
+              <Text style={styles.seeAllText}>Ver todos</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
             </TouchableOpacity>
           </View>
@@ -465,8 +465,8 @@ export default function HomeScreen() {
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="add-circle-outline" size={32} color={colors.primary[600]} />
               </View>
-              <Text style={styles.emptyCardTitle}>No habits yet</Text>
-              <Text style={styles.emptyCardSubtitle}>Tap to add your first habit</Text>
+              <Text style={styles.emptyCardTitle}>Sin hábitos aún</Text>
+              <Text style={styles.emptyCardSubtitle}>Toca para agregar tu primer hábito</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.habitsList}>
@@ -508,7 +508,7 @@ export default function HomeScreen() {
                   style={styles.moreHabitsButton}
                   onPress={() => router.push("/(tabs)/habitos")}
                 >
-                  <Text style={styles.moreHabitsText}>+{habitosHoy.length - 3} more habits</Text>
+                  <Text style={styles.moreHabitsText}>+{habitosHoy.length - 3} hábitos más</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -518,12 +518,12 @@ export default function HomeScreen() {
         {/* Plans Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Active Plans</Text>
+            <Text style={styles.sectionTitle}>Planes Activos</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/(tabs)/planes")}
             >
-              <Text style={styles.seeAllText}>See all</Text>
+              <Text style={styles.seeAllText}>Ver todos</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
             </TouchableOpacity>
           </View>
@@ -536,8 +536,8 @@ export default function HomeScreen() {
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="document-text-outline" size={32} color={colors.primary[600]} />
               </View>
-              <Text style={styles.emptyCardTitle}>No plans yet</Text>
-              <Text style={styles.emptyCardSubtitle}>Tap to create your first plan</Text>
+              <Text style={styles.emptyCardTitle}>Sin planes aún</Text>
+              <Text style={styles.emptyCardSubtitle}>Toca para crear tu primer plan</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.plansList}>
@@ -591,12 +591,12 @@ export default function HomeScreen() {
         {/* Daily Reflection Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Daily Reflection</Text>
+            <Text style={styles.sectionTitle}>Reflexión Diaria</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/seccion_reflexiones/historialReflexiones")}
             >
-              <Text style={styles.seeAllText}>History</Text>
+              <Text style={styles.seeAllText}>Historial</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
             </TouchableOpacity>
           </View>
@@ -629,7 +629,7 @@ export default function HomeScreen() {
               
               {reflexionHoy.que_salio_bien && (
                 <View style={styles.reflectionTextSection}>
-                  <Text style={styles.reflectionTextLabel}>What went well</Text>
+                  <Text style={styles.reflectionTextLabel}>¿Qué salió bien?</Text>
                   <Text style={styles.reflectionTextContent} numberOfLines={2}>
                     {reflexionHoy.que_salio_bien}
                   </Text>
@@ -638,14 +638,14 @@ export default function HomeScreen() {
               
               {reflexionHoy.que_mejorar && (
                 <View style={styles.reflectionTextSection}>
-                  <Text style={styles.reflectionTextLabel}>To improve</Text>
+                  <Text style={styles.reflectionTextLabel}>¿Qué mejorar?</Text>
                   <Text style={styles.reflectionTextContent} numberOfLines={2}>
                     {reflexionHoy.que_mejorar}
                   </Text>
                 </View>
               )}
               
-              <Text style={styles.reflectionTapHint}>Tap to edit</Text>
+              <Text style={styles.reflectionTapHint}>Toca para editar</Text>
             </TouchableOpacity>
           ) : (
             // Sin reflexión - CTA para crear
@@ -656,12 +656,12 @@ export default function HomeScreen() {
               <View style={styles.reflectionEmptyIcon}>
                 <Ionicons name="journal-outline" size={32} color={colors.primary[600]} />
               </View>
-              <Text style={styles.reflectionEmptyTitle}>How was your day?</Text>
+              <Text style={styles.reflectionEmptyTitle}>¿Cómo estuvo tu día?</Text>
               <Text style={styles.reflectionEmptySubtitle}>
-                Take a moment to reflect on your progress
+                Toma un momento para reflexionar sobre tu progreso
               </Text>
               <View style={styles.reflectionCTA}>
-                <Text style={styles.reflectionCTAText}>Add Reflection</Text>
+                <Text style={styles.reflectionCTAText}>Agregar Reflexión</Text>
                 <Ionicons name="add" size={18} color={colors.primary[600]} />
               </View>
             </TouchableOpacity>

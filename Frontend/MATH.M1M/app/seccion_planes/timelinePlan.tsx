@@ -70,11 +70,11 @@ export default function TimelinePlan() {
       if (result.success) {
         setData(result);
       } else {
-        setError(result.detail || 'Error loading timeline');
+        setError(result.detail || 'Error al cargar la línea de tiempo');
       }
     } catch (err) {
       console.error('Error loading timeline:', err);
-      setError('Could not load timeline');
+      setError('No se pudo cargar la línea de tiempo');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -102,9 +102,9 @@ export default function TimelinePlan() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
+    return date.toLocaleDateString('es-ES', {
       day: 'numeric',
+      month: 'short',
       year: 'numeric',
     });
   };
@@ -126,7 +126,7 @@ export default function TimelinePlan() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading timeline...</Text>
+          <Text style={styles.loadingText}>Cargando línea de tiempo...</Text>
         </View>
       </SafeAreaView>
     );
@@ -139,14 +139,14 @@ export default function TimelinePlan() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Timeline</Text>
+          <Text style={styles.headerTitle}>Línea de Tiempo</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.semantic.error} />
-          <Text style={styles.errorText}>{error || 'Could not load timeline'}</Text>
+          <Text style={styles.errorText}>{error || 'No se pudo cargar la línea de tiempo'}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadTimeline}>
-            <Text style={styles.retryText}>Try Again</Text>
+            <Text style={styles.retryText}>Intentar de Nuevo</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -162,7 +162,7 @@ export default function TimelinePlan() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Plan Timeline</Text>
+        <Text style={styles.headerTitle}>Línea de Tiempo del Plan</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -183,12 +183,12 @@ export default function TimelinePlan() {
             <Text style={styles.planTitle}>{data.plan_info.meta_principal}</Text>
             <View style={styles.planDates}>
               <View style={styles.dateItem}>
-                <Text style={styles.dateLabel}>Started</Text>
+                <Text style={styles.dateLabel}>Inicio</Text>
                 <Text style={styles.dateValue}>{formatDate(data.plan_info.fecha_inicio)}</Text>
               </View>
               {data.plan_info.fecha_objetivo && (
                 <View style={styles.dateItem}>
-                  <Text style={styles.dateLabel}>Target</Text>
+                  <Text style={styles.dateLabel}>Objetivo</Text>
                   <Text style={styles.dateValue}>{formatDate(data.plan_info.fecha_objetivo)}</Text>
                 </View>
               )}
@@ -216,27 +216,27 @@ export default function TimelinePlan() {
               <Ionicons name="checkmark-circle" size={20} color={colors.secondary[600]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.completadas}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+            <Text style={styles.statLabel}>Completadas</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
               <Ionicons name="play-circle" size={20} color={colors.primary[600]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.enProgreso}</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
+            <Text style={styles.statLabel}>En Progreso</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: colors.neutral[100] }]}>
               <Ionicons name="ellipse-outline" size={20} color={colors.neutral[500]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.pendientes}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statLabel}>Pendientes</Text>
           </View>
         </View>
 
         {/* Timeline Component */}
         <View style={styles.timelineSection}>
-          <Text style={styles.sectionTitle}>Visual Timeline</Text>
+          <Text style={styles.sectionTitle}>Línea de Tiempo Visual</Text>
           <PlanTimeline
             planInfo={data.plan_info}
             fases={data.fases}

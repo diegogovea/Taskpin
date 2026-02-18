@@ -18,9 +18,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { Toast } from "../../components/ui";
 
 const FRECUENCIAS = [
-  { value: 'diario', label: 'Daily', icon: 'today' },
-  { value: 'semanal', label: 'Weekly', icon: 'calendar' },
-  { value: 'mensual', label: 'Monthly', icon: 'calendar-outline' },
+  { value: 'diario', label: 'Diario', icon: 'today' },
+  { value: 'semanal', label: 'Semanal', icon: 'calendar' },
+  { value: 'mensual', label: 'Mensual', icon: 'calendar-outline' },
 ];
 
 export default function CatHCustomScreen() {
@@ -66,16 +66,16 @@ export default function CatHCustomScreen() {
       const data = await response.json();
 
       if (data.success) {
-        setToast({ visible: true, message: 'Habit created successfully!', type: 'success' });
+        setToast({ visible: true, message: '¡Hábito creado exitosamente!', type: 'success' });
         setTimeout(() => {
           router.replace("/(tabs)/habitos");
         }, 1200);
       } else {
-        setToast({ visible: true, message: data.detail || 'Error creating habit', type: 'error' });
+        setToast({ visible: true, message: data.detail || 'Error al crear el hábito', type: 'error' });
       }
     } catch (error) {
       console.error("Error creating custom habit:", error);
-      setToast({ visible: true, message: 'Connection error', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -105,9 +105,9 @@ export default function CatHCustomScreen() {
             <View style={styles.iconContainer}>
               <Ionicons name="sparkles" size={32} color={colors.primary[600]} />
             </View>
-            <Text style={styles.title}>Create Custom Habit</Text>
+            <Text style={styles.title}>Crear Hábito Personalizado</Text>
             <Text style={styles.subtitle}>
-              Design a habit that fits your unique goals
+              Crea tu propio hábito personalizado
             </Text>
           </View>
 
@@ -115,30 +115,30 @@ export default function CatHCustomScreen() {
           <View style={styles.formSection}>
             {/* Nombre */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Habit Name *</Text>
+              <Text style={styles.inputLabel}>Nombre del Hábito *</Text>
               <TextInput
                 style={[
                   styles.textInput,
                   nombre.length > 0 && nombre.length < 3 && styles.textInputError,
                 ]}
-                placeholder="e.g., Read 10 pages"
+                placeholder="ej., Leer 10 páginas"
                 placeholderTextColor={colors.neutral[400]}
                 value={nombre}
                 onChangeText={setNombre}
                 maxLength={100}
               />
               {nombre.length > 0 && nombre.length < 3 && (
-                <Text style={styles.errorText}>Name must be at least 3 characters</Text>
+                <Text style={styles.errorText}>El nombre debe tener al menos 3 caracteres</Text>
               )}
               <Text style={styles.charCount}>{nombre.length}/100</Text>
             </View>
 
             {/* Descripción */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Description (optional)</Text>
+              <Text style={styles.inputLabel}>Descripción (opcional)</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
-                placeholder="Add more details about your habit..."
+                placeholder="Agrega más detalles sobre tu hábito..."
                 placeholderTextColor={colors.neutral[400]}
                 value={descripcion}
                 onChangeText={setDescripcion}
@@ -152,7 +152,7 @@ export default function CatHCustomScreen() {
 
             {/* Frecuencia */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Frequency</Text>
+              <Text style={styles.inputLabel}>Frecuencia</Text>
               <View style={styles.frequencyContainer}>
                 {FRECUENCIAS.map((freq) => {
                   const isSelected = frecuencia === freq.value;
@@ -194,7 +194,7 @@ export default function CatHCustomScreen() {
           <View style={styles.infoCard}>
             <Ionicons name="diamond" size={20} color={colors.primary[600]} />
             <Text style={styles.infoText}>
-              Custom habits earn <Text style={styles.infoHighlight}>10 points</Text> each time you complete them
+              Los hábitos personalizados dan <Text style={styles.infoHighlight}>10 puntos</Text> cada vez que los completas
             </Text>
           </View>
 
@@ -212,11 +212,11 @@ export default function CatHCustomScreen() {
               style={styles.createButtonGradient}
             >
               {isLoading ? (
-                <Text style={styles.createButtonText}>Creating...</Text>
+                <Text style={styles.createButtonText}>Creando...</Text>
               ) : (
                 <>
                   <Ionicons name="sparkles" size={20} color={colors.neutral[0]} />
-                  <Text style={styles.createButtonText}>Create Habit</Text>
+                  <Text style={styles.createButtonText}>Crear Hábito</Text>
                 </>
               )}
             </LinearGradient>

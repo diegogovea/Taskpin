@@ -162,7 +162,7 @@ export default function PlanesScreen() {
 
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Progress</Text>
+            <Text style={styles.progressLabel}>Progreso</Text>
             <Text style={styles.progressPercent}>{plan.progreso_porcentaje}%</Text>
           </View>
           <View style={styles.progressBarBg}>
@@ -179,13 +179,13 @@ export default function PlanesScreen() {
           <View style={styles.footerItem}>
             <Ionicons name="calendar-outline" size={14} color={colors.neutral[400]} />
             <Text style={styles.footerText}>
-              Started {new Date(plan.fecha_inicio).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              Iniciado {new Date(plan.fecha_inicio).toLocaleDateString("es-ES", { month: "short", day: "numeric" })}
             </Text>
           </View>
           {diasRestantes !== null && (
             <View style={styles.footerItem}>
               <Ionicons name="time-outline" size={14} color={colors.neutral[400]} />
-              <Text style={styles.footerText}>{diasRestantes} days left</Text>
+              <Text style={styles.footerText}>{diasRestantes} días restantes</Text>
             </View>
           )}
         </View>
@@ -198,7 +198,7 @@ export default function PlanesScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading your plans...</Text>
+          <Text style={styles.loadingText}>Cargando tus planes...</Text>
         </View>
       </SafeAreaView>
     );
@@ -230,8 +230,8 @@ export default function PlanesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>My Plans</Text>
-          <Text style={styles.headerSubtitle}>{planes.length} total plans</Text>
+          <Text style={styles.headerTitle}>Mis Planes</Text>
+          <Text style={styles.headerSubtitle}>{planes.length} planes en total</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={navigateToAgregarPlan}>
           <Ionicons name="add" size={24} color={colors.primary[600]} />
@@ -249,7 +249,7 @@ export default function PlanesScreen() {
             <Ionicons name="warning-outline" size={20} color={colors.semantic.error} />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchMisPlanes}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>Reintentar</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -259,12 +259,12 @@ export default function PlanesScreen() {
             <View style={styles.emptyIconContainer}>
               <Ionicons name="document-text-outline" size={48} color={colors.neutral[300]} />
             </View>
-            <Text style={styles.emptyTitle}>No plans yet</Text>
-            <Text style={styles.emptySubtitle}>Create your first plan to start achieving your goals</Text>
+            <Text style={styles.emptyTitle}>Sin planes aún</Text>
+            <Text style={styles.emptySubtitle}>Crea tu primer plan para empezar a alcanzar tus metas</Text>
             <TouchableOpacity style={styles.createButton} onPress={navigateToAgregarPlan}>
               <LinearGradient colors={colors.gradients.primary} style={styles.createButtonGradient}>
                 <Ionicons name="add-circle" size={20} color={colors.neutral[0]} />
-                <Text style={styles.createButtonText}>Create New Plan</Text>
+                <Text style={styles.createButtonText}>Crear Nuevo Plan</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -274,25 +274,25 @@ export default function PlanesScreen() {
             <View style={styles.statsContainer}>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{activePlans.length}</Text>
-                <Text style={styles.statLabel}>Active</Text>
+                <Text style={styles.statLabel}>Activos</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{avgProgress}%</Text>
-                <Text style={styles.statLabel}>Avg Progress</Text>
+                <Text style={styles.statLabel}>Promedio</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{completedPlans.length}</Text>
-                <Text style={styles.statLabel}>Completed</Text>
+                <Text style={styles.statLabel}>Completados</Text>
               </View>
             </View>
 
             {/* Filter Chips */}
             <View style={styles.filterContainer}>
               {[
-                { key: "todos", label: "All" },
-                { key: "activo", label: "Active" },
-                { key: "pausado", label: "Paused" },
-                { key: "completado", label: "Completed" },
+                { key: "todos", label: "Todos" },
+                { key: "activo", label: "Activos" },
+                { key: "pausado", label: "Pausados" },
+                { key: "completado", label: "Completados" },
               ].map((filtro) => (
                 <TouchableOpacity
                   key={filtro.key}
@@ -317,7 +317,7 @@ export default function PlanesScreen() {
               {planesFiltrados.length === 0 ? (
                 <View style={styles.emptyFilterState}>
                   <Ionicons name="filter-outline" size={32} color={colors.neutral[300]} />
-                  <Text style={styles.emptyFilterText}>No {filtroEstado} plans</Text>
+                  <Text style={styles.emptyFilterText}>Sin planes {filtroEstado}s</Text>
                 </View>
               ) : (
                 planesFiltrados.map((plan) => (
@@ -330,7 +330,7 @@ export default function PlanesScreen() {
             <TouchableOpacity style={styles.addMoreButton} onPress={navigateToAgregarPlan}>
               <LinearGradient colors={colors.gradients.primary} style={styles.addMoreButtonGradient}>
                 <Ionicons name="add-circle" size={20} color={colors.neutral[0]} />
-                <Text style={styles.addMoreButtonText}>Add Another Plan</Text>
+                <Text style={styles.addMoreButtonText}>Agregar Otro Plan</Text>
               </LinearGradient>
             </TouchableOpacity>
           </>

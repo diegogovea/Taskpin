@@ -27,21 +27,21 @@ const CONTENT_PADDING_H = spacing[5];
 
 const SLIDES = [
   {
-    title: "Welcome to Taskpin",
+    title: "Bienvenido a Taskpin",
     description:
-      "We're here to help you build habits that stick. Let's make self-improvement easy and fun!",
+      "Estamos aquí para ayudarte a construir hábitos que perduran. ¡Hagamos que el auto-mejoramiento sea fácil y divertido!",
     image: require("../components/images/pic1-onboarding.png"),
   },
   {
-    title: "Track Your Progress",
+    title: "Registra tu Progreso",
     description:
-      "Easily set goals, track your habits, and see your progress over time with our intuitive tools.",
+      "Establece metas fácilmente, sigue tus hábitos y observa tu progreso con el tiempo usando nuestras herramientas intuitivas.",
     image: require("../components/images/pic2-onboarding.png"),
   },
   {
-    title: "Stay Motivated",
+    title: "Mantente Motivado",
     description:
-      "Unlock achievements and get reminders to keep you motivated and on track to reach your goals.",
+      "Desbloquea logros y recibe recordatorios para mantenerte motivado y enfocado en alcanzar tus metas.",
     image: require("../components/images/pic3-onboarding.png"),
   },
 ];
@@ -120,7 +120,7 @@ export default function OnboardingScreen() {
             onPress={handleSkip}
             activeOpacity={0.7}
           >
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>Omitir</Text>
           </TouchableOpacity>
         </View>
 
@@ -163,7 +163,7 @@ export default function OnboardingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="chevron-back" size={22} color={colors.primary[600]} />
-                <Text style={styles.backButtonText}>Back</Text>
+                <Text style={styles.backButtonText}>Atrás</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.nextButton}
@@ -177,7 +177,7 @@ export default function OnboardingScreen() {
                   style={styles.nextButtonGradient}
                 >
                   <Text style={styles.nextButtonText}>
-                    {isLast ? "Get Started" : "Next"}
+                    {isLast ? "Comenzar" : "Siguiente"}
                   </Text>
                   {!isLast && (
                     <Ionicons name="chevron-forward" size={20} color={colors.neutral[0]} />
@@ -197,7 +197,7 @@ export default function OnboardingScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.nextButtonGradient}
               >
-                <Text style={styles.nextButtonText}>Next</Text>
+                <Text style={styles.nextButtonText}>Siguiente</Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.neutral[0]} />
               </LinearGradient>
             </TouchableOpacity>

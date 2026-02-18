@@ -34,11 +34,11 @@ interface ResumenAnimo {
 
 // Configuración de estados de ánimo
 const MOOD_CONFIG: Record<string, { color: string; icon: string; label: string }> = {
-  great: { color: '#22C55E', icon: 'sunny', label: 'Great' },
-  good: { color: '#84CC16', icon: 'partly-sunny', label: 'Good' },
+  great: { color: '#22C55E', icon: 'sunny', label: 'Excelente' },
+  good: { color: '#84CC16', icon: 'partly-sunny', label: 'Bien' },
   neutral: { color: '#F59E0B', icon: 'cloudy', label: 'Neutral' },
-  low: { color: '#F97316', icon: 'rainy', label: 'Low' },
-  bad: { color: '#EF4444', icon: 'thunderstorm', label: 'Bad' },
+  low: { color: '#F97316', icon: 'rainy', label: 'Bajo' },
+  bad: { color: '#EF4444', icon: 'thunderstorm', label: 'Mal' },
 };
 
 export default function HistorialReflexiones() {
@@ -99,11 +99,11 @@ export default function HistorialReflexiones() {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return 'Hoy';
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return 'Ayer';
     } else {
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString('es-ES', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -143,20 +143,20 @@ export default function HistorialReflexiones() {
         
         {item.que_salio_bien && (
           <View style={styles.textSection}>
-            <Text style={styles.textLabel}>What went well</Text>
+            <Text style={styles.textLabel}>¿Qué salió bien?</Text>
             <Text style={styles.textContent}>{item.que_salio_bien}</Text>
           </View>
         )}
         
         {item.que_mejorar && (
           <View style={styles.textSection}>
-            <Text style={styles.textLabel}>To improve</Text>
+            <Text style={styles.textLabel}>¿Qué mejorar?</Text>
             <Text style={styles.textContent}>{item.que_mejorar}</Text>
           </View>
         )}
         
         {!item.que_salio_bien && !item.que_mejorar && (
-          <Text style={styles.noNotesText}>No notes added</Text>
+          <Text style={styles.noNotesText}>Sin notas agregadas</Text>
         )}
       </View>
     );
@@ -182,7 +182,7 @@ export default function HistorialReflexiones() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reflection History</Text>
+        <Text style={styles.headerTitle}>Historial de Reflexiones</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -203,9 +203,9 @@ export default function HistorialReflexiones() {
                 colors={colors.gradients.primary}
                 style={styles.summaryGradient}
               >
-                <Text style={styles.summaryTitle}>Your Mood Journey</Text>
+                <Text style={styles.summaryTitle}>Tu Viaje de Ánimo</Text>
                 <Text style={styles.summarySubtitle}>
-                  {total} reflection{total !== 1 ? 's' : ''} recorded
+                  {total} reflexion{total !== 1 ? 'es' : ''} registrada{total !== 1 ? 's' : ''}
                 </Text>
                 
                 <View style={styles.moodStatsRow}>
@@ -219,7 +219,7 @@ export default function HistorialReflexiones() {
             </View>
             
             {reflexiones.length > 0 && (
-              <Text style={styles.sectionTitle}>Recent Reflections</Text>
+              <Text style={styles.sectionTitle}>Reflexiones Recientes</Text>
             )}
           </>
         }
@@ -228,9 +228,9 @@ export default function HistorialReflexiones() {
             <View style={styles.emptyIcon}>
               <Ionicons name="journal-outline" size={48} color={colors.neutral[400]} />
             </View>
-            <Text style={styles.emptyTitle}>No reflections yet</Text>
+            <Text style={styles.emptyTitle}>Sin reflexiones aún</Text>
             <Text style={styles.emptySubtitle}>
-              Start your reflection journey from the home screen
+              Comienza tu viaje de reflexión desde la pantalla de inicio
             </Text>
           </View>
         }

@@ -76,14 +76,14 @@ export default function ConfiguracionScreen() {
     if (!editField || !userData.user_id) return;
 
     if (!editValue.trim()) {
-      Alert.alert("Error", "Field cannot be empty");
+      Alert.alert("Error", "El campo no puede estar vacío");
       return;
     }
 
     if (editField === "correo") {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(editValue)) {
-        Alert.alert("Error", "Please enter a valid email");
+        Alert.alert("Error", "Por favor ingresa un correo válido");
         return;
       }
     }
@@ -98,9 +98,9 @@ export default function ConfiguracionScreen() {
       await AsyncStorage.setItem(editField, editValue.trim());
 
       setEditModalVisible(false);
-      Alert.alert("Success", "Profile updated successfully");
+      Alert.alert("Éxito", "Perfil actualizado correctamente");
     } catch (error) {
-      Alert.alert("Error", "Could not update profile");
+      Alert.alert("Error", "No se pudo actualizar el perfil");
     } finally {
       setSaving(false);
     }
@@ -113,7 +113,7 @@ export default function ConfiguracionScreen() {
       setLogoutModalVisible(false);
       router.replace("/login");
     } catch (error) {
-      Alert.alert("Error", "Could not sign out");
+      Alert.alert("Error", "No se pudo cerrar sesión");
     }
   };
 
@@ -126,12 +126,12 @@ export default function ConfiguracionScreen() {
     try {
       await AsyncStorage.removeItem(ONBOARDING_KEY);
       Alert.alert(
-        "Onboarding reset",
-        "Next time you open the app you'll see the onboarding screens again. Going to loading now.",
+        "Onboarding reiniciado",
+        "La próxima vez que abras la app verás las pantallas de onboarding de nuevo. Yendo a carga ahora.",
         [{ text: "OK", onPress: () => router.replace("/loading") }]
       );
     } catch {
-      Alert.alert("Error", "Could not reset onboarding");
+      Alert.alert("Error", "No se pudo reiniciar el onboarding");
     }
   };
 
@@ -194,7 +194,7 @@ export default function ConfiguracionScreen() {
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>Configuración</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -205,18 +205,18 @@ export default function ConfiguracionScreen() {
       >
         {/* Profile Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile</Text>
+          <Text style={styles.sectionTitle}>Perfil</Text>
           <View style={styles.sectionCard}>
             <SettingItem
               icon="person"
-              title="Name"
+              title="Nombre"
               value={userData.nombre}
               onPress={() => openEditModal("nombre")}
             />
             <View style={styles.settingDivider} />
             <SettingItem
               icon="mail"
-              title="Email"
+              title="Correo"
               value={userData.correo}
               onPress={() => openEditModal("correo")}
             />
@@ -225,31 +225,31 @@ export default function ConfiguracionScreen() {
 
         {/* Preferences Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={styles.sectionTitle}>Preferencias</Text>
           <View style={styles.sectionCard}>
-            <SettingItem icon="notifications" title="Notifications" onPress={() => {}} />
+            <SettingItem icon="notifications" title="Notificaciones" onPress={() => {}} />
             <View style={styles.settingDivider} />
-            <SettingItem icon="moon" title="Dark Mode" onPress={() => {}} />
+            <SettingItem icon="moon" title="Modo Oscuro" onPress={() => {}} />
             <View style={styles.settingDivider} />
-            <SettingItem icon="language" title="Language" value="English" onPress={() => {}} />
+            <SettingItem icon="language" title="Idioma" value="Español" onPress={() => {}} />
           </View>
         </View>
 
         {/* Privacy Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy & Security</Text>
+          <Text style={styles.sectionTitle}>Privacidad y Seguridad</Text>
           <View style={styles.sectionCard}>
-            <SettingItem icon="lock-closed" title="Change Password" onPress={() => {}} />
+            <SettingItem icon="lock-closed" title="Cambiar Contraseña" onPress={() => {}} />
             <View style={styles.settingDivider} />
-            <SettingItem icon="shield" title="Privacy Policy" onPress={() => {}} />
+            <SettingItem icon="shield" title="Política de Privacidad" onPress={() => {}} />
             <View style={styles.settingDivider} />
-            <SettingItem icon="document-text" title="Terms of Service" onPress={() => {}} />
+            <SettingItem icon="document-text" title="Términos de Servicio" onPress={() => {}} />
           </View>
         </View>
 
         {/* Account Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>Cuenta</Text>
           <View style={styles.sectionCard}>
             <SettingItem
               icon="play-circle-outline"
@@ -260,7 +260,7 @@ export default function ConfiguracionScreen() {
             <View style={styles.settingDivider} />
             <SettingItem
               icon="log-out"
-              title="Sign Out"
+              title="Cerrar Sesión"
               onPress={() => setLogoutModalVisible(true)}
               showChevron={false}
               danger
@@ -288,27 +288,27 @@ export default function ConfiguracionScreen() {
           <SafeAreaView style={styles.modalSafeArea}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Text style={styles.modalCancel}>Cancel</Text>
+                <Text style={styles.modalCancel}>Cancelar</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>
-                Edit {editField === "nombre" ? "Name" : "Email"}
+                Editar {editField === "nombre" ? "Nombre" : "Correo"}
               </Text>
               <TouchableOpacity onPress={saveEdit} disabled={saving}>
                 <Text style={[styles.modalSave, saving && styles.modalSaveDisabled]}>
-                  {saving ? "Saving..." : "Save"}
+                  {saving ? "Guardando..." : "Guardar"}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalContent}>
               <Text style={styles.inputLabel}>
-                {editField === "nombre" ? "Full Name" : "Email Address"}
+                {editField === "nombre" ? "Nombre Completo" : "Correo Electrónico"}
               </Text>
               <TextInput
                 style={styles.input}
                 value={editValue}
                 onChangeText={setEditValue}
-                placeholder={editField === "nombre" ? "Your name" : "your@email.com"}
+                placeholder={editField === "nombre" ? "Tu nombre" : "tucorreo@email.com"}
                 placeholderTextColor={colors.neutral[400]}
                 keyboardType={editField === "correo" ? "email-address" : "default"}
                 autoCapitalize={editField === "nombre" ? "words" : "none"}
@@ -331,19 +331,19 @@ export default function ConfiguracionScreen() {
             <View style={styles.logoutIconContainer}>
               <Ionicons name="log-out" size={32} color={colors.semantic.error} />
             </View>
-            <Text style={styles.logoutTitle}>Sign Out?</Text>
+            <Text style={styles.logoutTitle}>¿Cerrar Sesión?</Text>
             <Text style={styles.logoutMessage}>
-              Are you sure you want to sign out of your account?
+              ¿Estás seguro de que quieres cerrar sesión?
             </Text>
             <View style={styles.logoutButtons}>
               <TouchableOpacity
                 style={styles.logoutCancelButton}
                 onPress={() => setLogoutModalVisible(false)}
               >
-                <Text style={styles.logoutCancelText}>Cancel</Text>
+                <Text style={styles.logoutCancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.logoutConfirmButton} onPress={handleLogout}>
-                <Text style={styles.logoutConfirmText}>Sign Out</Text>
+                <Text style={styles.logoutConfirmText}>Cerrar Sesión</Text>
               </TouchableOpacity>
             </View>
           </View>

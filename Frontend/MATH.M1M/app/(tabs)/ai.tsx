@@ -128,7 +128,7 @@ export default function AIScreen() {
       }
     } catch (error) {
       console.error("Error adding habit:", error);
-      Alert.alert("Error", "Could not add habit");
+      Alert.alert("Error", "No se pudo agregar el hábito");
     } finally {
       setAddingHabit(null);
     }
@@ -151,7 +151,7 @@ export default function AIScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading AI insights...</Text>
+          <Text style={styles.loadingText}>Cargando información de IA...</Text>
         </View>
       </SafeAreaView>
     );
@@ -162,8 +162,8 @@ export default function AIScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>AI Insights</Text>
-          <Text style={styles.headerSubtitle}>Personalized for you</Text>
+          <Text style={styles.headerTitle}>Información IA</Text>
+          <Text style={styles.headerSubtitle}>Personalizado para ti</Text>
         </View>
         <View style={styles.headerIcon}>
           <Ionicons name="sparkles" size={24} color={colors.primary[600]} />
@@ -185,7 +185,7 @@ export default function AIScreen() {
             <Text style={[styles.statNumber, { color: colors.primary[600] }]}>
               {recomendaciones.length}
             </Text>
-            <Text style={styles.statLabel}>Suggestions</Text>
+            <Text style={styles.statLabel}>Sugerencias</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -195,7 +195,7 @@ export default function AIScreen() {
             <Text style={[styles.statNumber, { color: colors.secondary[600] }]}>
               {avgPrediction}%
             </Text>
-            <Text style={styles.statLabel}>Avg Success</Text>
+            <Text style={styles.statLabel}>Prom. Éxito</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -205,21 +205,21 @@ export default function AIScreen() {
             <Text style={[styles.statNumber, { color: colors.accent.amber }]}>
               {highConfidence}
             </Text>
-            <Text style={styles.statLabel}>High Conf.</Text>
+            <Text style={styles.statLabel}>Alta Conf.</Text>
           </View>
         </View>
 
         {/* Recommendations Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Suggested Habits</Text>
+          <Text style={styles.sectionTitle}>Hábitos Sugeridos</Text>
 
           {recomendaciones.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="checkmark-done-circle" size={48} color={colors.secondary[400]} />
               </View>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptySubtitle}>You have all suggested habits</Text>
+              <Text style={styles.emptyTitle}>¡Todo al día!</Text>
+              <Text style={styles.emptySubtitle}>Ya tienes todos los hábitos sugeridos</Text>
             </View>
           ) : (
             recomendaciones.map((rec, index) => (
@@ -257,7 +257,7 @@ export default function AIScreen() {
                       <Text style={styles.habitCategory}>{rec.categoria || "General"}</Text>
                       <View style={styles.habitPoints}>
                         <Ionicons name="people" size={12} color={colors.primary[500]} />
-                        <Text style={styles.habitPointsText}>{Math.round(rec.score * 100)}% match</Text>
+                        <Text style={styles.habitPointsText}>{Math.round(rec.score * 100)}% coincidencia</Text>
                       </View>
                     </View>
                   </View>
@@ -272,15 +272,15 @@ export default function AIScreen() {
 
         {/* Predictions Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Predictions</Text>
+          <Text style={styles.sectionTitle}>Predicciones de Hoy</Text>
 
           {predicciones.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="fitness-outline" size={48} color={colors.neutral[300]} />
               </View>
-              <Text style={styles.emptyTitle}>No predictions yet</Text>
-              <Text style={styles.emptySubtitle}>Add habits to see success predictions</Text>
+              <Text style={styles.emptyTitle}>Sin predicciones aún</Text>
+              <Text style={styles.emptySubtitle}>Agrega hábitos para ver predicciones de éxito</Text>
             </View>
           ) : (
             predicciones.map((pred) => (

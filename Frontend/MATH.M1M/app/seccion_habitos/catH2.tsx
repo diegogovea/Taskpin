@@ -45,10 +45,10 @@ export default function CatH2Screen() {
   });
 
   const CATEGORY_ID = 2;
-  const CATEGORY_NAME = "Energy & Movement";
+  const CATEGORY_NAME = "Energía y Movimiento";
   const CATEGORY_ICON = "flash";
   const CATEGORY_COLOR = colors.accent.amber;
-  const CATEGORY_DESCRIPTION = "Physical activities to keep your body active and energized";
+  const CATEGORY_DESCRIPTION = "Actividades físicas para mantenerte activo";
 
   const fetchHabitos = async () => {
     try {
@@ -56,7 +56,7 @@ export default function CatH2Screen() {
       const data = await response.json();
       if (data.success) setHabitos(data.data);
     } catch (error) {
-      setToast({ visible: true, message: 'Could not load habits', type: 'error' });
+      setToast({ visible: true, message: 'No se pudieron cargar los hábitos', type: 'error' });
     }
   };
 
@@ -92,7 +92,7 @@ export default function CatH2Screen() {
   // Handle "Add Habits" button press - shows confirmation modal
   const handleAddPress = () => {
     if (selectedHabits.length === 0) {
-      setToast({ visible: true, message: 'Please select at least one habit', type: 'error' });
+      setToast({ visible: true, message: 'Por favor selecciona al menos un hábito', type: 'error' });
       return;
     }
     setShowConfirmModal(true);
@@ -101,7 +101,7 @@ export default function CatH2Screen() {
   // Actually add the habits after confirmation
   const agregarHabitos = async () => {
     if (!user?.user_id) {
-      setToast({ visible: true, message: 'User not found', type: 'error' });
+      setToast({ visible: true, message: 'Usuario no encontrado', type: 'error' });
       return;
     }
 
@@ -125,7 +125,7 @@ export default function CatH2Screen() {
         setSelectedHabits([]);
         setToast({
           visible: true,
-          message: `${count} habit${count > 1 ? 's' : ''} added successfully!`,
+          message: `${count} hábito${count > 1 ? 's' : ''} agregado${count > 1 ? 's' : ''} exitosamente!`,
           type: 'success',
         });
         setTimeout(() => {
@@ -133,11 +133,11 @@ export default function CatH2Screen() {
         }, 1500);
       } else {
         setShowConfirmModal(false);
-        setToast({ visible: true, message: 'Could not add habits. Try again.', type: 'error' });
+        setToast({ visible: true, message: 'No se pudieron agregar los hábitos. Intenta de nuevo.', type: 'error' });
       }
     } catch (error) {
       setShowConfirmModal(false);
-      setToast({ visible: true, message: 'Connection error. Please try again.', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión. Por favor intenta de nuevo.', type: 'error' });
     } finally {
       setAdding(false);
     }
@@ -148,7 +148,7 @@ export default function CatH2Screen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading habits...</Text>
+          <Text style={styles.loadingText}>Cargando hábitos...</Text>
         </View>
       </SafeAreaView>
     );
@@ -193,7 +193,7 @@ export default function CatH2Screen() {
                     {isAlreadyAdded && (
                       <View style={styles.alreadyAddedBadge}>
                         <Ionicons name="checkmark-circle" size={14} color={colors.secondary[500]} />
-                        <Text style={styles.alreadyAddedText}>Already added</Text>
+                        <Text style={styles.alreadyAddedText}>Ya agregado</Text>
                       </View>
                     )}
                     <Text style={[styles.habitName, isSelected && styles.habitNameSelected, isAlreadyAdded && styles.habitNameDisabled]}>{habito.nombre}</Text>
@@ -234,7 +234,7 @@ export default function CatH2Screen() {
               {adding ? <ActivityIndicator color={colors.neutral[0]} size="small" /> : (
                 <>
                   <Ionicons name="add-circle" size={22} color={colors.neutral[0]} />
-                  <Text style={styles.floatingButtonText}>Add {selectedHabits.length} Habit{selectedHabits.length > 1 ? "s" : ""}</Text>
+                  <Text style={styles.floatingButtonText}>Agregar {selectedHabits.length} Hábito{selectedHabits.length > 1 ? "s" : ""}</Text>
                 </>
               )}
             </LinearGradient>
@@ -245,12 +245,12 @@ export default function CatH2Screen() {
       {/* Confirmation Modal */}
       <ConfirmModal
         visible={showConfirmModal}
-        title="Add Habits?"
-        message={`You're about to add ${selectedHabits.length} habit${selectedHabits.length > 1 ? 's' : ''} to your daily routine.`}
+        title="¿Agregar Hábitos?"
+        message={`Estás a punto de agregar ${selectedHabits.length} hábito${selectedHabits.length > 1 ? 's' : ''} a tu rutina diaria.`}
         icon="add-circle-outline"
         iconColor={colors.secondary[500]}
-        confirmText="Add"
-        cancelText="Cancel"
+        confirmText="Agregar"
+        cancelText="Cancelar"
         confirmGradient={colors.gradients.secondary as readonly [string, string, ...string[]]}
         isLoading={adding}
         onConfirm={agregarHabitos}

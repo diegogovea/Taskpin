@@ -61,7 +61,7 @@ export default function DetallePlanScreen() {
       }
     } catch (error) {
       console.error("Error fetching plan:", error);
-      Alert.alert("Error", "Could not load plan details");
+      Alert.alert("Error", "No se pudieron cargar los detalles del plan");
     } finally {
       setLoading(false);
     }
@@ -98,11 +98,11 @@ export default function DetallePlanScreen() {
   const getDifficultyLabel = (dificultad: string) => {
     switch (dificultad) {
       case "fácil":
-        return "Easy";
+        return "Fácil";
       case "intermedio":
-        return "Intermediate";
+        return "Intermedio";
       case "difícil":
-        return "Difficult";
+        return "Difícil";
       default:
         return dificultad;
     }
@@ -113,7 +113,7 @@ export default function DetallePlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading plan details...</Text>
+          <Text style={styles.loadingText}>Cargando detalles del plan...</Text>
         </View>
       </SafeAreaView>
     );
@@ -124,7 +124,7 @@ export default function DetallePlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
-          <Text style={styles.loadingText}>Plan not found</Text>
+          <Text style={styles.loadingText}>Plan no encontrado</Text>
         </View>
       </SafeAreaView>
     );
@@ -139,7 +139,7 @@ export default function DetallePlanScreen() {
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Plan Details</Text>
+        <Text style={styles.headerTitle}>Detalles del Plan</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -178,21 +178,21 @@ export default function DetallePlanScreen() {
               <Ionicons name="calendar" size={18} color={colors.primary[600]} />
             </View>
             <Text style={styles.statValue}>{plan.plazo_dias_estimado}</Text>
-            <Text style={styles.statLabel}>Days</Text>
+            <Text style={styles.statLabel}>Días</Text>
           </View>
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: colors.secondary[100] }]}>
               <Ionicons name="layers" size={18} color={colors.secondary[600]} />
             </View>
             <Text style={styles.statValue}>{plan.total_fases}</Text>
-            <Text style={styles.statLabel}>Phases</Text>
+            <Text style={styles.statLabel}>Fases</Text>
           </View>
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: colors.accent.amber + "20" }]}>
               <Ionicons name="checkmark-circle" size={18} color={colors.accent.amber} />
             </View>
             <Text style={styles.statValue}>{plan.total_tareas}</Text>
-            <Text style={styles.statLabel}>Tasks</Text>
+            <Text style={styles.statLabel}>Tareas</Text>
           </View>
         </View>
 
@@ -207,7 +207,7 @@ export default function DetallePlanScreen() {
               size={22}
               color={showCustomDuration ? colors.primary[600] : colors.neutral[400]}
             />
-            <Text style={styles.customDurationToggleText}>Customize duration</Text>
+            <Text style={styles.customDurationToggleText}>Personalizar duración</Text>
           </TouchableOpacity>
 
           {showCustomDuration && (
@@ -217,17 +217,17 @@ export default function DetallePlanScreen() {
                 value={customDuration}
                 onChangeText={setCustomDuration}
                 keyboardType="number-pad"
-                placeholder="Days"
+                placeholder="Días"
                 placeholderTextColor={colors.neutral[400]}
               />
-              <Text style={styles.durationLabel}>days</Text>
+              <Text style={styles.durationLabel}>días</Text>
             </View>
           )}
         </View>
 
         {/* Phases */}
         <View style={styles.phasesSection}>
-          <Text style={styles.sectionTitle}>Plan Phases</Text>
+          <Text style={styles.sectionTitle}>Fases del Plan</Text>
           {plan.fases.map((fase, index) => (
             <View key={fase.fase_id} style={styles.phaseCard}>
               <View style={styles.phaseHeader}>
@@ -249,7 +249,7 @@ export default function DetallePlanScreen() {
                   </View>
                 ))}
                 {fase.tareas.length > 3 && (
-                  <Text style={styles.moreTasks}>+{fase.tareas.length - 3} more tasks</Text>
+                  <Text style={styles.moreTasks}>+{fase.tareas.length - 3} tareas más</Text>
                 )}
               </View>
             </View>
@@ -271,7 +271,7 @@ export default function DetallePlanScreen() {
             style={styles.floatingButtonGradient}
           >
             <Ionicons name="play-circle" size={22} color={colors.neutral[0]} />
-            <Text style={styles.floatingButtonText}>Start This Plan</Text>
+            <Text style={styles.floatingButtonText}>Iniciar Este Plan</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

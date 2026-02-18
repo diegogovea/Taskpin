@@ -144,7 +144,7 @@ export default function WSNotification({
             {streak !== undefined && streak > 0 && (
               <View style={styles.statBadge}>
                 <Ionicons name="flame" size={12} color="#EF4444" />
-                <Text style={styles.statText}>{streak} day streak</Text>
+                <Text style={styles.statText}>{streak} días de racha</Text>
               </View>
             )}
           </View>
