@@ -14,28 +14,56 @@ This repo contains:
 
 - **Python**: **3.10+** (recommended **3.11**)  
   - Reason: the backend dependencies include packages that require Python >= 3.10.
-- **Node.js**: recommended **Node 20 LTS** (Expo generally targets Node LTS).
+- **Node.js**: **>= 20** (Expo 53). En `Frontend/MATH.M1M` hay `.nvmrc` con `20` → `nvm use`.
 - **PostgreSQL**: **14+**
+- **Redis** (recomendado): caché de IA, Celery y mejor rendimiento; el backend puede arrancar sin Redis con funcionalidad degradada.
 
 ### macOS (Homebrew) quick install
 
 ```bash
 brew update
-brew install python@3.11 node postgresql@14
+brew install python@3.11 node@20 postgresql@14 redis
 brew services start postgresql@14
 ```
 
 ---
 
+## Arranque rápido (un solo comando)
+
+Desde la raíz del repo (después de crear la DB y `Backend/.env`):
+
+```bash
+./scripts/dev.sh
+```
+
+Detener API + Metro/Expo en los puertos habituales:
+
+```bash
+./scripts/stop-dev.sh
+```
+
+Para apagar también Redis: `STOP_REDIS=1 ./scripts/stop-dev.sh`
+
+Si tu `nvm` deja Node 12 por defecto, fuerza el binario de Homebrew:
+
+```bash
+export NODE_BINARY=/opt/homebrew/opt/node/bin/node
+./scripts/dev.sh
+```
+
+Si el puerto 8081 está ocupado: `EXPO_PORT=8082 ./scripts/dev.sh`
+
+---
+
 ## 1) Database setup (PostgreSQL)
 
-The backend currently connects with hard-coded credentials in `Backend/app/model/userConnection.py`:
+La conexión sale de `Backend/.env` (ver `Backend/.env.example`) y `Backend/app/config.py`:
 
-- database: `taskpin`
-- user: `postgres`
-- password: `123456`
+- database: `taskpin` (por defecto)
+- user: `postgres` (por defecto)
+- password: según `.env`
 - host: `localhost`
-- port: `5432`
+- port: `5432` por defecto en código; **tu `.env` puede usar otro** (ej. `5433`)
 
 Create the database and load the schema/seed:
 
@@ -48,7 +76,7 @@ psql -U postgres -d taskpin -f taskpin.sql
 Notes:
 
 - `taskpin.sql` includes `CREATE DATABASE taskpin;` so you may see `database "taskpin" already exists`. That’s fine.
-- If your Postgres user/password differs, update the connection string in `Backend/app/model/userConnection.py`.
+- If your Postgres user/password or port differs, update `Backend/.env`.
 
 ---
 
@@ -85,8 +113,11 @@ curl http://127.0.0.1:8000/test-habitos
 
 ## 3) Frontend (Expo)
 
+**Node >= 20** (obligatorio para Expo 53). Comprueba con `node -v`.
+
 ```bash
 cd Frontend/MATH.M1M
+nvm use   # si usas nvm, respeta .nvmrc
 npm ci
 npx expo start
 ```
@@ -139,6 +170,14 @@ curl -X POST http://127.0.0.1:8000/login \
 
 ### Postgres connection errors
 
-- Ensure Postgres is running and listening on `localhost:5432`
+- Ensure Postgres is running and the port matches `DATABASE_PORT` in `Backend/.env`
 - Ensure DB `taskpin` exists and `taskpin.sql` was imported
-- Ensure credentials match `Backend/app/model/userConnection.py`
+- Ensure credentials in `Backend/.env` match your cluster
+
+### Expo / `SyntaxError: Unexpected token '?'` al correr `npx expo`
+
+- Estás usando **Node demasiado viejo** (p. ej. 12). Usa Node 20+ o `./scripts/dev.sh` con `NODE_BINARY` apuntando a un Node reciente.
+
+### Puerto 8081 en uso
+
+- Usa `EXPO_PORT=8082 npx expo start` o `./scripts/stop-dev.sh` y vuelve a intentar.

@@ -114,7 +114,7 @@ export default function WizardPlanScreen() {
       }
     } catch (error) {
       console.error("Error fetching plan:", error);
-      Alert.alert("Error", "Could not load plan details");
+      Alert.alert("Error", "No se pudieron cargar los detalles del plan");
     }
   };
 
@@ -214,8 +214,8 @@ export default function WizardPlanScreen() {
       // Handle auth errors
       if (response.status === 401) {
         Alert.alert(
-          "Session Expired",
-          "Please log in again to continue.",
+          "Sesión Expirada",
+          "Por favor inicia sesión nuevamente para continuar.",
           [{ text: "OK" }]
         );
         return;
@@ -225,15 +225,15 @@ export default function WizardPlanScreen() {
 
       if (result.success) {
         const msg = result.habitos_vinculados > 0 
-          ? `Your plan has been created with ${result.habitos_vinculados} linked habits.`
-          : "Your plan has been created successfully.";
+          ? `Tu plan ha sido creado con ${result.habitos_vinculados} hábitos vinculados.`
+          : "Tu plan ha sido creado exitosamente.";
         setSuccessMessage(msg);
         setShowSuccessModal(true);
       } else {
-        Alert.alert("Error", result.message || result.detail || "Could not create plan");
+        Alert.alert("Error", result.message || result.detail || "No se pudo crear el plan");
       }
     } catch (error) {
-      Alert.alert("Error", "Connection error. Please try again.");
+      Alert.alert("Error", "Error de conexión. Por favor intenta de nuevo.");
     } finally {
       setSubmitting(false);
     }
@@ -254,9 +254,9 @@ export default function WizardPlanScreen() {
 
   const getDifficultyLabel = (dificultad: string) => {
     switch (dificultad) {
-      case "fácil": return "Easy";
-      case "intermedio": return "Intermediate";
-      case "difícil": return "Difficult";
+      case "fácil": return "Fácil";
+      case "intermedio": return "Intermedio";
+      case "difícil": return "Difícil";
       default: return dificultad;
     }
   };
@@ -270,7 +270,7 @@ export default function WizardPlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>Cargando...</Text>
         </View>
       </SafeAreaView>
     );
@@ -281,7 +281,7 @@ export default function WizardPlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
-          <Text style={styles.loadingText}>Plan not found</Text>
+          <Text style={styles.loadingText}>Plan no encontrado</Text>
         </View>
       </SafeAreaView>
     );
@@ -304,12 +304,12 @@ export default function WizardPlanScreen() {
           </View>
           <View style={[styles.badge, { backgroundColor: colors.primary[100] }]}>
             <Text style={[styles.badgeText, { color: colors.primary[600] }]}>
-              {plan.plazo_dias_estimado} days
+              {plan.plazo_dias_estimado} días
             </Text>
           </View>
           <View style={[styles.badge, { backgroundColor: colors.secondary[100] }]}>
             <Text style={[styles.badgeText, { color: colors.secondary[600] }]}>
-              {plan.total_fases} phases
+              {plan.total_fases} fases
             </Text>
           </View>
         </View>
@@ -320,7 +320,7 @@ export default function WizardPlanScreen() {
 
       {/* Phases */}
       <View style={styles.phasesSection}>
-        <Text style={styles.sectionTitle}>Plan Phases</Text>
+        <Text style={styles.sectionTitle}>Fases del Plan</Text>
         {plan.fases.map((fase, index) => {
           const isExpanded = expandedPhases.includes(fase.fase_id);
           return (
@@ -371,12 +371,12 @@ export default function WizardPlanScreen() {
       <View style={styles.stepIcon}>
         <Ionicons name="calendar" size={48} color={colors.primary[600]} />
       </View>
-      <Text style={styles.stepTitle}>When do you start?</Text>
-      <Text style={styles.stepSubtitle}>Choose your start date and customize the duration</Text>
+      <Text style={styles.stepTitle}>¿Cuándo empiezas?</Text>
+      <Text style={styles.stepSubtitle}>Elige tu fecha de inicio y personaliza la duración</Text>
 
       {/* Start Date */}
       <View style={styles.dateSection}>
-        <Text style={styles.fieldLabel}>Start Date</Text>
+        <Text style={styles.fieldLabel}>Fecha de Inicio</Text>
         <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
           <Ionicons name="calendar-outline" size={20} color={colors.primary[600]} />
           <Text style={styles.dateButtonText}>{formatDate(config.fechaInicio)}</Text>
@@ -396,7 +396,7 @@ export default function WizardPlanScreen() {
 
       {/* Duration */}
       <View style={styles.dateSection}>
-        <Text style={styles.fieldLabel}>Duration (days)</Text>
+        <Text style={styles.fieldLabel}>Duración (días)</Text>
         <View style={styles.durationSelector}>
           <TouchableOpacity 
             style={styles.durationButton}
@@ -409,7 +409,7 @@ export default function WizardPlanScreen() {
           </TouchableOpacity>
           <View style={styles.durationValue}>
             <Text style={styles.durationNumber}>{config.diasPersonalizados}</Text>
-            <Text style={styles.durationLabel}>days</Text>
+            <Text style={styles.durationLabel}>días</Text>
           </View>
           <TouchableOpacity 
             style={styles.durationButton}
@@ -422,7 +422,7 @@ export default function WizardPlanScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.recommendedText}>
-          Recommended: {plan.plazo_dias_estimado} days
+          Recomendado: {plan.plazo_dias_estimado} días
         </Text>
       </View>
 
@@ -432,7 +432,7 @@ export default function WizardPlanScreen() {
           <Ionicons name="flag" size={24} color={colors.secondary[600]} />
         </View>
         <View>
-          <Text style={styles.targetDateLabel}>Target completion</Text>
+          <Text style={styles.targetDateLabel}>Fecha objetivo</Text>
           <Text style={styles.targetDateValue}>{formatDate(calcularFechaObjetivo())}</Text>
         </View>
       </View>
@@ -448,17 +448,17 @@ export default function WizardPlanScreen() {
       <View style={styles.stepIcon}>
         <Ionicons name="refresh" size={48} color={colors.secondary[600]} />
       </View>
-      <Text style={styles.stepTitle}>Link your habits</Text>
+      <Text style={styles.stepTitle}>Vincula tus hábitos</Text>
       <Text style={styles.stepSubtitle}>
-        Optional: Select habits to track alongside your plan tasks
+        Opcional: Selecciona hábitos para seguir junto con las tareas de tu plan
       </Text>
 
       {misHabitos.length === 0 ? (
         <View style={styles.emptyHabits}>
           <Ionicons name="leaf-outline" size={48} color={colors.neutral[300]} />
-          <Text style={styles.emptyHabitsText}>No habits yet</Text>
+          <Text style={styles.emptyHabitsText}>Sin hábitos aún</Text>
           <Text style={styles.emptyHabitsSubtext}>
-            You can add habits from the Habits section
+            Puedes agregar hábitos desde la sección de Hábitos
           </Text>
         </View>
       ) : (
@@ -490,7 +490,7 @@ export default function WizardPlanScreen() {
 
       <View style={styles.selectedCount}>
         <Text style={styles.selectedCountText}>
-          {config.habitosSeleccionados.length} habit{config.habitosSeleccionados.length !== 1 ? "s" : ""} selected
+          {config.habitosSeleccionados.length} hábito{config.habitosSeleccionados.length !== 1 ? "s" : ""} seleccionado{config.habitosSeleccionados.length !== 1 ? "s" : ""}
         </Text>
       </View>
     </ScrollView>
@@ -510,8 +510,8 @@ export default function WizardPlanScreen() {
         <View style={styles.stepIcon}>
           <Ionicons name="checkmark-circle" size={48} color={colors.semantic.success} />
         </View>
-        <Text style={styles.stepTitle}>Ready to start!</Text>
-        <Text style={styles.stepSubtitle}>Review your plan configuration</Text>
+        <Text style={styles.stepTitle}>¡Listo para empezar!</Text>
+        <Text style={styles.stepSubtitle}>Revisa la configuración de tu plan</Text>
 
         {/* Summary Card */}
         <View style={styles.summaryCard}>
@@ -532,7 +532,7 @@ export default function WizardPlanScreen() {
               <Ionicons name="calendar" size={20} color={colors.secondary[600]} />
             </View>
             <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabel}>Start Date</Text>
+              <Text style={styles.summaryLabel}>Fecha de Inicio</Text>
               <Text style={styles.summaryValue}>{formatDate(config.fechaInicio)}</Text>
             </View>
           </View>
@@ -544,7 +544,7 @@ export default function WizardPlanScreen() {
               <Ionicons name="flag-outline" size={20} color={colors.accent.amber} />
             </View>
             <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabel}>Target Date</Text>
+              <Text style={styles.summaryLabel}>Fecha Objetivo</Text>
               <Text style={styles.summaryValue}>{formatDate(calcularFechaObjetivo())}</Text>
             </View>
           </View>
@@ -556,8 +556,8 @@ export default function WizardPlanScreen() {
               <Ionicons name="time" size={20} color={colors.primary[600]} />
             </View>
             <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabel}>Duration</Text>
-              <Text style={styles.summaryValue}>{config.diasPersonalizados} days</Text>
+              <Text style={styles.summaryLabel}>Duración</Text>
+              <Text style={styles.summaryValue}>{config.diasPersonalizados} días</Text>
             </View>
           </View>
 
@@ -569,7 +569,7 @@ export default function WizardPlanScreen() {
                   <Ionicons name="refresh" size={20} color={colors.secondary[600]} />
                 </View>
                 <View style={styles.summaryContent}>
-                  <Text style={styles.summaryLabel}>Linked Habits</Text>
+                  <Text style={styles.summaryLabel}>Hábitos Vinculados</Text>
                   <View style={styles.linkedHabitsList}>
                     {selectedHabits.map(h => (
                       <Text key={h.habito_usuario_id} style={styles.linkedHabitItem}>
@@ -602,10 +602,10 @@ export default function WizardPlanScreen() {
 
   const getStepTitle = () => {
     switch (step) {
-      case 1: return "Plan Preview";
-      case 2: return "Set Dates";
-      case 3: return "Link Habits";
-      case 4: return "Confirm";
+      case 1: return "Vista Previa";
+      case 2: return "Fechas";
+      case 3: return "Vincular Hábitos";
+      case 4: return "Confirmar";
       default: return "";
     }
   };
@@ -645,7 +645,7 @@ export default function WizardPlanScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.nextButtonGradient}
             >
-              <Text style={styles.nextButtonText}>Continue</Text>
+              <Text style={styles.nextButtonText}>Continuar</Text>
               <Ionicons name="arrow-forward" size={20} color={colors.neutral[0]} />
             </LinearGradient>
           </TouchableOpacity>
@@ -667,7 +667,7 @@ export default function WizardPlanScreen() {
               ) : (
                 <>
                   <Ionicons name="rocket" size={20} color={colors.neutral[0]} />
-                  <Text style={styles.nextButtonText}>Start Plan</Text>
+                  <Text style={styles.nextButtonText}>Iniciar Plan</Text>
                 </>
               )}
             </LinearGradient>
@@ -692,7 +692,7 @@ export default function WizardPlanScreen() {
                 <Ionicons name="checkmark" size={40} color={colors.neutral[0]} />
               </LinearGradient>
             </View>
-            <Text style={styles.modalTitle}>Plan Started!</Text>
+            <Text style={styles.modalTitle}>¡Plan Iniciado!</Text>
             <Text style={styles.modalMessage}>{successMessage}</Text>
             <TouchableOpacity
               style={styles.modalButton}
@@ -708,7 +708,7 @@ export default function WizardPlanScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.modalButtonGradient}
               >
-                <Text style={styles.modalButtonText}>Let's Go!</Text>
+                <Text style={styles.modalButtonText}>¡Vamos!</Text>
                 <Ionicons name="arrow-forward" size={18} color={colors.neutral[0]} />
               </LinearGradient>
             </TouchableOpacity>

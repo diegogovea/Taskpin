@@ -60,9 +60,9 @@ interface RachasData {
 }
 
 const FRECUENCIAS = [
-  { value: 'diario', label: 'Daily', icon: 'today' },
-  { value: 'semanal', label: 'Weekly', icon: 'calendar' },
-  { value: 'mensual', label: 'Monthly', icon: 'calendar-outline' },
+  { value: 'diario', label: 'Diario', icon: 'today' },
+  { value: 'semanal', label: 'Semanal', icon: 'calendar' },
+  { value: 'mensual', label: 'Mensual', icon: 'calendar-outline' },
 ];
 
 // Map category names to colors
@@ -112,11 +112,11 @@ export default function DetalleHabitoScreen() {
       if (data.success) {
         setHabito(data.data);
       } else {
-        setToast({ visible: true, message: 'Could not load habit details', type: 'error' });
+        setToast({ visible: true, message: 'No se pudieron cargar los detalles del hábito', type: 'error' });
       }
     } catch (error) {
       console.error("Error fetching habit detail:", error);
-      setToast({ visible: true, message: 'Connection error', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
     }
   };
 
@@ -192,13 +192,13 @@ export default function DetalleHabitoScreen() {
 
       if (data.success) {
         setHabito(prev => prev ? { ...prev, frecuencia_personal: newFrecuencia } : null);
-        setToast({ visible: true, message: 'Frequency updated!', type: 'success' });
+        setToast({ visible: true, message: '¡Frecuencia actualizada!', type: 'success' });
       } else {
-        setToast({ visible: true, message: 'Could not update frequency', type: 'error' });
+        setToast({ visible: true, message: 'No se pudo actualizar la frecuencia', type: 'error' });
       }
     } catch (error) {
       console.error("Error updating frequency:", error);
-      setToast({ visible: true, message: 'Connection error', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
     } finally {
       setUpdating(false);
     }
@@ -221,18 +221,18 @@ export default function DetalleHabitoScreen() {
 
       if (data.success) {
         setShowDeleteModal(false);
-        setToast({ visible: true, message: 'Habit deleted', type: 'success' });
+        setToast({ visible: true, message: 'Hábito eliminado', type: 'success' });
         setTimeout(() => {
           router.replace("/(tabs)/habitos");
         }, 1000);
       } else {
         setShowDeleteModal(false);
-        setToast({ visible: true, message: 'Could not delete habit', type: 'error' });
+        setToast({ visible: true, message: 'No se pudo eliminar el hábito', type: 'error' });
       }
     } catch (error) {
       console.error("Error deleting habit:", error);
       setShowDeleteModal(false);
-      setToast({ visible: true, message: 'Connection error', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
     } finally {
       setDeleting(false);
     }
@@ -252,7 +252,7 @@ export default function DetalleHabitoScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading habit...</Text>
+          <Text style={styles.loadingText}>Cargando hábito...</Text>
         </View>
       </SafeAreaView>
     );
@@ -315,7 +315,7 @@ export default function DetalleHabitoScreen() {
         {/* Description */}
         {habito.descripcion && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>Descripción</Text>
             <View style={styles.descriptionCard}>
               <Text style={styles.descriptionText}>{habito.descripcion}</Text>
             </View>
@@ -329,7 +329,7 @@ export default function DetalleHabitoScreen() {
             <Text style={[styles.statValue, { color: colors.accent.amber }]}>
               {habito.estadisticas.racha_actual}
             </Text>
-            <Text style={styles.statLabel}>Day Streak</Text>
+            <Text style={styles.statLabel}>Racha</Text>
           </View>
           
           <View style={[styles.statCard, { backgroundColor: colors.primary[50] }]}>
@@ -337,7 +337,7 @@ export default function DetalleHabitoScreen() {
             <Text style={[styles.statValue, { color: colors.primary[600] }]}>
               {habito.puntos_base}
             </Text>
-            <Text style={styles.statLabel}>Points</Text>
+            <Text style={styles.statLabel}>Puntos</Text>
           </View>
           
           <View style={[styles.statCard, { backgroundColor: colors.secondary[50] }]}>
@@ -345,13 +345,13 @@ export default function DetalleHabitoScreen() {
             <Text style={[styles.statValue, { color: colors.secondary[600] }]}>
               {habito.estadisticas.dias_completados}
             </Text>
-            <Text style={styles.statLabel}>Days Done</Text>
+            <Text style={styles.statLabel}>Días Hechos</Text>
           </View>
         </View>
 
         {/* History Calendar */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>History</Text>
+          <Text style={styles.sectionTitle}>Historial</Text>
           <View style={styles.calendarContainer}>
             <HabitCalendar historial={historial} />
           </View>
@@ -382,22 +382,22 @@ export default function DetalleHabitoScreen() {
             <View style={styles.streakItem}>
               <Ionicons name="trophy" size={20} color={colors.accent.amber} />
               <View>
-                <Text style={styles.streakValue}>{rachas.racha_maxima} days</Text>
-                <Text style={styles.streakLabel}>Best Streak</Text>
+                <Text style={styles.streakValue}>{rachas.racha_maxima} días</Text>
+                <Text style={styles.streakLabel}>Mejor Racha</Text>
               </View>
             </View>
             <View style={styles.streakItem}>
               <Ionicons name="analytics" size={20} color={colors.primary[600]} />
               <View>
-                <Text style={styles.streakValue}>{rachas.estadisticas.promedio_racha} days</Text>
-                <Text style={styles.streakLabel}>Avg Streak</Text>
+                <Text style={styles.streakValue}>{rachas.estadisticas.promedio_racha} días</Text>
+                <Text style={styles.streakLabel}>Promedio</Text>
               </View>
             </View>
             <View style={styles.streakItem}>
               <Ionicons name="layers" size={20} color={colors.secondary[600]} />
               <View>
                 <Text style={styles.streakValue}>{rachas.estadisticas.total_rachas}</Text>
-                <Text style={styles.streakLabel}>Total Streaks</Text>
+                <Text style={styles.streakLabel}>Total Rachas</Text>
               </View>
             </View>
           </View>
@@ -405,7 +405,7 @@ export default function DetalleHabitoScreen() {
 
         {/* Frequency Selector */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Frequency</Text>
+          <Text style={styles.sectionTitle}>Frecuencia</Text>
           <View style={styles.frequencyContainer}>
             {FRECUENCIAS.map((freq) => {
               const isSelected = habito.frecuencia_personal === freq.value;
@@ -451,7 +451,7 @@ export default function DetalleHabitoScreen() {
         <View style={styles.infoRow}>
           <Ionicons name="calendar-outline" size={18} color={colors.neutral[400]} />
           <Text style={styles.infoText}>
-            Added on {formatDate(habito.fecha_agregado)}
+            Agregado el {formatDate(habito.fecha_agregado)}
           </Text>
         </View>
 
@@ -462,7 +462,7 @@ export default function DetalleHabitoScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="trash-outline" size={20} color={colors.semantic.error} />
-          <Text style={styles.deleteButtonText}>Delete Habit</Text>
+          <Text style={styles.deleteButtonText}>Eliminar Hábito</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -471,12 +471,12 @@ export default function DetalleHabitoScreen() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         visible={showDeleteModal}
-        title="Delete Habit?"
-        message={`You're about to delete "${habito.nombre}". This will remove all your progress and history. This action cannot be undone.`}
+        title="¿Eliminar Hábito?"
+        message={`Estás a punto de eliminar "${habito.nombre}". Esto eliminará todo tu progreso e historial. Esta acción no se puede deshacer.`}
         icon="trash-outline"
         danger={true}
-        confirmText="Delete"
-        cancelText="Keep"
+        confirmText="Eliminar"
+        cancelText="Conservar"
         isLoading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setShowDeleteModal(false)}

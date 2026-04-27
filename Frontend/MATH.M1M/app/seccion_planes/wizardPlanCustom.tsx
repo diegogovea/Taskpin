@@ -53,17 +53,17 @@ interface PlanConfig {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const DIFICULTADES = [
-  { key: 'fácil', label: 'Easy', color: colors.secondary[500] },
-  { key: 'intermedio', label: 'Medium', color: colors.accent.amber },
-  { key: 'difícil', label: 'Hard', color: colors.semantic.error },
+  { key: 'fácil', label: 'Fácil', color: colors.secondary[500] },
+  { key: 'intermedio', label: 'Medio', color: colors.accent.amber },
+  { key: 'difícil', label: 'Difícil', color: colors.semantic.error },
 ];
 
 const DURACIONES_SUGERIDAS = [30, 60, 90, 120];
 
 const TIPOS_TAREA = [
-  { key: 'diaria', label: 'Daily', icon: 'today' },
-  { key: 'semanal', label: 'Weekly', icon: 'calendar' },
-  { key: 'única', label: 'One-time', icon: 'checkmark-done' },
+  { key: 'diaria', label: 'Diaria', icon: 'today' },
+  { key: 'semanal', label: 'Semanal', icon: 'calendar' },
+  { key: 'única', label: 'Única', icon: 'checkmark-done' },
 ];
 
 // =====================
@@ -101,13 +101,13 @@ export default function WizardPlanCustom() {
   const handleNext = () => {
     if (step === 1) {
       if (!config.meta_principal.trim() || config.meta_principal.length < 5) {
-        Alert.alert('Required', 'Please enter a goal with at least 5 characters');
+        Alert.alert('Requerido', 'Por favor ingresa una meta con al menos 5 caracteres');
         return;
       }
     }
     if (step === 2) {
       if (config.fases.length === 0) {
-        Alert.alert('Required', 'Add at least one phase to your plan');
+        Alert.alert('Requerido', 'Agrega al menos una fase a tu plan');
         return;
       }
     }
@@ -125,7 +125,7 @@ export default function WizardPlanCustom() {
   // Fase handlers
   const addFase = () => {
     if (diasRestantes <= 0) {
-      Alert.alert('No days left', 'All days are assigned. Increase plan duration or reduce phase durations.');
+      Alert.alert('Sin días disponibles', 'Todos los días están asignados. Aumenta la duración del plan o reduce la duración de las fases.');
       return;
     }
     setTempFase({
@@ -138,11 +138,11 @@ export default function WizardPlanCustom() {
 
   const saveFase = () => {
     if (!tempFase.titulo || tempFase.titulo.trim().length < 3) {
-      Alert.alert('Required', 'Phase title must have at least 3 characters');
+      Alert.alert('Requerido', 'El título de la fase debe tener al menos 3 caracteres');
       return;
     }
     if (!tempFase.duracion_dias || tempFase.duracion_dias < 1) {
-      Alert.alert('Required', 'Duration must be at least 1 day');
+      Alert.alert('Requerido', 'La duración debe ser de al menos 1 día');
       return;
     }
 
@@ -170,10 +170,10 @@ export default function WizardPlanCustom() {
   };
 
   const deleteFase = (faseId: string) => {
-    Alert.alert('Delete Phase', 'Are you sure? All tasks in this phase will be deleted.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Eliminar Fase', '¿Estás seguro? Todas las tareas de esta fase serán eliminadas.', [
+      { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Eliminar',
         style: 'destructive',
         onPress: () => setConfig({ ...config, fases: config.fases.filter((f) => f.id !== faseId) }),
       },
@@ -189,7 +189,7 @@ export default function WizardPlanCustom() {
 
   const saveTarea = () => {
     if (!tempTarea.titulo || tempTarea.titulo.trim().length < 3) {
-      Alert.alert('Required', 'Task title must have at least 3 characters');
+      Alert.alert('Requerido', 'El título de la tarea debe tener al menos 3 caracteres');
       return;
     }
 
@@ -229,14 +229,14 @@ export default function WizardPlanCustom() {
   // Submit
   const handleSubmit = async () => {
     if (!user?.user_id) {
-      Alert.alert('Error', 'Session expired. Please login again.');
+      Alert.alert('Error', 'Sesión expirada. Por favor inicia sesión nuevamente.');
       return;
     }
 
     // Validación final
     const fasesConTareas = config.fases.filter((f) => f.tareas.length > 0);
     if (fasesConTareas.length === 0) {
-      Alert.alert('Required', 'Add at least one task to your plan');
+      Alert.alert('Requerido', 'Agrega al menos una tarea a tu plan');
       return;
     }
 
@@ -274,11 +274,11 @@ export default function WizardPlanCustom() {
         // Redirigir automáticamente al plan creado
         router.replace(`/seccion_planes/seguimientoPlan?planUsuarioId=${data.plan_usuario_id}` as any);
       } else {
-        Alert.alert('Error', data.detail || data.message || 'Could not create plan');
+        Alert.alert('Error', data.detail || data.message || 'No se pudo crear el plan');
       }
     } catch (error) {
       console.error('Error creating plan:', error);
-      Alert.alert('Error', 'Could not create plan. Please try again.');
+      Alert.alert('Error', 'No se pudo crear el plan. Por favor intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -311,14 +311,14 @@ export default function WizardPlanCustom() {
 
   const renderStep1 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>What's your goal?</Text>
-      <Text style={styles.stepSubtitle}>Give your plan a clear objective</Text>
+      <Text style={styles.stepTitle}>¿Cuál es tu meta?</Text>
+      <Text style={styles.stepSubtitle}>Dale a tu plan un objetivo claro</Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Main Goal *</Text>
+        <Text style={styles.inputLabel}>Meta Principal *</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="e.g., Learn to play guitar"
+          placeholder="Ej: Aprender a tocar guitarra"
           placeholderTextColor={colors.neutral[400]}
           value={config.meta_principal}
           onChangeText={(t) => setConfig({ ...config, meta_principal: t })}
@@ -327,10 +327,10 @@ export default function WizardPlanCustom() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Description (optional)</Text>
+        <Text style={styles.inputLabel}>Descripción (opcional)</Text>
         <TextInput
           style={[styles.textInput, styles.textArea]}
-          placeholder="Describe what you want to achieve..."
+          placeholder="Describe lo que quieres lograr..."
           placeholderTextColor={colors.neutral[400]}
           value={config.descripcion}
           onChangeText={(t) => setConfig({ ...config, descripcion: t })}
@@ -341,7 +341,7 @@ export default function WizardPlanCustom() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Duration (days)</Text>
+        <Text style={styles.inputLabel}>Duración (días)</Text>
         <View style={styles.chipRow}>
           {DURACIONES_SUGERIDAS.map((d) => (
             <TouchableOpacity
@@ -350,13 +350,13 @@ export default function WizardPlanCustom() {
               onPress={() => setConfig({ ...config, plazo_dias: d })}
             >
               <Text style={[styles.chipText, config.plazo_dias === d && styles.chipTextActive]}>
-                {d} days
+                {d} días
               </Text>
             </TouchableOpacity>
           ))}
         </View>
         <View style={styles.customDurationRow}>
-          <Text style={styles.customLabel}>Custom:</Text>
+          <Text style={styles.customLabel}>Personalizar:</Text>
           <TextInput
             style={styles.smallInput}
             keyboardType="number-pad"
@@ -366,12 +366,12 @@ export default function WizardPlanCustom() {
               setConfig({ ...config, plazo_dias: Math.min(365, Math.max(7, num)) });
             }}
           />
-          <Text style={styles.customLabel}>days</Text>
+          <Text style={styles.customLabel}>días</Text>
         </View>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Difficulty</Text>
+        <Text style={styles.inputLabel}>Dificultad</Text>
         <View style={styles.chipRow}>
           {DIFICULTADES.map((d) => (
             <TouchableOpacity
@@ -398,9 +398,9 @@ export default function WizardPlanCustom() {
 
   const renderStep2 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Break it into phases</Text>
+      <Text style={styles.stepTitle}>Divídelo en fases</Text>
       <Text style={styles.stepSubtitle}>
-        Divide your {config.plazo_dias}-day plan into manageable phases
+        Divide tu plan de {config.plazo_dias} días en fases manejables
       </Text>
 
       {/* Days progress */}
@@ -414,7 +414,7 @@ export default function WizardPlanCustom() {
           />
         </View>
         <Text style={styles.daysProgressText}>
-          {diasUsados} of {config.plazo_dias} days assigned ({diasRestantes} remaining)
+          {diasUsados} de {config.plazo_dias} días asignados ({diasRestantes} restantes)
         </Text>
       </View>
 
@@ -423,7 +423,7 @@ export default function WizardPlanCustom() {
         <View key={fase.id} style={styles.faseCard}>
           <View style={styles.faseHeader}>
             <View style={styles.faseBadge}>
-              <Text style={styles.faseBadgeText}>Phase {index + 1}</Text>
+              <Text style={styles.faseBadgeText}>Fase {index + 1}</Text>
             </View>
             <View style={styles.faseActions}>
               <TouchableOpacity
@@ -440,7 +440,7 @@ export default function WizardPlanCustom() {
             </View>
           </View>
           <Text style={styles.faseTitulo}>{fase.titulo}</Text>
-          <Text style={styles.faseDuracion}>{fase.duracion_dias} days</Text>
+          <Text style={styles.faseDuracion}>{fase.duracion_dias} días</Text>
           {fase.descripcion && <Text style={styles.faseDesc}>{fase.descripcion}</Text>}
         </View>
       ))}
@@ -449,7 +449,7 @@ export default function WizardPlanCustom() {
       <TouchableOpacity style={styles.addButton} onPress={addFase} disabled={diasRestantes <= 0}>
         <Ionicons name="add" size={20} color={diasRestantes > 0 ? colors.primary[600] : colors.neutral[400]} />
         <Text style={[styles.addButtonText, diasRestantes <= 0 && { color: colors.neutral[400] }]}>
-          Add Phase
+          Agregar Fase
         </Text>
       </TouchableOpacity>
 
@@ -472,32 +472,32 @@ export default function WizardPlanCustom() {
       <View style={styles.editModal}>
         <View style={styles.editModalContent}>
           <Text style={styles.editModalTitle}>
-            {editingFaseId === 'new' ? 'New Phase' : 'Edit Phase'}
+            {editingFaseId === 'new' ? 'Nueva Fase' : 'Editar Fase'}
           </Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Phase title"
+            placeholder="Título de la fase"
             placeholderTextColor={colors.neutral[400]}
             value={tempFase.titulo || ''}
             onChangeText={(t) => setTempFase({ ...tempFase, titulo: t })}
           />
           <TextInput
             style={[styles.textInput, styles.textArea, { marginTop: spacing[3] }]}
-            placeholder="Description (optional)"
+            placeholder="Descripción (opcional)"
             placeholderTextColor={colors.neutral[400]}
             value={tempFase.descripcion || ''}
             onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
             multiline
           />
           <View style={styles.durationRow}>
-            <Text style={styles.inputLabel}>Duration:</Text>
+            <Text style={styles.inputLabel}>Duración:</Text>
             <TextInput
               style={styles.smallInput}
               keyboardType="number-pad"
               value={(tempFase.duracion_dias || '').toString()}
               onChangeText={(t) => setTempFase({ ...tempFase, duracion_dias: parseInt(t) || 1 })}
             />
-            <Text style={styles.inputLabel}>days</Text>
+            <Text style={styles.inputLabel}>días</Text>
           </View>
           <View style={styles.editModalButtons}>
             <TouchableOpacity
@@ -507,10 +507,10 @@ export default function WizardPlanCustom() {
                 setTempFase({});
               }}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={saveFase}>
-              <Text style={styles.saveBtnText}>Save</Text>
+              <Text style={styles.saveBtnText}>Guardar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -535,24 +535,24 @@ export default function WizardPlanCustom() {
       <View style={styles.editModal}>
         <View style={styles.editModalContent}>
           <Text style={styles.editModalTitle}>
-            {editingTareaId === 'new' ? 'New Task' : 'Edit Task'}
+            {editingTareaId === 'new' ? 'Nueva Tarea' : 'Editar Tarea'}
           </Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Task title"
+            placeholder="Título de la tarea"
             placeholderTextColor={colors.neutral[400]}
             value={tempTarea.titulo || ''}
             onChangeText={(t) => setTempTarea({ ...tempTarea, titulo: t })}
           />
           <TextInput
             style={[styles.textInput, styles.textArea, { marginTop: spacing[3] }]}
-            placeholder="Description (optional)"
+            placeholder="Descripción (opcional)"
             placeholderTextColor={colors.neutral[400]}
             value={tempTarea.descripcion || ''}
             onChangeText={(t) => setTempTarea({ ...tempTarea, descripcion: t })}
             multiline
           />
-          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Task Type</Text>
+          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Tipo de Tarea</Text>
           <View style={styles.chipRow}>
             {TIPOS_TAREA.map((tipo) => (
               <TouchableOpacity
@@ -580,10 +580,10 @@ export default function WizardPlanCustom() {
                 setEditingFaseId(null);
               }}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={saveTarea}>
-              <Text style={styles.saveBtnText}>Save</Text>
+              <Text style={styles.saveBtnText}>Guardar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -597,14 +597,14 @@ export default function WizardPlanCustom() {
 
   const renderStep3 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Add tasks to each phase</Text>
-      <Text style={styles.stepSubtitle}>Define what you'll do in each phase</Text>
+      <Text style={styles.stepTitle}>Agrega tareas a cada fase</Text>
+      <Text style={styles.stepSubtitle}>Define lo que harás en cada fase</Text>
 
       {config.fases.map((fase, faseIndex) => (
         <View key={fase.id} style={styles.faseTasksCard}>
           <View style={styles.faseTasksHeader}>
-            <Text style={styles.faseTasksTitle}>Phase {faseIndex + 1}: {fase.titulo}</Text>
-            <Text style={styles.faseTasksDuration}>{fase.duracion_dias} days</Text>
+            <Text style={styles.faseTasksTitle}>Fase {faseIndex + 1}: {fase.titulo}</Text>
+            <Text style={styles.faseTasksDuration}>{fase.duracion_dias} días</Text>
           </View>
 
           {/* Tasks list */}
@@ -627,7 +627,7 @@ export default function WizardPlanCustom() {
           {/* Add task button */}
           <TouchableOpacity style={styles.addTaskBtn} onPress={() => addTarea(fase.id)}>
             <Ionicons name="add" size={18} color={colors.primary[600]} />
-            <Text style={styles.addTaskBtnText}>Add Task</Text>
+            <Text style={styles.addTaskBtnText}>Agregar Tarea</Text>
           </TouchableOpacity>
         </View>
       ))}
@@ -635,21 +635,21 @@ export default function WizardPlanCustom() {
 
       {/* Summary */}
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Plan Summary</Text>
+        <Text style={styles.summaryTitle}>Resumen del Plan</Text>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Goal:</Text>
+          <Text style={styles.summaryLabel}>Meta:</Text>
           <Text style={styles.summaryValue}>{config.meta_principal}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Duration:</Text>
-          <Text style={styles.summaryValue}>{config.plazo_dias} days</Text>
+          <Text style={styles.summaryLabel}>Duración:</Text>
+          <Text style={styles.summaryValue}>{config.plazo_dias} días</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Phases:</Text>
+          <Text style={styles.summaryLabel}>Fases:</Text>
           <Text style={styles.summaryValue}>{config.fases.length}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total tasks:</Text>
+          <Text style={styles.summaryLabel}>Total de tareas:</Text>
           <Text style={styles.summaryValue}>
             {config.fases.reduce((acc, f) => acc + f.tareas.length, 0)}
           </Text>
@@ -686,7 +686,7 @@ export default function WizardPlanCustom() {
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Custom Plan</Text>
+          <Text style={styles.headerTitle}>Crear Plan Personalizado</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -702,7 +702,7 @@ export default function WizardPlanCustom() {
         <View style={styles.footer}>
           {step < 3 ? (
             <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Continue</Text>
+              <Text style={styles.nextButtonText}>Continuar</Text>
               <Ionicons name="arrow-forward" size={20} color={colors.neutral[0]} />
             </TouchableOpacity>
           ) : (
@@ -716,7 +716,7 @@ export default function WizardPlanCustom() {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color={colors.neutral[0]} />
-                  <Text style={styles.nextButtonText}>Create Plan</Text>
+                  <Text style={styles.nextButtonText}>Crear Plan</Text>
                 </>
               )}
             </TouchableOpacity>

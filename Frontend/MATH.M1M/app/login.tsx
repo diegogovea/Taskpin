@@ -61,7 +61,7 @@ export default function LoginScreen() {
 
           {/* Brand */}
           <Text style={styles.brandName}>taskpin</Text>
-          <Text style={styles.tagline}>Build habits that stick</Text>
+          <Text style={styles.tagline}>Construye hábitos que perduran</Text>
         </Animated.View>
 
         {/* Bottom Section - Buttons */}
@@ -85,7 +85,7 @@ export default function LoginScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.primaryButtonGradient}
             >
-              <Text style={styles.primaryButtonText}>Get Started</Text>
+              <Text style={styles.primaryButtonText}>Comenzar</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -95,15 +95,15 @@ export default function LoginScreen() {
             activeOpacity={0.8}
             onPress={() => router.replace("/inicio")}
           >
-            <Text style={styles.secondaryButtonText}>I already have an account</Text>
+            <Text style={styles.secondaryButtonText}>Ya tengo una cuenta</Text>
           </TouchableOpacity>
 
           {/* Terms */}
           <Text style={styles.termsText}>
-            By continuing, you agree to our{" "}
-            <Text style={styles.termsLink}>Terms of Service</Text>
-            {" "}and{" "}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+            Al continuar, aceptas nuestros{" "}
+            <Text style={styles.termsLink}>Términos de Servicio</Text>
+            {" "}y{" "}
+            <Text style={styles.termsLink}>Política de Privacidad</Text>
           </Text>
         </Animated.View>
       </LinearGradient>

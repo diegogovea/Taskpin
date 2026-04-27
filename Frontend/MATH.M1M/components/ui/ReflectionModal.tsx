@@ -16,11 +16,11 @@ import { colors, typography, spacing, radius, shadows } from '../../constants/th
 
 // Configuración de estados de ánimo
 const MOOD_OPTIONS = [
-  { key: 'great', label: 'Great', color: '#22C55E', icon: 'sunny' },
-  { key: 'good', label: 'Good', color: '#84CC16', icon: 'partly-sunny' },
+  { key: 'great', label: 'Excelente', color: '#22C55E', icon: 'sunny' },
+  { key: 'good', label: 'Bien', color: '#84CC16', icon: 'partly-sunny' },
   { key: 'neutral', label: 'Neutral', color: '#F59E0B', icon: 'cloudy' },
-  { key: 'low', label: 'Low', color: '#F97316', icon: 'rainy' },
-  { key: 'bad', label: 'Bad', color: '#EF4444', icon: 'thunderstorm' },
+  { key: 'low', label: 'Bajo', color: '#F97316', icon: 'rainy' },
+  { key: 'bad', label: 'Mal', color: '#EF4444', icon: 'thunderstorm' },
 ];
 
 interface ReflectionModalProps {
@@ -97,7 +97,7 @@ export default function ReflectionModal({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {isEditing ? 'Edit Reflection' : 'Daily Reflection'}
+              {isEditing ? 'Editar Reflexión' : 'Reflexión Diaria'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.neutral[500]} />
@@ -111,7 +111,7 @@ export default function ReflectionModal({
           >
             {/* Mood Selection */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>How are you feeling today?</Text>
+              <Text style={styles.sectionTitle}>¿Cómo te sientes hoy?</Text>
               <View style={styles.moodGrid}>
                 {MOOD_OPTIONS.map((mood) => (
                   <TouchableOpacity
@@ -145,11 +145,11 @@ export default function ReflectionModal({
 
             {/* What went well */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What went well today?</Text>
-              <Text style={styles.sectionHint}>Optional - celebrate your wins</Text>
+              <Text style={styles.sectionTitle}>¿Qué salió bien hoy?</Text>
+              <Text style={styles.sectionHint}>Opcional - celebra tus logros</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g., Completed my morning routine..."
+                placeholder="ej: Completé mi rutina de la mañana..."
                 placeholderTextColor={colors.neutral[400]}
                 value={queSalioBien}
                 onChangeText={setQueSalioBien}
@@ -161,11 +161,11 @@ export default function ReflectionModal({
 
             {/* What to improve */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What could be better?</Text>
-              <Text style={styles.sectionHint}>Optional - areas for growth</Text>
+              <Text style={styles.sectionTitle}>¿Qué podría ser mejor?</Text>
+              <Text style={styles.sectionHint}>Opcional - áreas de crecimiento</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g., Need to sleep earlier..."
+                placeholder="ej: Necesito dormir más temprano..."
                 placeholderTextColor={colors.neutral[400]}
                 value={queMejorar}
                 onChangeText={setQueMejorar}
@@ -182,7 +182,7 @@ export default function ReflectionModal({
               style={styles.cancelButton}
               onPress={onClose}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -196,7 +196,7 @@ export default function ReflectionModal({
                 <ActivityIndicator size="small" color={colors.neutral[0]} />
               ) : (
                 <Text style={styles.saveButtonText}>
-                  {isEditing ? 'Update' : 'Save'}
+                  {isEditing ? 'Actualizar' : 'Guardar'}
                 </Text>
               )}
             </TouchableOpacity>

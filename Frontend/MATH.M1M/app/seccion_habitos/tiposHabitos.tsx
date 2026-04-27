@@ -25,8 +25,8 @@ interface CategoryItem {
 const categories: CategoryItem[] = [
   {
     id: "1",
-    title: "Daily Wellness",
-    description: "Self-care and healthy routines",
+    title: "Bienestar Diario",
+    description: "Autocuidado y rutinas saludables",
     icon: "heart",
     route: "/seccion_habitos/catH1",
     gradient: [colors.secondary[100], colors.secondary[50]],
@@ -34,8 +34,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "2",
-    title: "Energy & Movement",
-    description: "Physical activities to stay active",
+    title: "Energía y Movimiento",
+    description: "Actividades físicas para mantenerte activo",
     icon: "flash",
     route: "/seccion_habitos/catH2",
     gradient: [colors.accent.amber + "30", colors.accent.amber + "15"],
@@ -43,8 +43,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "3",
-    title: "Mind & Focus",
-    description: "Mental development and concentration",
+    title: "Mente y Enfoque",
+    description: "Desarrollo mental y concentración",
     icon: "bulb",
     route: "/seccion_habitos/catH3",
     gradient: [colors.primary[100], colors.primary[50]],
@@ -52,8 +52,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "4",
-    title: "Home Organization",
-    description: "Domestic order and maintenance",
+    title: "Organización del Hogar",
+    description: "Orden y mantenimiento doméstico",
     icon: "home",
     route: "/seccion_habitos/catH4",
     gradient: [colors.accent.cyan + "30", colors.accent.cyan + "15"],
@@ -61,8 +61,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "5",
-    title: "Personal Finance",
-    description: "Money management habits",
+    title: "Finanzas Personales",
+    description: "Hábitos de manejo del dinero",
     icon: "wallet",
     route: "/seccion_habitos/catH5",
     gradient: [colors.accent.rose + "30", colors.accent.rose + "15"],
@@ -70,8 +70,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "6",
-    title: "My Custom Habits",
-    description: "Your personalized habits",
+    title: "Mis Hábitos Personalizados",
+    description: "Tus hábitos personalizados",
     icon: "sparkles",
     route: "/seccion_habitos/catH6",
     gradient: [colors.primary[100], colors.primary[50]],
@@ -106,9 +106,9 @@ export default function TiposHabitosScreen() {
       >
         {/* Title */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Add New Habit</Text>
+          <Text style={styles.title}>Agregar Nuevo Hábito</Text>
           <Text style={styles.subtitle}>
-            Choose a category to find habits that match your goals
+            Elige una categoría para encontrar hábitos que coincidan con tus metas
           </Text>
         </View>
 

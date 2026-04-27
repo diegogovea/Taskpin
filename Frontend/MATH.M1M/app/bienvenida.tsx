@@ -68,9 +68,9 @@ export default function BienvenidaScreen() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return "Buenos días";
+    if (hour < 18) return "Buenas tardes";
+    return "Buenas noches";
   };
 
   return (
@@ -111,7 +111,7 @@ export default function BienvenidaScreen() {
 
           {/* Message */}
           <Text style={styles.message}>
-            Ready to continue building{"\n"}your habits today?
+            ¿Listo para continuar construyendo{"\n"}tus hábitos hoy?
           </Text>
         </Animated.View>
 
@@ -136,7 +136,7 @@ export default function BienvenidaScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.primaryButtonGradient}
             >
-              <Text style={styles.primaryButtonText}>Let's Go</Text>
+              <Text style={styles.primaryButtonText}>¡Vamos!</Text>
               <Ionicons name="arrow-forward" size={20} color={colors.neutral[0]} />
             </LinearGradient>
           </TouchableOpacity>
@@ -145,7 +145,7 @@ export default function BienvenidaScreen() {
             style={styles.logoutButton}
             onPress={handleLogout}
           >
-            <Text style={styles.logoutButtonText}>Sign out</Text>
+            <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

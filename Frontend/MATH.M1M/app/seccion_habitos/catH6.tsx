@@ -50,11 +50,11 @@ export default function CatH6Screen() {
       if (data.success) {
         setHabitos(data.data);
       } else {
-        setToast({ visible: true, message: 'Error loading habits', type: 'error' });
+        setToast({ visible: true, message: 'No se pudieron cargar los hábitos', type: 'error' });
       }
     } catch (error) {
       console.error("Error fetching custom habits:", error);
-      setToast({ visible: true, message: 'Connection error', type: 'error' });
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
     }
   };
 
@@ -95,7 +95,7 @@ export default function CatH6Screen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading your habits...</Text>
+          <Text style={styles.loadingText}>Cargando tus hábitos...</Text>
         </View>
       </SafeAreaView>
     );
@@ -112,7 +112,7 @@ export default function CatH6Screen() {
           <View style={styles.headerIconContainer}>
             <Ionicons name="sparkles" size={20} color={colors.primary[600]} />
           </View>
-          <Text style={styles.headerTitle}>My Custom Habits</Text>
+          <Text style={styles.headerTitle}>Mis Hábitos Personalizados</Text>
         </View>
         <View style={{ width: 44 }} />
       </View>
@@ -131,9 +131,9 @@ export default function CatH6Screen() {
             <View style={styles.emptyIconContainer}>
               <Ionicons name="sparkles-outline" size={48} color={colors.neutral[300]} />
             </View>
-            <Text style={styles.emptyTitle}>No custom habits yet</Text>
+            <Text style={styles.emptyTitle}>No tienes hábitos personalizados</Text>
             <Text style={styles.emptySubtitle}>
-              Create your first personalized habit to start tracking your unique goals
+              Crea tu primer hábito personalizado para comenzar a seguir tus metas únicas
             </Text>
             <TouchableOpacity
               style={styles.emptyButton}
@@ -147,7 +147,7 @@ export default function CatH6Screen() {
                 style={styles.emptyButtonGradient}
               >
                 <Ionicons name="add" size={20} color={colors.neutral[0]} />
-                <Text style={styles.emptyButtonText}>Create Custom Habit</Text>
+                <Text style={styles.emptyButtonText}>Crear Hábito Personalizado</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -155,7 +155,7 @@ export default function CatH6Screen() {
           /* Habits List */
           <>
             <View style={styles.listHeader}>
-              <Text style={styles.listCount}>{habitos.length} habit{habitos.length !== 1 ? 's' : ''}</Text>
+              <Text style={styles.listCount}>{habitos.length} hábito{habitos.length !== 1 ? 's' : ''}</Text>
             </View>
 
             <View style={styles.habitsList}>
@@ -186,8 +186,8 @@ export default function CatH6Screen() {
                           <View style={styles.metaBadge}>
                             <Ionicons name="calendar-outline" size={12} color={colors.neutral[500]} />
                             <Text style={styles.metaBadgeText}>
-                              {habito.frecuencia_personal === 'diario' ? 'Daily' : 
-                               habito.frecuencia_personal === 'semanal' ? 'Weekly' : 'Monthly'}
+                              {habito.frecuencia_personal === 'diario' ? 'Diario' : 
+                               habito.frecuencia_personal === 'semanal' ? 'Semanal' : 'Mensual'}
                             </Text>
                           </View>
                         )}
@@ -205,7 +205,7 @@ export default function CatH6Screen() {
               onPress={() => router.push("/seccion_habitos/catHCustom")}
             >
               <Ionicons name="add-circle-outline" size={20} color={colors.primary[600]} />
-              <Text style={styles.addMoreText}>Create another custom habit</Text>
+              <Text style={styles.addMoreText}>Crear otro hábito personalizado</Text>
             </TouchableOpacity>
           </>
         )}

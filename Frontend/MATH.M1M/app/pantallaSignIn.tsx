@@ -70,32 +70,32 @@ export default function SignInScreen() {
 
   const handleRegister = async () => {
     if (!nombre.trim()) {
-      Alert.alert("Error", "Please enter your name");
+      Alert.alert("Error", "Por favor ingresa tu nombre");
       return;
     }
 
     if (!correo.trim()) {
-      Alert.alert("Error", "Please enter your email");
+      Alert.alert("Error", "Por favor ingresa tu correo");
       return;
     }
 
     if (!validateEmail(correo)) {
-      Alert.alert("Error", "Please enter a valid email");
+      Alert.alert("Error", "Por favor ingresa un correo válido");
       return;
     }
 
     if (!contraseña.trim()) {
-      Alert.alert("Error", "Please enter a password");
+      Alert.alert("Error", "Por favor ingresa una contraseña");
       return;
     }
 
     if (contraseña.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
     if (contraseña !== confirmarContraseña) {
-      Alert.alert("Error", "Passwords don't match");
+      Alert.alert("Error", "Las contraseñas no coinciden");
       return;
     }
 
@@ -113,10 +113,10 @@ export default function SignInScreen() {
         // El registro + login fueron exitosos, ir a bienvenida
         router.replace("/bienvenida");
       } else {
-        Alert.alert("Error", result.message || "Error creating account");
+        Alert.alert("Error", result.message || "Error al crear la cuenta");
       }
     } catch (error: any) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      Alert.alert("Error", "Algo salió mal. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -125,9 +125,9 @@ export default function SignInScreen() {
   // Password strength indicator
   const getPasswordStrength = () => {
     if (!contraseña) return { level: 0, text: "", color: colors.neutral[300] };
-    if (contraseña.length < 6) return { level: 1, text: "Weak", color: colors.semantic.error };
-    if (contraseña.length < 10) return { level: 2, text: "Fair", color: colors.semantic.warning };
-    return { level: 3, text: "Strong", color: colors.semantic.success };
+    if (contraseña.length < 6) return { level: 1, text: "Débil", color: colors.semantic.error };
+    if (contraseña.length < 10) return { level: 2, text: "Regular", color: colors.semantic.warning };
+    return { level: 3, text: "Fuerte", color: colors.semantic.success };
   };
 
   const passwordStrength = getPasswordStrength();
@@ -170,9 +170,9 @@ export default function SignInScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.title}>Crear cuenta</Text>
             <Text style={styles.subtitle}>
-              Start your journey to better habits today
+              Comienza tu camino hacia mejores hábitos hoy
             </Text>
           </View>
 
@@ -180,7 +180,7 @@ export default function SignInScreen() {
           <View style={styles.form}>
             {/* Name Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full name</Text>
+              <Text style={styles.label}>Nombre completo</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -195,7 +195,7 @@ export default function SignInScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="John Doe"
+                  placeholder="Tu nombre"
                   placeholderTextColor={colors.neutral[400]}
                   value={nombre}
                   onChangeText={setNombre}
@@ -208,7 +208,7 @@ export default function SignInScreen() {
 
             {/* Email Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>Correo electrónico</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -223,7 +223,7 @@ export default function SignInScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="your@email.com"
+                  placeholder="tucorreo@email.com"
                   placeholderTextColor={colors.neutral[400]}
                   keyboardType="email-address"
                   value={correo}
@@ -238,7 +238,7 @@ export default function SignInScreen() {
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>Contraseña</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -303,7 +303,7 @@ export default function SignInScreen() {
 
             {/* Confirm Password Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirm password</Text>
+              <Text style={styles.label}>Confirmar contraseña</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -342,7 +342,7 @@ export default function SignInScreen() {
                 </TouchableOpacity>
               </View>
               {confirmarContraseña.length > 0 && contraseña !== confirmarContraseña && (
-                <Text style={styles.errorText}>Passwords don't match</Text>
+                <Text style={styles.errorText}>Las contraseñas no coinciden</Text>
               )}
             </View>
 
@@ -354,16 +354,16 @@ export default function SignInScreen() {
               activeOpacity={0.9}
             >
               <Text style={styles.registerButtonText}>
-                {loading ? "Creating account..." : "Create Account"}
+                {loading ? "Creando cuenta..." : "Crear Cuenta"}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Login Link */}
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
+            <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
             <TouchableOpacity onPress={() => router.replace("/inicio")}>
-              <Text style={styles.loginLink}>Sign in</Text>
+              <Text style={styles.loginLink}>Inicia sesión</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

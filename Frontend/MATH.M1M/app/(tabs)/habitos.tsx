@@ -170,7 +170,7 @@ export default function HabitosScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading habits...</Text>
+          <Text style={styles.loadingText}>Cargando hábitos...</Text>
         </View>
       </SafeAreaView>
     );
@@ -181,7 +181,7 @@ export default function HabitosScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>My Habits</Text>
+          <Text style={styles.headerTitle}>Mis Hábitos</Text>
           <Text style={styles.headerSubtitle}>{month} {day}, {weekday}</Text>
         </View>
         <TouchableOpacity
@@ -214,7 +214,7 @@ export default function HabitosScreen() {
             <Text style={[styles.statNumber, { color: colors.secondary[600] }]}>
               {estadisticas.completados}
             </Text>
-            <Text style={styles.statLabel}>Completed</Text>
+            <Text style={styles.statLabel}>Completados</Text>
           </View>
 
           <View style={[styles.statCard, { backgroundColor: colors.accent.amber + "15" }]}>
@@ -224,7 +224,7 @@ export default function HabitosScreen() {
             <Text style={[styles.statNumber, { color: colors.accent.amber }]}>
               {estadisticas.pendientes}
             </Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statLabel}>Pendientes</Text>
           </View>
         </View>
 
@@ -232,7 +232,7 @@ export default function HabitosScreen() {
         {habitos.length > 0 && (
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Today's Progress</Text>
+              <Text style={styles.progressTitle}>Progreso de Hoy</Text>
               <Text style={styles.progressPercent}>{progress}%</Text>
             </View>
             <View style={styles.progressBarBg}>
@@ -252,9 +252,9 @@ export default function HabitosScreen() {
             <View style={styles.emptyIconContainer}>
               <Ionicons name="leaf-outline" size={48} color={colors.neutral[300]} />
             </View>
-            <Text style={styles.emptyTitle}>No habits yet</Text>
+            <Text style={styles.emptyTitle}>Sin hábitos aún</Text>
             <Text style={styles.emptySubtitle}>
-              Start building better habits today
+              Empieza a construir mejores hábitos hoy
             </Text>
             <TouchableOpacity
               style={styles.createButton}
@@ -262,13 +262,13 @@ export default function HabitosScreen() {
             >
               <LinearGradient colors={colors.gradients.secondary} style={styles.createButtonGradient}>
                 <Ionicons name="add" size={20} color={colors.neutral[0]} />
-                <Text style={styles.createButtonText}>Create new habit</Text>
+                <Text style={styles.createButtonText}>Crear nuevo hábito</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.habitsSection}>
-            <Text style={styles.sectionTitle}>Today's Habits</Text>
+            <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
             {habitos.map((habito) => (
               <View
                 key={habito.habito_usuario_id}
@@ -307,7 +307,7 @@ export default function HabitosScreen() {
                       {habito.categoria_nombre === "My Custom Habits" && (
                         <View style={styles.customBadge}>
                           <Ionicons name="sparkles" size={10} color={colors.primary[600]} />
-                          <Text style={styles.customBadgeText}>Custom</Text>
+                          <Text style={styles.customBadgeText}>Personal</Text>
                         </View>
                       )}
                     </View>
@@ -320,7 +320,7 @@ export default function HabitosScreen() {
                     </View>
                     {habito.completado_hoy && habito.hora_completado && (
                       <Text style={styles.habitCompletedTime}>
-                        Completed at {habito.hora_completado.slice(0, 5)}
+                        Completado a las {habito.hora_completado.slice(0, 5)}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -337,7 +337,7 @@ export default function HabitosScreen() {
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
               <Ionicons name="add-circle-outline" size={20} color={colors.primary[600]} />
-              <Text style={styles.addMoreText}>Add more habits</Text>
+              <Text style={styles.addMoreText}>Agregar más hábitos</Text>
             </TouchableOpacity>
           </View>
         )}

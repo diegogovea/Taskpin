@@ -27,8 +27,8 @@ interface CategoryItem {
 const categories: CategoryItem[] = [
   {
     id: "1",
-    title: "Health & Wellness",
-    description: "Fitness, nutrition, and self-care plans",
+    title: "Salud y Bienestar",
+    description: "Planes de fitness, nutrición y autocuidado",
     icon: "heart",
     route: "/seccion_planes/bienestarYSalud",
     gradient: [colors.secondary[100], colors.secondary[50]],
@@ -37,8 +37,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "2",
-    title: "Personal Finance",
-    description: "Savings, budgeting, and financial goals",
+    title: "Finanzas Personales",
+    description: "Ahorro, presupuesto y metas financieras",
     icon: "wallet",
     route: "/",
     gradient: [colors.accent.amber + "30", colors.accent.amber + "15"],
@@ -47,8 +47,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "3",
-    title: "Personal Development",
-    description: "Skills, learning, and growth plans",
+    title: "Desarrollo Personal",
+    description: "Planes de habilidades, aprendizaje y crecimiento",
     icon: "rocket",
     route: "/",
     gradient: [colors.primary[100], colors.primary[50]],
@@ -57,8 +57,8 @@ const categories: CategoryItem[] = [
   },
   {
     id: "4",
-    title: "Career Growth",
-    description: "Professional development plans",
+    title: "Crecimiento Profesional",
+    description: "Planes de desarrollo profesional",
     icon: "briefcase",
     route: "/",
     gradient: [colors.accent.cyan + "30", colors.accent.cyan + "15"],
@@ -90,9 +90,9 @@ export default function TiposPlanesScreen() {
       >
         {/* Title */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Choose a Plan</Text>
+          <Text style={styles.title}>Elige un Plan</Text>
           <Text style={styles.subtitle}>
-            Select a category to explore available plans that match your goals
+            Selecciona una categoría para explorar planes disponibles que coincidan con tus metas
           </Text>
         </View>
 
@@ -111,8 +111,8 @@ export default function TiposPlanesScreen() {
               <Ionicons name="create" size={24} color={colors.neutral[0]} />
             </View>
             <View style={styles.customPlanText}>
-              <Text style={styles.customPlanTitle}>Create Custom Plan</Text>
-              <Text style={styles.customPlanSubtitle}>Design your own plan from scratch</Text>
+              <Text style={styles.customPlanTitle}>Crear Plan Personalizado</Text>
+              <Text style={styles.customPlanSubtitle}>Diseña tu propio plan desde cero</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.neutral[0]} />
           </LinearGradient>
@@ -121,7 +121,7 @@ export default function TiposPlanesScreen() {
         {/* Divider */}
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or browse categories</Text>
+          <Text style={styles.dividerText}>o explora categorías</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -169,7 +169,7 @@ export default function TiposPlanesScreen() {
                       </Text>
                       {!category.available && (
                         <View style={styles.comingSoonBadge}>
-                          <Text style={styles.comingSoonText}>Coming Soon</Text>
+                          <Text style={styles.comingSoonText}>Próximamente</Text>
                         </View>
                       )}
                     </View>

@@ -113,7 +113,7 @@ export default function SeguimientoPlanScreen() {
       }
     } catch (error) {
       console.error("Error fetching dashboard:", error);
-      Alert.alert("Error", "Could not load plan data");
+      Alert.alert("Error", "No se pudieron cargar los datos del plan");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -139,21 +139,21 @@ export default function SeguimientoPlanScreen() {
         setAccionPendiente(null);
         
         if (nuevoEstado === "cancelado") {
-          Alert.alert("Plan Cancelled", "The plan has been cancelled.", [
+          Alert.alert("Plan Cancelado", "El plan ha sido cancelado.", [
             { text: "OK", onPress: () => router.replace("/(tabs)/planes") }
           ]);
         } else if (nuevoEstado === "pausado") {
-          Alert.alert("Plan Paused", "You can resume this plan anytime.");
+          Alert.alert("Plan Pausado", "Puedes reanudar este plan cuando quieras.");
           fetchDashboard();
         } else if (nuevoEstado === "activo") {
-          Alert.alert("Plan Resumed", "Your plan is active again!");
+          Alert.alert("Plan Reanudado", "¡Tu plan está activo de nuevo!");
           fetchDashboard();
         }
       } else {
-        Alert.alert("Error", data.message || "Could not update plan status");
+        Alert.alert("Error", data.message || "No se pudo actualizar el estado del plan");
       }
     } catch (error) {
-      Alert.alert("Error", "Connection error");
+      Alert.alert("Error", "Error de conexión");
     } finally {
       setProcesandoAccion(false);
     }
@@ -177,30 +177,30 @@ export default function SeguimientoPlanScreen() {
     switch (accionPendiente) {
       case "pausar":
         return {
-          title: "Pause Plan?",
-          message: "Your progress will be saved. You can resume this plan anytime.",
-          confirmText: "Pause",
+          title: "¿Pausar Plan?",
+          message: "Tu progreso será guardado. Puedes reanudar este plan cuando quieras.",
+          confirmText: "Pausar",
           icon: "pause-circle" as const,
           danger: false,
         };
       case "reanudar":
         return {
-          title: "Resume Plan?",
-          message: "Ready to continue your journey? Let's get back on track!",
-          confirmText: "Resume",
+          title: "¿Reanudar Plan?",
+          message: "¿Listo para continuar tu camino? ¡Volvamos a la pista!",
+          confirmText: "Reanudar",
           icon: "play-circle" as const,
           danger: false,
         };
       case "cancelar":
         return {
-          title: "Cancel Plan?",
-          message: "This action cannot be undone. All progress will be lost.",
-          confirmText: "Cancel Plan",
+          title: "¿Cancelar Plan?",
+          message: "Esta acción no se puede deshacer. Todo el progreso se perderá.",
+          confirmText: "Cancelar Plan",
           icon: "close-circle" as const,
           danger: true,
         };
       default:
-        return { title: "", message: "", confirmText: "Confirm", icon: "help-circle" as const, danger: false };
+        return { title: "", message: "", confirmText: "Confirmar", icon: "help-circle" as const, danger: false };
     }
   };
 
@@ -236,10 +236,10 @@ export default function SeguimientoPlanScreen() {
           };
         });
       } else {
-        Alert.alert("Error", result.message || "Could not update task");
+        Alert.alert("Error", result.message || "No se pudo actualizar la tarea");
       }
     } catch (error) {
-      Alert.alert("Error", "Connection error");
+      Alert.alert("Error", "Error de conexión");
     } finally {
       setTogglingTask(null);
     }
@@ -273,10 +273,10 @@ export default function SeguimientoPlanScreen() {
           };
         });
       } else {
-        Alert.alert("Error", result.message || "Could not update habit");
+        Alert.alert("Error", result.message || "No se pudo actualizar el hábito");
       }
     } catch (error) {
-      Alert.alert("Error", "Connection error");
+      Alert.alert("Error", "Error de conexión");
     } finally {
       setTogglingHabit(null);
     }
@@ -318,7 +318,7 @@ export default function SeguimientoPlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading your progress...</Text>
+          <Text style={styles.loadingText}>Cargando tu progreso...</Text>
         </View>
       </SafeAreaView>
     );
@@ -329,7 +329,7 @@ export default function SeguimientoPlanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
-          <Text style={styles.loadingText}>Could not load plan</Text>
+          <Text style={styles.loadingText}>No se pudo cargar el plan</Text>
         </View>
       </SafeAreaView>
     );
@@ -378,11 +378,11 @@ export default function SeguimientoPlanScreen() {
               <Ionicons name="pause-circle" size={24} color={colors.accent.amber} />
             </View>
             <View style={styles.statusBannerContent}>
-              <Text style={styles.statusBannerTitle}>Plan Paused</Text>
-              <Text style={styles.statusBannerText}>Your progress is saved</Text>
+              <Text style={styles.statusBannerTitle}>Plan Pausado</Text>
+              <Text style={styles.statusBannerText}>Tu progreso está guardado</Text>
             </View>
             <TouchableOpacity style={styles.statusBannerButton} onPress={() => handleAccion("reanudar")}>
-              <Text style={styles.statusBannerButtonText}>Resume</Text>
+              <Text style={styles.statusBannerButtonText}>Reanudar</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -393,8 +393,8 @@ export default function SeguimientoPlanScreen() {
               <Ionicons name="close-circle" size={24} color={colors.semantic.error} />
             </View>
             <View style={styles.statusBannerContent}>
-              <Text style={[styles.statusBannerTitle, { color: colors.semantic.error }]}>Plan Cancelled</Text>
-              <Text style={styles.statusBannerText}>This plan is no longer active</Text>
+              <Text style={[styles.statusBannerTitle, { color: colors.semantic.error }]}>Plan Cancelado</Text>
+              <Text style={styles.statusBannerText}>Este plan ya no está activo</Text>
             </View>
           </View>
         )}
@@ -412,12 +412,12 @@ export default function SeguimientoPlanScreen() {
             <View style={styles.phaseBannerHeader}>
               <View style={styles.phaseBadge}>
                 <Text style={styles.phaseBadgeText}>
-                  Phase {dashboard.fase_actual.orden_fase}/{dashboard.fase_actual.total_fases}
+                  Fase {dashboard.fase_actual.orden_fase}/{dashboard.fase_actual.total_fases}
                 </Text>
               </View>
               <View style={styles.dayBadge}>
                 <Ionicons name="calendar-outline" size={14} color={colors.neutral[0]} />
-                <Text style={styles.dayBadgeText}>Day {dashboard.progreso_general.dias_transcurridos}</Text>
+                <Text style={styles.dayBadgeText}>Día {dashboard.progreso_general.dias_transcurridos}</Text>
               </View>
             </View>
 
@@ -432,7 +432,7 @@ export default function SeguimientoPlanScreen() {
             <View style={styles.phaseProgressContainer}>
               <View style={styles.phaseProgressInfo}>
                 <Text style={styles.phaseProgressText}>
-                  Day {dashboard.fase_actual.dia_en_fase} of {dashboard.fase_actual.duracion_fase}
+                  Día {dashboard.fase_actual.dia_en_fase} de {dashboard.fase_actual.duracion_fase}
                 </Text>
                 <Text style={styles.phaseProgressPercent}>{dashboard.fase_actual.porcentaje_fase}%</Text>
               </View>
@@ -454,17 +454,17 @@ export default function SeguimientoPlanScreen() {
             <View style={[styles.quickActionIcon, { backgroundColor: colors.primary[100] }]}>
               <Ionicons name="git-branch-outline" size={18} color={colors.primary[600]} />
             </View>
-            <Text style={styles.quickActionText}>Timeline</Text>
+            <Text style={styles.quickActionText}>Línea de tiempo</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.quickActionBtn}
-            onPress={() => Alert.alert('Coming Soon', 'Plan statistics will be available in a future update.')}
+            onPress={() => Alert.alert('Próximamente', 'Las estadísticas del plan estarán disponibles en una futura actualización.')}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
               <Ionicons name="stats-chart-outline" size={18} color={colors.secondary[600]} />
             </View>
-            <Text style={styles.quickActionText}>Stats</Text>
+            <Text style={styles.quickActionText}>Estadísticas</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -474,7 +474,7 @@ export default function SeguimientoPlanScreen() {
             <View style={[styles.quickActionIcon, { backgroundColor: colors.neutral[100] }]}>
               <Ionicons name="settings-outline" size={18} color={colors.neutral[600]} />
             </View>
-            <Text style={styles.quickActionText}>Options</Text>
+            <Text style={styles.quickActionText}>Opciones</Text>
           </TouchableOpacity>
         </View>
 
@@ -485,7 +485,7 @@ export default function SeguimientoPlanScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="checkbox-outline" size={20} color={colors.primary[600]} />
-              <Text style={styles.sectionTitle}>Today's Tasks</Text>
+              <Text style={styles.sectionTitle}>Tareas de Hoy</Text>
             </View>
             <View style={styles.sectionBadge}>
               <Text style={styles.sectionBadgeText}>
@@ -497,7 +497,7 @@ export default function SeguimientoPlanScreen() {
           {dashboard.tareas_hoy.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="checkmark-done-circle" size={40} color={colors.secondary[400]} />
-              <Text style={styles.emptyTitle}>No tasks for today</Text>
+              <Text style={styles.emptyTitle}>Sin tareas para hoy</Text>
             </View>
           ) : (
             <View style={styles.itemsList}>
@@ -541,7 +541,7 @@ export default function SeguimientoPlanScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <Ionicons name="refresh" size={20} color={colors.secondary[600]} />
-                <Text style={styles.sectionTitle}>Plan Habits</Text>
+                <Text style={styles.sectionTitle}>Hábitos del Plan</Text>
               </View>
               <View style={[styles.sectionBadge, { backgroundColor: colors.secondary[100] }]}>
                 <Text style={[styles.sectionBadgeText, { color: colors.secondary[600] }]}>
@@ -585,7 +585,7 @@ export default function SeguimientoPlanScreen() {
         {dashboard.habitos_plan.length === 0 && (
           <View style={styles.noHabitsCard}>
             <Ionicons name="leaf-outline" size={24} color={colors.neutral[400]} />
-            <Text style={styles.noHabitsText}>No habits linked to this plan</Text>
+            <Text style={styles.noHabitsText}>Sin hábitos vinculados a este plan</Text>
           </View>
         )}
 
@@ -599,8 +599,8 @@ export default function SeguimientoPlanScreen() {
               style={styles.completionGradient}
             >
               <Ionicons name="trophy" size={32} color={colors.neutral[0]} />
-              <Text style={styles.completionTitle}>Great job today! 🎉</Text>
-              <Text style={styles.completionText}>You've completed all tasks and habits</Text>
+              <Text style={styles.completionTitle}>¡Excelente trabajo hoy! 🎉</Text>
+              <Text style={styles.completionText}>Has completado todas las tareas y hábitos</Text>
             </LinearGradient>
           </View>
         )}
@@ -613,7 +613,7 @@ export default function SeguimientoPlanScreen() {
         <Pressable style={styles.actionMenuOverlay} onPress={() => setShowActionMenu(false)}>
           <View style={styles.actionMenuContainer}>
             <View style={styles.actionMenuHeader}>
-              <Text style={styles.actionMenuTitle}>Plan Options</Text>
+              <Text style={styles.actionMenuTitle}>Opciones del Plan</Text>
             </View>
             
             {estadoPlan === "activo" && (
@@ -622,8 +622,8 @@ export default function SeguimientoPlanScreen() {
                   <Ionicons name="pause-circle" size={22} color={colors.accent.amber} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={styles.actionMenuItemText}>Pause Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Take a break, resume anytime</Text>
+                  <Text style={styles.actionMenuItemText}>Pausar Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Toma un descanso, reanuda cuando quieras</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -634,8 +634,8 @@ export default function SeguimientoPlanScreen() {
                   <Ionicons name="play-circle" size={22} color={colors.secondary[500]} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={styles.actionMenuItemText}>Resume Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Continue your journey</Text>
+                  <Text style={styles.actionMenuItemText}>Reanudar Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Continúa tu camino</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -646,14 +646,14 @@ export default function SeguimientoPlanScreen() {
                   <Ionicons name="close-circle" size={22} color={colors.semantic.error} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>Cancel Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>This cannot be undone</Text>
+                  <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>Cancelar Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Esto no se puede deshacer</Text>
                 </View>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={styles.actionMenuCloseButton} onPress={() => setShowActionMenu(false)}>
-              <Text style={styles.actionMenuCloseText}>Close</Text>
+              <Text style={styles.actionMenuCloseText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -665,7 +665,7 @@ export default function SeguimientoPlanScreen() {
         title={getModalConfig().title}
         message={getModalConfig().message}
         confirmText={getModalConfig().confirmText}
-        cancelText="Go Back"
+        cancelText="Volver"
         icon={getModalConfig().icon}
         danger={getModalConfig().danger}
         isLoading={procesandoAccion}

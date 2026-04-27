@@ -47,56 +47,56 @@ export default function PerfilScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
 
-  // Achievements basados en stats
+  // Logros basados en stats
   const getAchievements = (): Achievement[] => {
     return [
       {
         id: "first_habit",
-        name: "First Step",
+        name: "Primer Paso",
         icon: "footsteps",
         color: colors.secondary[500],
         unlocked: stats.totalHabits >= 1,
-        description: "Create your first habit",
+        description: "Crea tu primer hábito",
       },
       {
         id: "streak_7",
-        name: "Week Warrior",
+        name: "Guerrero Semanal",
         icon: "flame",
         color: colors.accent.amber,
         unlocked: stats.streak >= 7,
-        description: "7 day streak",
+        description: "7 días de racha",
       },
       {
         id: "streak_30",
-        name: "Monthly Master",
+        name: "Maestro Mensual",
         icon: "calendar",
         color: colors.primary[600],
         unlocked: stats.streak >= 30,
-        description: "30 day streak",
+        description: "30 días de racha",
       },
       {
         id: "points_100",
-        name: "Point Collector",
+        name: "Coleccionista",
         icon: "diamond",
         color: colors.accent.cyan,
         unlocked: stats.totalPoints >= 100,
-        description: "Earn 100 points",
+        description: "Gana 100 puntos",
       },
       {
         id: "points_500",
-        name: "Point Hunter",
+        name: "Cazador de Puntos",
         icon: "trophy",
         color: colors.accent.rose,
         unlocked: stats.totalPoints >= 500,
-        description: "Earn 500 points",
+        description: "Gana 500 puntos",
       },
       {
         id: "habits_5",
-        name: "Habit Builder",
+        name: "Constructor",
         icon: "construct",
         color: colors.secondary[600],
         unlocked: stats.totalHabits >= 5,
-        description: "Track 5 habits",
+        description: "Sigue 5 hábitos",
       },
     ];
   };
@@ -171,12 +171,12 @@ export default function PerfilScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
+      "Cerrar Sesión",
+      "¿Estás seguro de que quieres cerrar sesión?",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancelar", style: "cancel" },
         { 
-          text: "Log Out", 
+          text: "Cerrar Sesión", 
           style: "destructive",
           onPress: async () => {
             await logout();
@@ -206,7 +206,7 @@ export default function PerfilScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>Perfil</Text>
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => router.push("/configuracion")}
@@ -239,7 +239,7 @@ export default function PerfilScreen() {
                   <Ionicons name="flame" size={18} color={colors.accent.amber} />
                 </View>
                 <Text style={styles.statValue}>{stats.streak}</Text>
-                <Text style={styles.statLabel}>Streak</Text>
+                <Text style={styles.statLabel}>Racha</Text>
               </View>
               
               <View style={styles.statDivider} />
@@ -249,7 +249,7 @@ export default function PerfilScreen() {
                   <Ionicons name="diamond" size={18} color={colors.accent.cyan} />
                 </View>
                 <Text style={styles.statValue}>{stats.totalPoints}</Text>
-                <Text style={styles.statLabel}>Points</Text>
+                <Text style={styles.statLabel}>Puntos</Text>
               </View>
               
               <View style={styles.statDivider} />
@@ -259,7 +259,7 @@ export default function PerfilScreen() {
                   <Ionicons name="trophy" size={18} color={colors.accent.amber} />
                 </View>
                 <Text style={styles.statValue}>{stats.level}</Text>
-                <Text style={styles.statLabel}>Level</Text>
+                <Text style={styles.statLabel}>Nivel</Text>
               </View>
             </View>
 
@@ -269,7 +269,7 @@ export default function PerfilScreen() {
                 <View style={[styles.levelProgressFill, { width: `${getLevelProgress()}%` }]} />
               </View>
               <Text style={styles.levelProgressText}>
-                {Math.round(getLevelProgress())}% to Level {stats.level + 1}
+                {Math.round(getLevelProgress())}% para Nivel {stats.level + 1}
               </Text>
             </View>
           </LinearGradient>
@@ -279,15 +279,15 @@ export default function PerfilScreen() {
         <View style={styles.todayCard}>
           <View style={styles.todayHeader}>
             <Ionicons name="today" size={20} color={colors.primary[600]} />
-            <Text style={styles.todayTitle}>Today's Progress</Text>
+            <Text style={styles.todayTitle}>Progreso de Hoy</Text>
           </View>
           <View style={styles.todayContent}>
             <View style={styles.todayStats}>
               <Text style={styles.todayNumber}>{stats.completedToday}</Text>
-              <Text style={styles.todayOf}>of</Text>
+              <Text style={styles.todayOf}>de</Text>
               <Text style={styles.todayNumber}>{stats.totalHabits}</Text>
             </View>
-            <Text style={styles.todayLabel}>habits completed</Text>
+            <Text style={styles.todayLabel}>hábitos completados</Text>
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBar}>
                 <LinearGradient
@@ -305,8 +305,8 @@ export default function PerfilScreen() {
         {/* Achievements */}
         <View style={styles.achievementsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            <Text style={styles.sectionSubtitle}>{unlockedCount} of {achievements.length} unlocked</Text>
+            <Text style={styles.sectionTitle}>Logros</Text>
+            <Text style={styles.sectionSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
           </View>
           <View style={styles.achievementsGrid}>
             {achievements.map((achievement) => (
@@ -350,7 +350,7 @@ export default function PerfilScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="log-out-outline" size={22} color={colors.semantic.error} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />

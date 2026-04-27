@@ -130,9 +130,9 @@ export default function LoginScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.title}>Bienvenido de nuevo</Text>
             <Text style={styles.subtitle}>
-              Sign in to continue building your habits
+              Inicia sesión para continuar construyendo tus hábitos
             </Text>
           </View>
 
@@ -140,7 +140,7 @@ export default function LoginScreen() {
           <View style={styles.form}>
             {/* Email Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>Correo electrónico</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -155,7 +155,7 @@ export default function LoginScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="your@email.com"
+                  placeholder="tucorreo@email.com"
                   placeholderTextColor={colors.neutral[400]}
                   value={correo}
                   onChangeText={setCorreo}
@@ -170,7 +170,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>Contraseña</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -209,7 +209,7 @@ export default function LoginScreen() {
 
             {/* Forgot Password */}
             <TouchableOpacity style={styles.forgotButton}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
+              <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
 
             {/* Login Button */}
@@ -220,14 +220,14 @@ export default function LoginScreen() {
               activeOpacity={0.9}
             >
               <Text style={styles.loginButtonText}>
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </Text>
             </TouchableOpacity>
 
             {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={styles.dividerText}>o</Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -244,9 +244,9 @@ export default function LoginScreen() {
 
           {/* Register Link */}
           <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
+            <Text style={styles.registerText}>¿No tienes cuenta? </Text>
             <TouchableOpacity onPress={() => router.push("/pantallaSignIn")}>
-              <Text style={styles.registerLink}>Sign up</Text>
+              <Text style={styles.registerLink}>Regístrate</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
