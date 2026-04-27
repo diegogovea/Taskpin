@@ -15,7 +15,7 @@ DATABASE_NAME = os.getenv('DATABASE_NAME', 'taskpin')
 DATABASE_USER = os.getenv('DATABASE_USER', 'postgres')
 DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD', '123456')
 DATABASE_HOST = os.getenv('DATABASE_HOST', 'localhost')
-DATABASE_PORT = os.getenv('DATABASE_PORT', '5433')
+DATABASE_PORT = os.getenv('DATABASE_PORT', '5432')
 
 # Connection string para psycopg
 DATABASE_URL = f"dbname={DATABASE_NAME} user={DATABASE_USER} password={DATABASE_PASSWORD} host={DATABASE_HOST} port={DATABASE_PORT}"
