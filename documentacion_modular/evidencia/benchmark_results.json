@@ -1,0 +1,197 @@
+{
+  "metadata": {
+    "generado_en": "2026-04-27T17:47:59.709241",
+    "script": "Backend/scripts/benchmark.py",
+    "base_url": "http://127.0.0.1:8000",
+    "repeticiones": 50,
+    "concurrentes": 20
+  },
+  "benchmark_secuencial": {
+    "GET /test": {
+      "min_ms": 6.18,
+      "max_ms": 12.59,
+      "mean_ms": 7.09,
+      "median_ms": 6.66,
+      "p50_ms": 6.66,
+      "p95_ms": 9.69,
+      "p99_ms": 11.34,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "POST /login": {
+      "min_ms": 239.71,
+      "max_ms": 347.51,
+      "mean_ms": 246.89,
+      "median_ms": 242.25,
+      "p50_ms": 242.25,
+      "p95_ms": 266.42,
+      "p99_ms": 323.06,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /api/current-user": {
+      "min_ms": 4.66,
+      "max_ms": 17.12,
+      "mean_ms": 5.82,
+      "median_ms": 5.22,
+      "p50_ms": 5.22,
+      "p95_ms": 8.43,
+      "p99_ms": 14.63,
+      "samples": 50,
+      "success_rate": 0.0
+    },
+    "GET /habitos/hoy": {
+      "min_ms": 6.53,
+      "max_ms": 13.18,
+      "mean_ms": 7.83,
+      "median_ms": 7.38,
+      "p50_ms": 7.38,
+      "p95_ms": 10.2,
+      "p99_ms": 11.98,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /estadisticas": {
+      "min_ms": 5.98,
+      "max_ms": 24.99,
+      "mean_ms": 7.69,
+      "median_ms": 6.72,
+      "p50_ms": 6.72,
+      "p95_ms": 10.4,
+      "p99_ms": 21.07,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /ai/predicciones": {
+      "min_ms": 5.44,
+      "max_ms": 298.4,
+      "mean_ms": 12.06,
+      "median_ms": 6.07,
+      "p50_ms": 6.07,
+      "p95_ms": 9.51,
+      "p99_ms": 157.0,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /ai/recomendaciones": {
+      "min_ms": 5.47,
+      "max_ms": 24.33,
+      "mean_ms": 6.67,
+      "median_ms": 6.1,
+      "p50_ms": 6.1,
+      "p95_ms": 9.22,
+      "p99_ms": 17.25,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /api/system/health": {
+      "min_ms": 1013.59,
+      "max_ms": 1050.39,
+      "mean_ms": 1022.97,
+      "median_ms": 1023.14,
+      "p50_ms": 1023.14,
+      "p95_ms": 1035.81,
+      "p99_ms": 1044.67,
+      "samples": 50,
+      "success_rate": 100.0
+    },
+    "GET /api/system/redis/status": {
+      "min_ms": 5.59,
+      "max_ms": 13.92,
+      "mean_ms": 6.63,
+      "median_ms": 6.08,
+      "p50_ms": 6.08,
+      "p95_ms": 9.69,
+      "p99_ms": 12.77,
+      "samples": 50,
+      "success_rate": 100.0
+    }
+  },
+  "benchmark_concurrente": [
+    {
+      "endpoint": "GET /test",
+      "concurrent": 20,
+      "rps": 277.2,
+      "errors": 0,
+      "latency": {
+        "min_ms": 5.55,
+        "max_ms": 70.45,
+        "mean_ms": 41.49,
+        "median_ms": 36.77,
+        "p50_ms": 36.77,
+        "p95_ms": 69.55,
+        "p99_ms": 70.27,
+        "samples": 20
+      },
+      "total_time_s": 0.072
+    },
+    {
+      "endpoint": "GET /habitos/hoy",
+      "concurrent": 20,
+      "rps": 280.7,
+      "errors": 0,
+      "latency": {
+        "min_ms": 17.88,
+        "max_ms": 69.06,
+        "mean_ms": 53.79,
+        "median_ms": 56.07,
+        "p50_ms": 56.07,
+        "p95_ms": 68.72,
+        "p99_ms": 68.99,
+        "samples": 20
+      },
+      "total_time_s": 0.071
+    },
+    {
+      "endpoint": "GET /ai/predicciones",
+      "concurrent": 20,
+      "rps": 878.3,
+      "errors": 0,
+      "latency": {
+        "min_ms": 4.4,
+        "max_ms": 20.83,
+        "mean_ms": 15.34,
+        "median_ms": 15.94,
+        "p50_ms": 15.94,
+        "p95_ms": 20.38,
+        "p99_ms": 20.74,
+        "samples": 20
+      },
+      "total_time_s": 0.023
+    },
+    {
+      "endpoint": "GET /ai/recomendaciones",
+      "concurrent": 20,
+      "rps": 944.5,
+      "errors": 0,
+      "latency": {
+        "min_ms": 5.16,
+        "max_ms": 18.47,
+        "mean_ms": 14.6,
+        "median_ms": 15.32,
+        "p50_ms": 15.32,
+        "p95_ms": 18.03,
+        "p99_ms": 18.38,
+        "samples": 20
+      },
+      "total_time_s": 0.021
+    },
+    {
+      "endpoint": "GET /api/system/health",
+      "concurrent": 20,
+      "rps": 4.8,
+      "errors": 0,
+      "latency": {
+        "min_ms": 1027.37,
+        "max_ms": 4123.86,
+        "mean_ms": 2509.06,
+        "median_ms": 2608.92,
+        "p50_ms": 2608.92,
+        "p95_ms": 4122.92,
+        "p99_ms": 4123.68,
+        "samples": 20
+      },
+      "total_time_s": 4.126
+    }
+  ]
+}

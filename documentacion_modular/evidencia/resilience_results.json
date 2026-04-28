@@ -1,0 +1,199 @@
+{
+  "metadata": {
+    "generado_en": "2026-04-27T17:49:12.203942",
+    "script": "Backend/scripts/test_resilience.py",
+    "base_url": "http://127.0.0.1:8000",
+    "redis_activo": true,
+    "postgres_activo": true,
+    "celery_activo": false
+  },
+  "resultados": [
+    {
+      "test": "T1 - Health check general",
+      "system_status": "healthy",
+      "postgresql": {
+        "status": "connected",
+        "test": "81 users"
+      },
+      "redis": {
+        "status": "connected",
+        "db": 1,
+        "keys": 2,
+        "memory": "1.25M"
+      },
+      "celery": {
+        "status": "no_workers",
+        "note": "Start worker with: celery -A app.tasks.celery_app worker"
+      }
+    },
+    {
+      "test": "GET /habitos/hoy",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "27.7 ms",
+      "body_summary": "{'success': True, 'data': {'habitos': [{'habito_usuario_id': 7, 'user_id': 1, 'habito_id': 4, 'nombre': 'Dormir sin usar el celular al menos 30 min antes', 'descripcion': 'Descansar sin pantallas ante"
+    },
+    {
+      "test": "GET /ai/predicciones/hoy",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "10.1 ms",
+      "body_summary": "{'success': True, 'user_id': 1, 'fecha': '2026-04-27', 'total_habitos': 8, 'predicciones': [{'habito_usuario_id': 1, 'habito_id': 2, 'nombre': 'Salir 10 minutos a tomar aire fresco', 'probabilidad': 0"
+    },
+    {
+      "test": "GET /ai/recomendaciones",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "8.7 ms",
+      "body_summary": "{'success': True, 'user_id': 1, 'total_recomendaciones': 5, 'recomendaciones': [{'habito_id': 14, 'nombre': 'Aprender un dato curioso nuevo', 'descripcion': 'Descubrir algo nuevo e interesante', 'cate"
+    },
+    {
+      "test": "GET /estadisticas",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "10.9 ms",
+      "body_summary": "{'success': True, 'data': {'puntos_totales': 186, 'racha_actual': 1, 'racha_maxima': 2, 'nivel': 2, 'ultima_actividad': '2026-02-06', 'progreso_siguiente_nivel': 100}}"
+    },
+    {
+      "test": "GET /api/system/health",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "1016.2 ms",
+      "body_summary": "{'status': 'healthy', 'services': {'postgresql': {'status': 'connected', 'test': '81 users'}, 'redis': {'status': 'connected', 'db': 1, 'keys': 2, 'memory': '1.26M'}, 'celery': {'status': 'no_workers'"
+    },
+    {
+      "test": "GET /api/system/redis/status",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "16.7 ms",
+      "body_summary": "{'success': True, 'redis': {'connected': True, 'host': 'localhost', 'port': 6379, 'db': 1, 'taskpin_keys': 2, 'used_memory': '1.26M', 'connected_clients': 5}}"
+    },
+    {
+      "test": "GET /api/system/websocket/status",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "10.5 ms",
+      "body_summary": "{'success': True, 'websocket': {'total_connections': 0, 'total_users': 0, 'connected_user_ids': []}}"
+    },
+    {
+      "test": "GET /api/system/celery/status",
+      "http_status": 200,
+      "expected": [
+        200
+      ],
+      "passed": true,
+      "note": "1012.7 ms",
+      "body_summary": "{'success': True, 'celery': {'status': 'no_workers', 'note': 'Celery configured but no workers running'}}"
+    },
+    {
+      "test": "Login credenciales incorrectas",
+      "http_status": 401,
+      "expected": [
+        401
+      ],
+      "passed": true,
+      "note": "9.0 ms — Credenciales incorrectas",
+      "body_summary": "{'detail': 'Credenciales incorrectas'}"
+    },
+    {
+      "test": "Acceso a usuario ajeno (seguridad)",
+      "http_status": 403,
+      "expected": [
+        403
+      ],
+      "passed": true,
+      "note": "11.7 ms — No tienes permiso para acceder a estos datos",
+      "body_summary": "{'detail': 'No tienes permiso para acceder a estos datos'}"
+    },
+    {
+      "test": "Hábito inexistente",
+      "http_status": 404,
+      "expected": [
+        404,
+        422
+      ],
+      "passed": true,
+      "note": "10.2 ms — Hábito no encontrado",
+      "body_summary": "{'detail': 'Hábito no encontrado'}"
+    },
+    {
+      "test": "Predicción sin hábito",
+      "http_status": 404,
+      "expected": [
+        200,
+        404
+      ],
+      "passed": true,
+      "note": "8.3 ms — Hábito no encontrado",
+      "body_summary": "{'detail': 'Hábito no encontrado'}"
+    },
+    {
+      "test": "Token inválido",
+      "http_status": 401,
+      "expected": [
+        401,
+        403
+      ],
+      "passed": true,
+      "note": "5.9 ms — Token inválido o expirado: Not enough segments",
+      "body_summary": "{'detail': 'Token inválido o expirado: Not enough segments'}"
+    },
+    {
+      "test": "T4 - Caché Predicciones (TTL 30 min)",
+      "primera_llamada_ms": 6.3,
+      "segunda_llamada_ms": 6.3,
+      "speedup_x": 1.0,
+      "cache_activo": true,
+      "segunda_mas_rapida": false
+    },
+    {
+      "test": "T4 - Caché Recomendaciones (TTL 60 min)",
+      "primera_llamada_ms": 6.2,
+      "segunda_llamada_ms": 5.8,
+      "speedup_x": 1.1,
+      "cache_activo": true,
+      "segunda_mas_rapida": true
+    },
+    {
+      "test": "T5 - Comportamiento sin Redis (análisis de código)",
+      "componente": "Redis",
+      "estado_actual": "connected",
+      "comportamiento_sin_redis": {
+        "predicciones": "Se calculan en tiempo real sin caché (más lento)",
+        "recomendaciones": "Se calculan en tiempo real sin caché (más lento)",
+        "websocket": "Funciona normalmente (no depende de Redis)",
+        "celery": "Broker no disponible → tareas async no se encolan",
+        "api_rest": "100% funcional — Redis es solo optimización",
+        "degradacion": "Sistema marcado como 'degraded' en /api/system/health",
+        "fallback_code": "try/except con graceful fallback en redis_client.py"
+      },
+      "impacto_usuario": "La app funciona con normalidad; solo predicciones/recomendaciones son más lentas"
+    }
+  ],
+  "resumen": {
+    "total_tests": 13,
+    "passed": 13,
+    "failed": 0
+  }
+}

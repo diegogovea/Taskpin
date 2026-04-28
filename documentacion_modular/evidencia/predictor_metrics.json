@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "generado_en": "2026-04-27T17:40:34.578571",
+    "script": "Backend/scripts/evaluate_predictor.py",
+    "modelo": "Random Forest Classifier (scikit-learn)",
+    "random_state": 42
+  },
+  "datos": {
+    "total_registros": 32489,
+    "positivos": 20677,
+    "negativos": 11812,
+    "balance_positivos_pct": 63.64,
+    "usuarios": 81,
+    "habitos_en_catalogo": 25
+  },
+  "split": {
+    "metodo": "train_test_split estratificado",
+    "train_pct": 80,
+    "test_pct": 20,
+    "train_registros": 25991,
+    "test_registros": 6498
+  },
+  "metricas_test_set": {
+    "accuracy": 0.7004,
+    "precision_weighted": 0.6894,
+    "precision_macro": 0.6761,
+    "recall_weighted": 0.7004,
+    "recall_macro": 0.6428,
+    "f1_weighted": 0.6849,
+    "f1_macro": 0.6478,
+    "auc_roc": 0.7409
+  },
+  "matriz_confusion": {
+    "verdaderos_negativos": 1020,
+    "falsos_positivos": 1342,
+    "falsos_negativos": 605,
+    "verdaderos_positivos": 3531,
+    "tabla": [
+      [
+        1020,
+        1342
+      ],
+      [
+        605,
+        3531
+      ]
+    ]
+  },
+  "validacion_cruzada_5fold": {
+    "accuracy": {
+      "scores_por_fold": [
+        0.7022,
+        0.7018,
+        0.703,
+        0.7036,
+        0.7
+      ],
+      "media": 0.7021,
+      "desviacion": 0.0012
+    },
+    "precision_weighted": {
+      "scores_por_fold": [
+        0.6915,
+        0.6912,
+        0.6924,
+        0.6932,
+        0.689
+      ],
+      "media": 0.6915,
+      "desviacion": 0.0014
+    },
+    "recall_weighted": {
+      "scores_por_fold": [
+        0.7022,
+        0.7018,
+        0.703,
+        0.7036,
+        0.7
+      ],
+      "media": 0.7021,
+      "desviacion": 0.0012
+    },
+    "f1_weighted": {
+      "scores_por_fold": [
+        0.6866,
+        0.6836,
+        0.6874,
+        0.6874,
+        0.6829
+      ],
+      "media": 0.6856,
+      "desviacion": 0.0019
+    }
+  },
+  "feature_importance": {
+    "dia_semana": 0.0954,
+    "racha_actual": 0.1574,
+    "tasa_exito_7_dias": 0.3936,
+    "completado_ayer": 0.0703,
+    "dias_desde_agregado": 0.2834
+  },
+  "tiempos": {
+    "entrenamiento_segundos": 0.208,
+    "inferencia_ms_por_muestra": 0.0042
+  }
+}

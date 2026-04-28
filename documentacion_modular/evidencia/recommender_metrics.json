@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "generado_en": "2026-04-27T17:44:01.411726",
+    "script": "Backend/scripts/evaluate_recommender.py",
+    "modelo": "Filtrado Colaborativo — Similitud Coseno",
+    "protocolo_evaluacion": "Leave-One-Out (LOO)",
+    "descripcion": "Se oculta 1 hábito por usuario y se mide si el sistema lo recomienda"
+  },
+  "datos": {
+    "usuarios_totales": 81,
+    "habitos_en_catalogo": 25,
+    "usuarios_elegibles_loo": 77,
+    "promedio_habitos_por_usuario": 7.44,
+    "min_habitos_por_usuario": 0,
+    "max_habitos_por_usuario": 14
+  },
+  "metricas": {
+    "hit_rate": {
+      "@1": 0.0649,
+      "@3": 0.1169,
+      "@5": 0.2078,
+      "@10": 0.4805
+    },
+    "precision": {
+      "@1": 0.0649,
+      "@3": 0.039,
+      "@5": 0.0416,
+      "@10": 0.0481
+    },
+    "recall": {
+      "@1": 0.0649,
+      "@3": 0.1169,
+      "@5": 0.2078,
+      "@10": 0.4805
+    },
+    "mrr": 0.1469,
+    "cobertura_catalogo": 1.0,
+    "habitos_recomendados_distintos": 25,
+    "habitos_totales_catalogo": 25
+  },
+  "similitud_coseno": {
+    "pares_con_similitud_positiva": 2755,
+    "total_pares_posibles": 3240,
+    "media": 0.335,
+    "mediana": 0.3333,
+    "maxima": 0.8018,
+    "desviacion_std": 0.1367
+  },
+  "tiempos": {
+    "evaluacion_total_segundos": 0.068,
+    "ms_por_usuario": 0.88
+  }
+}

@@ -357,35 +357,37 @@ def login(user_data: LoginData):
     }
 
 @app.get("/api/current-user", status_code=200)
-def get_current_user():
+def get_current_user(current_user: TokenData = Depends(verify_token)):
     """Obtener el usuario de la sesión activa más reciente"""
     try:
-        with conn.conn.cursor() as cur:
-            # Obtener la sesión más reciente (último usuario que hizo login)
-            cur.execute("""
-                SELECT c.user_id, u.nombre, u.correo, c.last_access, c.id_control
-                FROM control c
-                INNER JOIN usuarios u ON c.user_id = u.user_id
-                WHERE u.activo = true
-                ORDER BY c.last_access DESC
-                LIMIT 1;
-            """)
-            
-            session_data = cur.fetchone()
-            
-            if not session_data:
-                raise HTTPException(status_code=404, detail="No hay sesión activa")
-            
-            return {
-                "success": True,
-                "data": {
-                    "user_id": session_data[0],
-                    "nombre": session_data[1],
-                    "correo": session_data[2],
-                    "last_access": session_data[3],
-                    "control_id": session_data[4]
+        from .database import get_pool
+        pool = get_pool()
+        with pool.connection() as _conn:
+            with _conn.cursor() as cur:
+                # Obtener la sesión más reciente (último usuario que hizo login)
+                cur.execute("""
+                    SELECT c.user_id, u.nombre, u.correo, c.last_access, c.id_control
+                    FROM control c
+                    INNER JOIN usuarios u ON c.user_id = u.user_id
+                    WHERE u.activo = true
+                    ORDER BY c.last_access DESC
+                    LIMIT 1;
+                """)
+                session_data = cur.fetchone()
+
+                if not session_data:
+                    raise HTTPException(status_code=404, detail="No hay sesión activa")
+
+                return {
+                    "success": True,
+                    "data": {
+                        "user_id": session_data[0],
+                        "nombre": session_data[1],
+                        "correo": session_data[2],
+                        "last_access": session_data[3],
+                        "control_id": session_data[4]
+                    }
                 }
-            }
     except HTTPException:
         raise
     except Exception as e:
