@@ -157,6 +157,21 @@ curl -X POST http://127.0.0.1:8000/login \
 
 ---
 
+## Deploy backend (Render, Docker)
+
+Render a veces ignora `runtime.txt` y usa Python 3.14; `pydantic_core` entonces intenta compilar con Rust y el build falla. Este repo incluye **`Backend/Dockerfile`** con **Python 3.11**.
+
+En Render → tu **Web Service** → **Settings**:
+
+1. **Environment** → **Docker** (no “Python 3” nativo).
+2. **Dockerfile path:** `Backend/Dockerfile`
+3. **Docker build context:** `Backend`
+4. **Start command:** déjalo vacío o el que Render sugiera para Docker (el `CMD` del Dockerfile ya arranca uvicorn con `$PORT`).
+
+Mismas **Environment Variables** que antes (Neon, JWT, etc.). Vuelve a **Deploy**.
+
+---
+
 ## FAQ / Common issues
 
 ### “Why do I see thousands of changed files?”
