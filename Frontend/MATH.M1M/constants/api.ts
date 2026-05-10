@@ -5,7 +5,7 @@
 
 // En Expo, las variables de entorno deben tener prefijo EXPO_PUBLIC_
 // Se acceden con process.env.EXPO_PUBLIC_*
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL='http://192.168.100.9:8000';
 
 // Endpoints comunes (opcional, para referencia)
 export const ENDPOINTS = {
