@@ -157,18 +157,37 @@ curl -X POST http://127.0.0.1:8000/login \
 
 ---
 
-## Deploy backend (Render, Docker)
+## Deploy backend (Render)
 
-Render a veces ignora `runtime.txt` y usa Python 3.14; `pydantic_core` entonces intenta compilar con Rust y el build falla. Este repo incluye **`Backend/Dockerfile`** con **Python 3.11**.
+Si en los logs del build ves **`python3.14`** y falla **`pydantic_core` / Rust**, estás en el runtime **Python nativo** con una versión demasiado nueva. Hay que **bajar a Python 3.11** o usar **Docker**.
 
-En Render → tu **Web Service** → **Settings**:
+### Cómo saber qué estás usando
 
-1. **Environment** → **Docker** (no “Python 3” nativo).
+- **Nativo (malo con 3.14):** el log muestra `Running build command 'pip install -r requirements.txt'` y rutas como `.venv/bin/python3.14`.
+- **Docker (recomendado):** el log muestra pasos tipo `docker build`, `FROM python:3.11`, etc.
+
+### Opción A — Sin Docker (rápido)
+
+1. Render → tu servicio → **Environment** (variables).
+2. Añade **`PYTHON_VERSION`** = **`3.11.9`** (exactamente eso).
+3. Confirma que el tipo de servicio sigue siendo **Web Service** con lenguaje **Python** (no hace falta Docker).
+4. **Manual Deploy** → **Clear build cache & deploy**.
+
+En el repo hay **`.python-version`** y **`runtime.txt`** en la raíz como refuerzo; lo que más suele funcionar es **`PYTHON_VERSION` en el panel**.
+
+### Opción B — Docker (más fiable)
+
+1. **Settings** → **Build & Deploy** → runtime **Docker** (no “Python 3”).
 2. **Dockerfile path:** `Backend/Dockerfile`
 3. **Docker build context:** `Backend`
-4. **Start command:** déjalo vacío o el que Render sugiera para Docker (el `CMD` del Dockerfile ya arranca uvicorn con `$PORT`).
+4. Quita el **Start Command** de uvicorn del modo Python (el `Dockerfile` ya define el comando).
+5. Deploy.
 
-Mismas **Environment Variables** que antes (Neon, JWT, etc.). Vuelve a **Deploy**.
+### Opción C — Blueprint desde cero
+
+En la raíz está **`render.yaml`**: en Render puedes crear un **Blueprint** conectando el repo; creará el servicio ya en modo **Docker**. Si ya tienes otro servicio duplicado, borra el viejo o no uses el Blueprint y aplica la opción B a mano.
+
+Mismas **Environment Variables** que en `Backend/.env` (Neon, JWT, etc.) en cualquier opción.
 
 ---
 

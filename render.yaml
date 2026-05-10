@@ -1,0 +1,13 @@
+# Blueprint opcional: crea el servicio con Docker (Python 3.11) desde el primer deploy.
+# En Render: New → Blueprint → conecta este repo, o añade este archivo y "Apply".
+# Si ya tienes un Web Service "Python" nativo, o bien cámbialo a Docker en Settings,
+# o añade la variable PYTHON_VERSION=3.11.9 (ver README).
+
+services:
+  - type: web
+    name: taskpin-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Backend/Dockerfile
+    dockerContext: ./Backend
