@@ -1,0 +1,9 @@
+# Deploy del front Expo (export estático web).
+# Ajusta EXPO_PUBLIC_API_URL si tu API en Render tiene otra URL.
+[build]
+  command = "cd Frontend/MATH.M1M && npm ci && npx expo export --platform web"
+  publish = "Frontend/MATH.M1M/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  EXPO_PUBLIC_API_URL = "https://taskpin.onrender.com"
