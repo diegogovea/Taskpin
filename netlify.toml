@@ -1,8 +1,11 @@
 # Deploy del front Expo (export estático web).
+# "base" es la carpeta del proyecto Expo; el comando corre ya ahí (no uses cd ...).
+# En Netlify UI: deja Base directory vacío para no duplicar con esto.
 # Ajusta EXPO_PUBLIC_API_URL si tu API en Render tiene otra URL.
 [build]
-  command = "cd Frontend/MATH.M1M && npm ci && npx expo export --platform web"
-  publish = "Frontend/MATH.M1M/dist"
+  base = "Frontend/MATH.M1M"
+  command = "npm ci && npx expo export --platform web"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"

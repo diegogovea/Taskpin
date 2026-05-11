@@ -205,14 +205,14 @@ npx expo export --platform web
 
 ### Netlify (Git → build automático)
 
-En la raíz del repo hay **`netlify.toml`**: conecta el repo y Netlify ya usa **Node 20**, `npm ci`, `expo export --platform web` y publica **`Frontend/MATH.M1M/dist`**.
+En la raíz del repo hay **`netlify.toml`**: define **`base = Frontend/MATH.M1M`**, **Node 20**, comando `npm ci && npx expo export --platform web` y **`publish = dist`** (relativo a esa base). En el panel de Netlify, deja **Base directory vacío** si usas solo este archivo, para no duplicar la ruta.
 
 Si configuras a mano en la pantalla de Netlify en vez del `.toml`:
 
 | Campo | Valor |
 |--------|--------|
 | **Base directory** | `Frontend/MATH.M1M` |
-| **Build command** | `npm ci && npx expo export --platform web` |
+| **Build command** | `npm ci && npx expo export --platform web` (sin `cd ...` si ya pusiste base) |
 | **Publish directory** | `dist` |
 | **Environment variables** | `NODE_VERSION` = `20` · `EXPO_PUBLIC_API_URL` = `https://TU-API.onrender.com` |
 
