@@ -203,6 +203,21 @@ npx expo export --platform web
 3. Sube la carpeta de salida del export (suele ser **`dist/`**; revisa la salida de Expo) a **Netlify**, **Cloudflare Pages** o **Vercel** como sitio estático.
 4. Abre la URL del hosting en el celular: la app cargará y llamará a Render.
 
+### Netlify (Git → build automático)
+
+En la raíz del repo hay **`netlify.toml`**: conecta el repo y Netlify ya usa **Node 20**, `npm ci`, `expo export --platform web` y publica **`Frontend/MATH.M1M/dist`**.
+
+Si configuras a mano en la pantalla de Netlify en vez del `.toml`:
+
+| Campo | Valor |
+|--------|--------|
+| **Base directory** | `Frontend/MATH.M1M` |
+| **Build command** | `npm ci && npx expo export --platform web` |
+| **Publish directory** | `dist` |
+| **Environment variables** | `NODE_VERSION` = `20` · `EXPO_PUBLIC_API_URL` = `https://TU-API.onrender.com` |
+
+Las IPs tipo `74.220.x.x` son solo para **DNS** de un dominio propio; no van en estos campos.
+
 ### Sobre rangos IP tipo `74.220.48.0/24`
 
 Eso lo suelen dar los hostings para **DNS** (registros **A** o **ANAME** de tu dominio), **no** van en `.env` ni en el código del front. Render/Neon no necesitan esas IPs para que Expo hable con tu API; solo las usarías si configuras un **dominio propio** apuntando al proveedor del front estático.
