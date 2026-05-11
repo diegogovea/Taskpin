@@ -191,6 +191,24 @@ Mismas **Environment Variables** que en `Backend/.env` (Neon, JWT, etc.) en cual
 
 ---
 
+## Deploy frontend (web, sin depender de tu PC)
+
+1. En **`Frontend/MATH.M1M/.env`** define **`EXPO_PUBLIC_API_URL`** con la URL **HTTPS** de tu API en Render (ej. `https://taskpin.onrender.com`). No pongas ahí credenciales de Postgres; solo lo público del API.
+2. Desde `Frontend/MATH.M1M` (Node 20+):
+
+```bash
+npx expo export --platform web
+```
+
+3. Sube la carpeta de salida del export (suele ser **`dist/`**; revisa la salida de Expo) a **Netlify**, **Cloudflare Pages** o **Vercel** como sitio estático.
+4. Abre la URL del hosting en el celular: la app cargará y llamará a Render.
+
+### Sobre rangos IP tipo `74.220.48.0/24`
+
+Eso lo suelen dar los hostings para **DNS** (registros **A** o **ANAME** de tu dominio), **no** van en `.env` ni en el código del front. Render/Neon no necesitan esas IPs para que Expo hable con tu API; solo las usarías si configuras un **dominio propio** apuntando al proveedor del front estático.
+
+---
+
 ## FAQ / Common issues
 
 ### “Why do I see thousands of changed files?”

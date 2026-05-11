@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getWebSocketBaseUrl } from '../constants/api';
 
 // Types
 export interface WSEvent {
@@ -42,8 +43,6 @@ interface UseWebSocketOptions {
   autoReconnect?: boolean;
   reconnectInterval?: number;
 }
-
-const WS_BASE_URL = 'ws://localhost:8000';
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
@@ -123,7 +122,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     isManualDisconnect.current = false;
     setStatus('connecting');
 
-    const wsUrl = `${WS_BASE_URL}/ws/${userId}`;
+    const wsUrl = `${getWebSocketBaseUrl()}/ws/${userId}`;
     console.log('[WS] Connecting to:', wsUrl);
 
     try {

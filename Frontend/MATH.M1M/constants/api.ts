@@ -5,7 +5,25 @@
 
 // En Expo, las variables de entorno deben tener prefijo EXPO_PUBLIC_
 // Se acceden con process.env.EXPO_PUBLIC_*
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL='http://192.168.100.9:8000';
+export const API_BASE_URL =
+  (process.env.EXPO_PUBLIC_API_URL || '').trim() || 'http://localhost:8000';
+
+/**
+ * Base ws/wss al mismo host que el API (Render = https → wss).
+ * Opcional: EXPO_PUBLIC_WS_URL si el proxy de WS difiere del HTTP.
+ */
+export function getWebSocketBaseUrl(): string {
+  const explicit = (process.env.EXPO_PUBLIC_WS_URL || '').trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  const base = API_BASE_URL.replace(/\/$/, '');
+  if (base.startsWith('https://')) {
+    return 'wss://' + base.slice('https://'.length);
+  }
+  if (base.startsWith('http://')) {
+    return 'ws://' + base.slice('http://'.length);
+  }
+  return 'ws://localhost:8000';
+}
 
 // Endpoints comunes (opcional, para referencia)
 export const ENDPOINTS = {
