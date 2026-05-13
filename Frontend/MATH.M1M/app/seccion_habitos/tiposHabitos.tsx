@@ -171,7 +171,7 @@ export default function TiposHabitosScreen() {
               style={styles.customButtonGradient}
             >
               <Ionicons name="create-outline" size={22} color={colors.neutral[0]} />
-              <Text style={styles.customButtonText}>Create Custom Habit</Text>
+              <Text style={styles.customButtonText}>Crear hábito personalizado</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

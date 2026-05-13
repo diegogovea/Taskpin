@@ -120,11 +120,11 @@ export default function AIScreen() {
       });
       const data = await response.json();
       if (data.success || data.habito_usuario_id) {
-        Alert.alert("Success", "Habit added to your list!");
+        Alert.alert("Listo", "Hábito agregado a tu lista");
         loadRecomendaciones(user.user_id);
         loadPredicciones(user.user_id);
       } else {
-        Alert.alert("Error", data.detail || "Could not add habit");
+        Alert.alert("Error", data.detail || "No se pudo agregar el hábito");
       }
     } catch (error) {
       console.error("Error adding habit:", error);
@@ -332,7 +332,7 @@ export default function AIScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="information-circle" size={20} color={colors.primary[500]} />
           <Text style={styles.infoText}>
-            AI predictions improve as you track more habits. Keep logging your progress!
+            Las predicciones de la IA mejoran cuando registras más hábitos. ¡Sigue anotando tu progreso!
           </Text>
         </View>
 

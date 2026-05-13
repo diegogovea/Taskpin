@@ -42,7 +42,7 @@ export default function BienestarYSaludScreen() {
       }
     } catch (error) {
       console.error("Error fetching planes:", error);
-      Alert.alert("Error", "Could not load plans");
+      Alert.alert("Error", "No se pudieron cargar los planes");
     } finally {
       setLoading(false);
     }
@@ -76,11 +76,11 @@ export default function BienestarYSaludScreen() {
   const getDifficultyLabel = (dificultad: string) => {
     switch (dificultad) {
       case "fácil":
-        return "Easy";
+        return "Fácil";
       case "intermedio":
-        return "Intermediate";
+        return "Intermedio";
       case "difícil":
-        return "Difficult";
+        return "Difícil";
       default:
         return dificultad;
     }
@@ -91,7 +91,7 @@ export default function BienestarYSaludScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading plans...</Text>
+          <Text style={styles.loadingText}>Cargando planes...</Text>
         </View>
       </SafeAreaView>
     );
@@ -116,9 +116,9 @@ export default function BienestarYSaludScreen() {
           <View style={styles.categoryIcon}>
             <Ionicons name="heart" size={28} color={colors.secondary[600]} />
           </View>
-          <Text style={styles.title}>Health & Wellness</Text>
+          <Text style={styles.title}>Bienestar y salud</Text>
           <Text style={styles.subtitle}>
-            Choose a plan to improve your health and well-being
+            Elige un plan para mejorar tu salud y tu bienestar
           </Text>
         </View>
 
@@ -149,20 +149,20 @@ export default function BienestarYSaludScreen() {
                 <View style={styles.planMeta}>
                   <View style={styles.metaItem}>
                     <Ionicons name="calendar-outline" size={14} color={colors.neutral[400]} />
-                    <Text style={styles.metaText}>{plan.duracion_estimada_dias} days</Text>
+                    <Text style={styles.metaText}>{plan.duracion_estimada_dias} días</Text>
                   </View>
                   <View style={styles.metaItem}>
                     <Ionicons name="layers-outline" size={14} color={colors.neutral[400]} />
-                    <Text style={styles.metaText}>{plan.total_fases} phases</Text>
+                    <Text style={styles.metaText}>{plan.total_fases} fases</Text>
                   </View>
                   <View style={styles.metaItem}>
                     <Ionicons name="checkmark-circle-outline" size={14} color={colors.neutral[400]} />
-                    <Text style={styles.metaText}>{plan.total_tareas} tasks</Text>
+                    <Text style={styles.metaText}>{plan.total_tareas} tareas</Text>
                   </View>
                 </View>
 
                 <View style={styles.planFooter}>
-                  <Text style={styles.viewDetailsText}>View Details</Text>
+                  <Text style={styles.viewDetailsText}>Ver detalles</Text>
                   <Ionicons name="arrow-forward" size={16} color={colors.primary[600]} />
                 </View>
               </TouchableOpacity>
@@ -175,8 +175,10 @@ export default function BienestarYSaludScreen() {
             <View style={styles.emptyIconContainer}>
               <Ionicons name="document-text-outline" size={48} color={colors.neutral[300]} />
             </View>
-            <Text style={styles.emptyTitle}>No plans available</Text>
-            <Text style={styles.emptySubtitle}>Check back later for new wellness plans</Text>
+            <Text style={styles.emptyTitle}>No hay planes disponibles</Text>
+            <Text style={styles.emptySubtitle}>
+              Vuelve más tarde para ver nuevos planes de bienestar
+            </Text>
           </View>
         )}
       </ScrollView>

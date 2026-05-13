@@ -68,8 +68,8 @@ export default function HabitosScreen() {
   const getCurrentDate = () => {
     const now = new Date();
     const day = now.getDate();
-    const weekday = now.toLocaleDateString("en-US", { weekday: "short" });
-    const month = now.toLocaleDateString("en-US", { month: "short" });
+    const weekday = now.toLocaleDateString("es-ES", { weekday: "short" });
+    const month = now.toLocaleDateString("es-ES", { month: "short" });
     return { day, weekday, month };
   };
 
@@ -124,11 +124,11 @@ export default function HabitosScreen() {
 
         setEstadisticas((prev) => ({ ...prev, completados, pendientes }));
       } else {
-        Alert.alert("Error", "Could not update habit");
+        Alert.alert("Error", "No se pudo actualizar el hábito");
       }
     } catch (error) {
       console.error("Error toggling habit:", error);
-      Alert.alert("Error", "Connection error");
+      Alert.alert("Error", "Error de conexión");
     } finally {
       setTogglingHabit(null);
     }

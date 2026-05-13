@@ -240,7 +240,7 @@ export default function DetalleHabitoScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('es-ES', { 
       month: 'short', 
       day: 'numeric', 
       year: 'numeric' 
@@ -268,9 +268,9 @@ export default function DetalleHabitoScreen() {
         </View>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.neutral[400]} />
-          <Text style={styles.errorText}>Habit not found</Text>
+          <Text style={styles.errorText}>No se encontró el hábito</Text>
           <TouchableOpacity style={styles.goBackButton} onPress={goBack}>
-            <Text style={styles.goBackButtonText}>Go back</Text>
+            <Text style={styles.goBackButtonText}>Volver</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -286,7 +286,7 @@ export default function DetalleHabitoScreen() {
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Habit Details</Text>
+        <Text style={styles.headerTitle}>Detalle del hábito</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -364,14 +364,14 @@ export default function DetalleHabitoScreen() {
               <Text style={styles.monthStatValue}>
                 {historialResumen.dias_completados}/{historialResumen.total_dias}
               </Text>
-              <Text style={styles.monthStatLabel}>days this month</Text>
+              <Text style={styles.monthStatLabel}>Días este mes</Text>
             </View>
             <View style={styles.monthStatDivider} />
             <View style={styles.monthStatItem}>
               <Text style={styles.monthStatValue}>
                 {historialResumen.porcentaje_completado}%
               </Text>
-              <Text style={styles.monthStatLabel}>success rate</Text>
+              <Text style={styles.monthStatLabel}>Tasa de éxito</Text>
             </View>
           </View>
         )}

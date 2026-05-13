@@ -236,9 +236,9 @@ class habitConnection():
                         INSERT INTO habitos_predeterminados 
                         (categoria_id, nombre, descripcion, frecuencia_recomendada, 
                          puntos_base, es_personalizado, creado_por_user_id)
-                        VALUES (6, %s, %s, 'diario', 10, true, %s)
+                        VALUES (6, %s, %s, %s, 10, true, %s)
                         RETURNING habito_id;
-                    """, (nombre, descripcion, user_id))
+                    """, (nombre, descripcion, frecuencia_personal, user_id))
                     habito_id = cur.fetchone()[0]
                     
                     # 2. Agregarlo automáticamente al usuario

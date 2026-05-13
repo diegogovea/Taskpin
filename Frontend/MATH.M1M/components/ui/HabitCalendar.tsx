@@ -30,10 +30,10 @@ interface CalendarDay {
   isCurrentMonth: boolean;
 }
 
-const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 const HabitCalendar: React.FC<HabitCalendarProps> = ({
@@ -238,15 +238,15 @@ const HabitCalendar: React.FC<HabitCalendarProps> = ({
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: completedColor }]} />
-          <Text style={styles.legendText}>Completed</Text>
+          <Text style={styles.legendText}>Completado</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: missedColor }]} />
-          <Text style={styles.legendText}>Missed</Text>
+          <Text style={styles.legendText}>No cumplido</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: 'transparent', borderWidth: 2, borderColor: todayBorderColor }]} />
-          <Text style={styles.legendText}>Today</Text>
+          <Text style={styles.legendText}>Hoy</Text>
         </View>
       </View>
     </View>
