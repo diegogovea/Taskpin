@@ -98,37 +98,53 @@ habit_conn = habitConnection()
 stats_conn = EstadisticasConnection()
 
 # ============================================
-# SISTEMA DE NIVELES - Función helper
+# ============================================
+# SISTEMA DE NIVELES - Funciones unificadas
 # ============================================
 
-def calcular_nivel(puntos_totales: int) -> dict:
+def puntos_para_subir_nivel(nivel: int) -> int:
     """
-    Calcula el nivel del usuario basado en sus puntos totales.
-    Fórmula: puntos_para_nivel(n) = 50 + (n * 50)
-    - Nivel 2: 100 puntos
-    - Nivel 3: 150 puntos adicionales (250 total)
-    - Nivel 4: 200 puntos adicionales (450 total)
-    - etc.
+    Puntos necesarios para pasar del nivel `nivel` al siguiente.
+    Fórmula: 100 * nivel² + 100
+    - Nivel 1→2:  200 pts
+    - Nivel 2→3:  500 pts
+    - Nivel 3→4: 1 000 pts
+    - Nivel 4→5: 1 700 pts
+    - Nivel 5→6: 2 600 pts
+    - Nivel 6→7: 3 700 pts
+    """
+    return 100 * (nivel ** 2) + 100
+
+
+def calcular_nivel_desde_puntos(puntos_totales: int) -> dict:
+    """
+    Calcula el nivel y todas las métricas de progreso a partir de puntos totales.
+    Usa puntos_para_subir_nivel como fuente de verdad única.
+
+    Returns:
+        nivel, puntos_en_nivel, puntos_para_siguiente, puntos_faltantes, progreso_porcentaje
     """
     nivel = 1
     puntos_acumulados = 0
-    
+
     while True:
-        puntos_siguiente = 50 + (nivel * 50)  # 100, 150, 200, 250...
-        if puntos_totales < puntos_acumulados + puntos_siguiente:
+        necesarios = puntos_para_subir_nivel(nivel)
+        if puntos_totales < puntos_acumulados + necesarios:
             break
-        puntos_acumulados += puntos_siguiente
+        puntos_acumulados += necesarios
         nivel += 1
-    
-    puntos_en_nivel_actual = puntos_totales - puntos_acumulados
-    puntos_para_siguiente = 50 + (nivel * 50)
-    progreso = int((puntos_en_nivel_actual / puntos_para_siguiente) * 100) if puntos_para_siguiente > 0 else 0
-    
+
+    puntos_en_nivel = puntos_totales - puntos_acumulados
+    puntos_para_siguiente = puntos_para_subir_nivel(nivel)
+    puntos_faltantes = puntos_para_siguiente - puntos_en_nivel
+    progreso = int((puntos_en_nivel / puntos_para_siguiente) * 100) if puntos_para_siguiente > 0 else 100
+
     return {
         "nivel": nivel,
-        "puntos_en_nivel": puntos_en_nivel_actual,
+        "puntos_en_nivel": puntos_en_nivel,
         "puntos_para_siguiente": puntos_para_siguiente,
-        "progreso_porcentaje": progreso
+        "puntos_faltantes": max(0, puntos_faltantes),
+        "progreso_porcentaje": max(0, min(100, progreso)),
     }
 
 # ============================================
@@ -649,6 +665,7 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                         h.nombre,
                         h.descripcion,
                         h.puntos_base,
+                        h.categoria_id,
                         c.nombre as categoria_nombre,
                         hu.frecuencia_personal,
                         hu.fecha_agregado,
@@ -677,12 +694,13 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                 "nombre": data[3],
                 "descripcion": data[4],
                 "puntos_base": data[5],
-                "categoria_nombre": data[6],
-                "frecuencia_personal": data[7],
-                "fecha_agregado": data[8],
-                "completado_hoy": data[9],
-                "hora_completado": data[10],
-                "notas": data[11]
+                "categoria_id": data[6],
+                "categoria_nombre": data[7],
+                "frecuencia_personal": data[8],
+                "fecha_agregado": data[9],
+                "completado_hoy": data[10],
+                "hora_completado": data[11],
+                "notas": data[12]
             }
             habits.append(habit_dict)
         
@@ -859,7 +877,7 @@ async def toggle_habit_completion(
                     # ========================================
                     # LÓGICA DE NIVEL - Calcular y actualizar
                     # ========================================
-                    nivel_calculado = calcular_nivel(puntos_totales_nuevos)
+                    nivel_calculado = calcular_nivel_desde_puntos(puntos_totales_nuevos)
                     nuevo_nivel = nivel_calculado["nivel"]
                     
                     # Actualizar nivel en BD si cambió
@@ -1253,90 +1271,114 @@ def get_habito_rachas(
 # ENDPOINTS DE ESTADÍSTICAS (Gamificación)
 # ============================================
 
-def calcular_progreso_nivel(puntos_totales: int, nivel_actual: int) -> int:
-    """
-    Calcula el porcentaje de progreso hacia el siguiente nivel.
-    
-    Escala de puntos:
-    - Nivel 1→2: 50 puntos
-    - Nivel 2→3: 100 puntos (total: 150)
-    - Nivel 3→4: 200 puntos (total: 350)
-    - etc. (duplica cada nivel)
-    """
-    def puntos_para_nivel(nivel: int) -> int:
-        """Puntos necesarios para pasar del nivel n al n+1"""
-        if nivel <= 1:
-            return 50
-        return 50 * (2 ** (nivel - 1))
-    
-    # Calcular puntos acumulados hasta el nivel actual
-    puntos_nivel_actual = sum(puntos_para_nivel(n) for n in range(1, nivel_actual))
-    
-    # Puntos necesarios para el siguiente nivel
-    puntos_siguiente = puntos_para_nivel(nivel_actual)
-    
-    # Puntos dentro del nivel actual
-    puntos_en_nivel = puntos_totales - puntos_nivel_actual
-    
-    # Calcular porcentaje
-    if puntos_siguiente <= 0:
-        return 100
-    
-    progreso = int((puntos_en_nivel / puntos_siguiente) * 100)
-    return max(0, min(100, progreso))  # Entre 0 y 100
-
-
 @app.get("/api/usuario/{user_id}/estadisticas", status_code=HTTP_200_OK)
 def get_estadisticas_usuario(user_id: int):
     """
     Obtener estadísticas de gamificación del usuario.
-    
-    Retorna: puntos_totales, racha_actual, racha_maxima, nivel, 
-             ultima_actividad, progreso_siguiente_nivel
+
+    Retorna: puntos_totales, racha_actual, racha_maxima, nivel,
+             ultima_actividad, fecha_inicio_racha,
+             puntos_en_nivel, puntos_para_siguiente, puntos_faltantes,
+             progreso_siguiente_nivel
     """
     try:
-        # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
-        # Obtener estadísticas
+
         data = stats_conn.get_estadisticas_usuario(user_id)
-        
         if not data:
             raise HTTPException(status_code=404, detail="Estadísticas no encontradas para este usuario")
-        
-        # Extraer datos: (estadistica_id, user_id, puntos_totales, racha_actual,
-        #                 racha_maxima, nivel, ultima_actividad, fecha_creacion)
-        puntos_totales = data[2]
-        racha_maxima = data[4]
-        nivel = data[5]
+
+        # (estadistica_id, user_id, puntos_totales, racha_actual,
+        #  racha_maxima, nivel, ultima_actividad, fecha_creacion)
+        puntos_totales  = data[2]
+        racha_maxima    = data[4]
+        nivel           = data[5]
         ultima_actividad = data[6]
 
-        # Verificar si la racha expiró (sin actividad ayer ni hoy) y resetear en BD
+        # Resetear racha si expiró (sin actividad ayer ni hoy)
         racha_actual = stats_conn.reset_racha_si_expirada(user_id)
         if racha_actual is None:
-            racha_actual = data[3]  # fallback al valor guardado si hay error
+            racha_actual = data[3]
 
-        # Calcular progreso al siguiente nivel
-        progreso_siguiente = calcular_progreso_nivel(puntos_totales, nivel)
-        
+        # Fecha de inicio de la racha actual
+        from datetime import timedelta as _td
+        if racha_actual > 0 and ultima_actividad:
+            fecha_inicio_racha = (ultima_actividad - _td(days=racha_actual - 1)).isoformat()
+        else:
+            fecha_inicio_racha = None
+
+        # Nivel y métricas usando la fórmula unificada
+        nivel_info = calcular_nivel_desde_puntos(puntos_totales)
+
         return {
             "success": True,
             "data": {
-                "puntos_totales": puntos_totales,
-                "racha_actual": racha_actual,
-                "racha_maxima": racha_maxima,
-                "nivel": nivel,
-                "ultima_actividad": ultima_actividad.isoformat() if ultima_actividad else None,
-                "progreso_siguiente_nivel": progreso_siguiente
+                "puntos_totales":          puntos_totales,
+                "racha_actual":            racha_actual,
+                "racha_maxima":            racha_maxima,
+                "nivel":                   nivel_info["nivel"],
+                "ultima_actividad":        ultima_actividad.isoformat() if ultima_actividad else None,
+                "fecha_inicio_racha":      fecha_inicio_racha,
+                "puntos_en_nivel":         nivel_info["puntos_en_nivel"],
+                "puntos_para_siguiente":   nivel_info["puntos_para_siguiente"],
+                "puntos_faltantes":        nivel_info["puntos_faltantes"],
+                "progreso_siguiente_nivel": nivel_info["progreso_porcentaje"],
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+
+
+@app.get("/api/usuario/{user_id}/estadisticas/puntos-historial", status_code=HTTP_200_OK)
+def get_puntos_historial(
+    user_id: int,
+    dias: int = 14,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Historial de puntos ganados por día en los últimos N días.
+    Devuelve un array [{fecha, puntos}] ordenado ASC, rellenando días sin
+    actividad con puntos=0 para que el gráfico siempre tenga `dias` barras.
+    """
+    try:
+        verify_user_access(user_id, current_user)
+
+        from datetime import date as _date, timedelta as _td2
+        from .database import get_pool
+        pool = get_pool()
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
+                cur.execute("""
+                    SELECT sh.fecha, COALESCE(SUM(h.puntos_base), 0)::int AS puntos
+                    FROM seguimiento_habitos sh
+                    JOIN habitos_usuario hu ON sh.habito_usuario_id = hu.habito_usuario_id
+                    JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
+                    WHERE hu.user_id = %s
+                      AND sh.completado = true
+                      AND sh.fecha >= CURRENT_DATE - INTERVAL '%s days'
+                    GROUP BY sh.fecha
+                    ORDER BY sh.fecha ASC;
+                """, (user_id, dias - 1))
+                rows = {row[0]: row[1] for row in cur.fetchall()}
+
+        # Rellenar días sin actividad con 0
+        hoy = _date.today()
+        historial = []
+        for i in range(dias - 1, -1, -1):
+            dia = hoy - _td2(days=i)
+            historial.append({"fecha": dia.isoformat(), "puntos": rows.get(dia, 0)})
+
+        return {"success": True, "data": historial}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener historial de puntos: {str(e)}")
 
 # ============================================
 # ENDPOINTS DE REFLEXIONES DIARIAS

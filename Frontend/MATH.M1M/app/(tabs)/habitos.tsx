@@ -15,11 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
-import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
+import { useAuth } from "../../contexts/AuthContext";
+import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
 
 interface HabitoHoy {
   habito_usuario_id: number;
   user_id: number;
+  categoria_id?: number;
   habito_id: number;
   nombre: string;
   descripcion: string | null;
@@ -269,17 +271,23 @@ export default function HabitosScreen() {
         ) : (
           <View style={styles.habitsSection}>
             <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
-            {habitos.map((habito) => (
+            {habitos.map((habito) => {
+              const catColor = habito.categoria_id
+                ? getCategoryColor(habito.categoria_id)
+                : getCategoryColorByName(habito.categoria_nombre);
+              return (
               <View
                 key={habito.habito_usuario_id}
                 style={[styles.habitCard, habito.completado_hoy && styles.habitCardCompleted]}
               >
+                <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
                 <View style={styles.habitContent}>
                   {/* Checkbox - toggles completion */}
                   <TouchableOpacity
                     style={[
                       styles.checkbox,
                       habito.completado_hoy && styles.checkboxCompleted,
+                      habito.completado_hoy && { backgroundColor: catColor, borderColor: catColor },
                     ]}
                     onPress={() => toggleHabitCompletion(habito.habito_usuario_id)}
                     disabled={togglingHabit === habito.habito_usuario_id}
@@ -312,7 +320,7 @@ export default function HabitosScreen() {
                       )}
                     </View>
                     <View style={styles.habitMeta}>
-                      <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
+                      <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
                       <View style={styles.habitPoints}>
                         <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
                         <Text style={styles.habitPointsText}>{habito.puntos_base}</Text>
@@ -329,7 +337,8 @@ export default function HabitosScreen() {
                   <Ionicons name="chevron-forward" size={20} color={colors.neutral[300]} />
                 </View>
               </View>
-            ))}
+              );
+            })}
 
             {/* Add More Button */}
             <TouchableOpacity
@@ -566,6 +575,13 @@ const styles = StyleSheet.create({
   checkboxCompleted: {
     backgroundColor: colors.secondary[500],
     borderColor: colors.secondary[500],
+  },
+  habitCategoryBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderTopLeftRadius: radius.xl,
+    borderBottomLeftRadius: radius.xl,
+    marginRight: spacing[3],
   },
   habitInfo: {
     flex: 1,

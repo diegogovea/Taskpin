@@ -274,21 +274,22 @@ class EstadisticasConnection:
     def _calcular_nivel_por_puntos(self, puntos_totales: int) -> int:
         """
         Calcula el nivel correspondiente a una cantidad de puntos.
-        
-        Escala:
-        - Nivel 1: 0-49 puntos
-        - Nivel 2: 50-149 puntos
-        - Nivel 3: 150-349 puntos
-        - Nivel 4: 350-749 puntos
-        - etc.
+        Usa la misma fórmula que calcular_nivel_desde_puntos en main.py:
+        puntos_para_subir_nivel(n) = 100 * n² + 100
+
+        - Nivel 1→2:  200 pts
+        - Nivel 2→3:  500 pts
+        - Nivel 3→4: 1 000 pts
+        - Nivel 4→5: 1 700 pts
         """
         nivel = 1
         puntos_acumulados = 0
-        puntos_necesarios = 50
-        
-        while puntos_acumulados + puntos_necesarios <= puntos_totales:
-            puntos_acumulados += puntos_necesarios
+
+        while True:
+            necesarios = 100 * (nivel ** 2) + 100
+            if puntos_acumulados + necesarios > puntos_totales:
+                break
+            puntos_acumulados += necesarios
             nivel += 1
-            puntos_necesarios *= 2  # Duplica cada nivel
-        
+
         return nivel

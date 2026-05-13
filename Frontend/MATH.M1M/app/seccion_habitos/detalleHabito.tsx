@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { getCategoryColor } from "../../constants/categoryColors";
 import { ConfirmModal } from "../../components/modals";
 import { Toast, HabitCalendar } from "../../components/ui";
 
@@ -66,16 +67,6 @@ const FRECUENCIAS = [
 ];
 
 // Map category names to colors
-const getCategoryColor = (categoryId: number): string => {
-  const categoryColors: Record<number, string> = {
-    1: colors.secondary[600],  // Daily Wellness
-    2: colors.accent.amber,     // Energy & Movement
-    3: colors.primary[600],     // Mind & Focus
-    4: colors.accent.cyan,      // Home Organization
-    5: colors.accent.rose,      // Personal Finance
-  };
-  return categoryColors[categoryId] || colors.primary[600];
-};
 
 export default function DetalleHabitoScreen() {
   const router = useRouter();

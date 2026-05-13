@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Dimensions,
   Alert,
+  Modal,
+  Animated,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
 import ReflectionModal from "../../components/ui/ReflectionModal";
 import { useWebSocket, HabitCompletedEvent, HabitUncompletedEvent } from "../../hooks/useWebSocket";
 import WSNotification from "../../components/ui/WSNotification";
@@ -27,9 +30,15 @@ const { width } = Dimensions.get("window");
 interface HabitoHoy {
   habito_usuario_id: number;
   nombre: string;
+  categoria_id?: number;
   categoria_nombre: string;
   completado_hoy: boolean;
   puntos_base: number;
+}
+
+interface PuntosHistorialItem {
+  fecha: string;
+  puntos: number;
 }
 
 interface EstadisticasHabitos {
@@ -52,9 +61,14 @@ interface MiPlan {
 
 interface ResumenUsuario {
   racha_actual: number;
-  puntos_totales: number;   // ← Renombrado de gemas_totales
+  puntos_totales: number;
   nivel_actual: number;
-  racha_maxima: number;     // ← Nuevo campo del backend
+  racha_maxima: number;
+  fecha_inicio_racha: string | null;
+  puntos_en_nivel: number;
+  puntos_para_siguiente: number;
+  puntos_faltantes: number;
+  progreso_nivel: number;
 }
 
 interface ReflexionHoy {
@@ -112,7 +126,17 @@ export default function HomeScreen() {
     puntos_totales: 0,
     nivel_actual: 1,
     racha_maxima: 0,
+    fecha_inicio_racha: null,
+    puntos_en_nivel: 0,
+    puntos_para_siguiente: 200,
+    puntos_faltantes: 200,
+    progreso_nivel: 0,
   });
+
+  const [activeModal, setActiveModal] = useState<'racha' | 'puntos' | 'nivel' | null>(null);
+  const [puntosHistorial, setPuntosHistorial] = useState<PuntosHistorialItem[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   
   // Estado para reflexiones
   const [reflexionHoy, setReflexionHoy] = useState<ReflexionHoy | null>(null);
@@ -126,6 +150,22 @@ export default function HomeScreen() {
     points?: number;
     streak?: number;
   }>({ visible: false, type: 'info', message: '' });
+
+  // Animación de pulso para la racha
+  useEffect(() => {
+    if (resumenUsuario.racha_actual > 0) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.25, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [resumenUsuario.racha_actual]);
 
   // WebSocket connection for real-time updates
   const { status: wsStatus, isConnected } = useWebSocket({
@@ -197,10 +237,15 @@ export default function HomeScreen() {
       
       if (data.success) {
         setResumenUsuario({
-          racha_actual: data.data.racha_actual,
-          puntos_totales: data.data.puntos_totales,
-          nivel_actual: data.data.nivel,
-          racha_maxima: data.data.racha_maxima,
+          racha_actual:         data.data.racha_actual,
+          puntos_totales:       data.data.puntos_totales,
+          nivel_actual:         data.data.nivel,
+          racha_maxima:         data.data.racha_maxima,
+          fecha_inicio_racha:   data.data.fecha_inicio_racha ?? null,
+          puntos_en_nivel:      data.data.puntos_en_nivel ?? 0,
+          puntos_para_siguiente: data.data.puntos_para_siguiente ?? 200,
+          puntos_faltantes:     data.data.puntos_faltantes ?? 200,
+          progreso_nivel:       data.data.progreso_siguiente_nivel ?? 0,
         });
       }
     } catch (error) {
@@ -208,6 +253,28 @@ export default function HomeScreen() {
       // Mantener valores por defecto en caso de error
     }
   };
+
+  const loadPuntosHistorial = async (userId: number) => {
+    setLoadingHistorial(true);
+    try {
+      const response = await authFetch(`/api/usuario/${userId}/estadisticas/puntos-historial?dias=14`);
+      const data = await response.json();
+      if (data.success) setPuntosHistorial(data.data);
+    } catch (error) {
+      console.error("Error loading puntos historial:", error);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  const handleOpenModal = (type: 'racha' | 'puntos' | 'nivel') => {
+    setActiveModal(type);
+    if (type === 'puntos' && user?.user_id) {
+      loadPuntosHistorial(user.user_id);
+    }
+  };
+
+  const handleCloseModal = () => setActiveModal(null);
 
   const loadReflexionHoy = async (userId: number) => {
     try {
@@ -321,25 +388,35 @@ export default function HomeScreen() {
     }
   };
 
-  // Stats Card Component
+  // Stats Card Component — tappable
   const StatCard = ({
     icon,
     value,
     label,
     gradient,
+    onPress,
+    withPulse = false,
   }: {
     icon: string;
     value: string | number;
     label: string;
     gradient: string[];
+    onPress?: () => void;
+    withPulse?: boolean;
   }) => (
-    <View style={styles.statCard}>
+    <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.82}>
       <LinearGradient colors={gradient} style={styles.statCardGradient}>
-        <Ionicons name={icon as any} size={24} color={colors.neutral[0]} />
+        {withPulse ? (
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <Ionicons name={icon as any} size={24} color={colors.neutral[0]} />
+          </Animated.View>
+        ) : (
+          <Ionicons name={icon as any} size={24} color={colors.neutral[0]} />
+        )}
         <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
       </LinearGradient>
-    </View>
+    </TouchableOpacity>
   );
 
   // Progress Ring Component
@@ -406,18 +483,22 @@ export default function HomeScreen() {
             value={resumenUsuario.racha_actual}
             label="Racha"
             gradient={["#F97316", "#EA580C"]}
+            onPress={() => handleOpenModal('racha')}
+            withPulse={resumenUsuario.racha_actual > 0}
           />
           <StatCard
             icon="diamond"
             value={resumenUsuario.puntos_totales}
             label="Puntos"
             gradient={colors.gradients.primary}
+            onPress={() => handleOpenModal('puntos')}
           />
           <StatCard
             icon="trophy"
             value={`Nv.${resumenUsuario.nivel_actual}`}
             label="Nivel"
             gradient={colors.gradients.secondary}
+            onPress={() => handleOpenModal('nivel')}
           />
         </View>
 
@@ -470,39 +551,46 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ) : (
             <View style={styles.habitsList}>
-              {habitosHoy.slice(0, 3).map((habito) => (
-                <View key={habito.habito_usuario_id} style={styles.habitItem}>
-                  <View
-                    style={[
-                      styles.habitCheckbox,
-                      habito.completado_hoy && styles.habitCheckboxCompleted,
-                    ]}
-                  >
-                    {habito.completado_hoy && (
-                      <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
-                    )}
-                  </View>
-                  <View style={styles.habitInfo}>
-                    <View style={styles.habitNameRow}>
-                      <Text
-                        style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
-                      >
-                        {habito.nombre}
-                      </Text>
-                      {habito.categoria_nombre === "My Custom Habits" && (
-                        <View style={styles.customBadge}>
-                          <Ionicons name="sparkles" size={8} color={colors.primary[600]} />
-                        </View>
+              {habitosHoy.slice(0, 3).map((habito) => {
+                const catColor = habito.categoria_id
+                  ? getCategoryColor(habito.categoria_id)
+                  : getCategoryColorByName(habito.categoria_nombre);
+                return (
+                  <View key={habito.habito_usuario_id} style={styles.habitItem}>
+                    <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
+                    <View
+                      style={[
+                        styles.habitCheckbox,
+                        habito.completado_hoy && styles.habitCheckboxCompleted,
+                        habito.completado_hoy && { backgroundColor: catColor },
+                      ]}
+                    >
+                      {habito.completado_hoy && (
+                        <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
                       )}
                     </View>
-                    <Text style={styles.habitCategory}>{habito.categoria_nombre}</Text>
+                    <View style={styles.habitInfo}>
+                      <View style={styles.habitNameRow}>
+                        <Text
+                          style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
+                        >
+                          {habito.nombre}
+                        </Text>
+                        {habito.categoria_nombre === "My Custom Habits" && (
+                          <View style={styles.customBadge}>
+                            <Ionicons name="sparkles" size={8} color={colors.primary[600]} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
+                    </View>
+                    <View style={styles.habitPoints}>
+                      <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
+                      <Text style={styles.habitPointsText}>+{habito.puntos_base}</Text>
+                    </View>
                   </View>
-                  <View style={styles.habitPoints}>
-                    <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
-                    <Text style={styles.habitPointsText}>+{habito.puntos_base}</Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
               {habitosHoy.length > 3 && (
                 <TouchableOpacity
                   style={styles.moreHabitsButton}
@@ -671,6 +759,113 @@ export default function HomeScreen() {
         {/* Bottom Padding for Tab Bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Stats Detail Modal */}
+      <Modal
+        visible={activeModal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseModal}
+      >
+        <TouchableOpacity style={styles.modalOverlay} onPress={handleCloseModal} activeOpacity={1}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={handleCloseModal}>
+              <Ionicons name="close" size={18} color={colors.neutral[500]} />
+            </TouchableOpacity>
+
+            {/* ── RACHA ── */}
+            {activeModal === 'racha' && (
+              <View style={styles.modalContent}>
+                <Animated.Text style={[styles.modalBigIcon, { transform: [{ scale: pulseAnim }] }]}>🔥</Animated.Text>
+                <Text style={styles.modalBigNumber}>{resumenUsuario.racha_actual}</Text>
+                <Text style={styles.modalBigLabel}>días seguidos</Text>
+                <View style={styles.modalDivider} />
+                <View style={styles.modalRow}>
+                  <View style={styles.modalStat}>
+                    <Text style={styles.modalStatValue}>{resumenUsuario.racha_maxima}</Text>
+                    <Text style={styles.modalStatLabel}>Racha máxima</Text>
+                  </View>
+                  {resumenUsuario.racha_actual > 0 && resumenUsuario.fecha_inicio_racha && (
+                    <View style={styles.modalStat}>
+                      <Text style={styles.modalStatValue}>
+                        {new Date(resumenUsuario.fecha_inicio_racha + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      </Text>
+                      <Text style={styles.modalStatLabel}>Desde</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.modalMotivation}>
+                  {resumenUsuario.racha_actual === 0
+                    ? '¡Completa un hábito hoy para empezar tu racha!'
+                    : resumenUsuario.racha_actual < 7
+                    ? '¡Vas muy bien, sigue así! 💪'
+                    : resumenUsuario.racha_actual < 30
+                    ? '¡Increíble constancia! 🏆'
+                    : '¡Eres una máquina de hábitos! 🚀'}
+                </Text>
+              </View>
+            )}
+
+            {/* ── PUNTOS ── */}
+            {activeModal === 'puntos' && (
+              <View style={styles.modalContent}>
+                <Ionicons name="diamond" size={40} color={colors.primary[500]} />
+                <Text style={styles.modalBigNumber}>{resumenUsuario.puntos_totales}</Text>
+                <Text style={styles.modalBigLabel}>puntos totales</Text>
+                <View style={styles.modalDivider} />
+                <Text style={styles.modalChartTitle}>Últimos 14 días</Text>
+                {loadingHistorial ? (
+                  <ActivityIndicator color={colors.primary[600]} style={{ marginTop: 20 }} />
+                ) : (
+                  <View style={styles.barChart}>
+                    {puntosHistorial.map((item, i) => {
+                      const maxPts = Math.max(...puntosHistorial.map(d => d.puntos), 1);
+                      const barH = Math.max(4, (item.puntos / maxPts) * 72);
+                      const fecha = new Date(item.fecha + 'T00:00:00');
+                      return (
+                        <View key={i} style={styles.barColumn}>
+                          {item.puntos > 0 && <Text style={styles.barValue}>{item.puntos}</Text>}
+                          <View style={[styles.bar, {
+                            height: barH,
+                            backgroundColor: item.puntos > 0 ? colors.primary[500] : colors.neutral[200],
+                          }]} />
+                          <Text style={styles.barLabel}>
+                            {fecha.toLocaleDateString('es-ES', { weekday: 'narrow' })}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* ── NIVEL ── */}
+            {activeModal === 'nivel' && (
+              <View style={styles.modalContent}>
+                <View style={styles.levelBadge}>
+                  <Ionicons name="trophy" size={32} color={colors.neutral[0]} />
+                </View>
+                <Text style={styles.modalBigNumber}>Nivel {resumenUsuario.nivel_actual}</Text>
+                <Text style={styles.modalBigLabel}>nivel actual</Text>
+                <View style={styles.levelProgressBarBg}>
+                  <View style={[styles.levelProgressFill, { width: `${resumenUsuario.progreso_nivel}%` }]} />
+                </View>
+                <Text style={styles.levelProgressText}>
+                  {resumenUsuario.puntos_en_nivel} / {resumenUsuario.puntos_para_siguiente} pts en este nivel
+                </Text>
+                <View style={styles.modalDivider} />
+                <Text style={styles.levelNeedText}>
+                  Te faltan{' '}
+                  <Text style={styles.levelNeedHighlight}>{resumenUsuario.puntos_faltantes} pts</Text>
+                  {' '}para el Nivel {resumenUsuario.nivel_actual + 1}
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Reflection Modal */}
       <ReflectionModal
@@ -1133,5 +1328,165 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#22C55E',
+  },
+  // Category color bar on habit items
+  habitCategoryBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: spacing[2],
+  },
+  // Stats modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.neutral[0],
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing[6],
+    paddingBottom: spacing[12],
+    minHeight: 340,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.neutral[200],
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing[4],
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: spacing[5],
+    right: spacing[5],
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    alignItems: 'center',
+    paddingTop: spacing[2],
+  },
+  modalBigIcon: {
+    fontSize: 48,
+    marginBottom: spacing[2],
+  },
+  modalBigNumber: {
+    fontSize: typography.size['3xl'],
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
+  },
+  modalBigLabel: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+    marginBottom: spacing[2],
+  },
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: colors.neutral[100],
+    marginVertical: spacing[4],
+  },
+  modalRow: {
+    flexDirection: 'row',
+    gap: spacing[10],
+    justifyContent: 'center',
+  },
+  modalStat: {
+    alignItems: 'center',
+  },
+  modalStatValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[800],
+  },
+  modalStatLabel: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[500],
+    marginTop: spacing[1],
+  },
+  modalMotivation: {
+    marginTop: spacing[5],
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  modalChartTitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginBottom: spacing[3],
+    alignSelf: 'flex-start',
+  },
+  barChart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 100,
+    gap: 3,
+    width: '100%',
+  },
+  barColumn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  barValue: {
+    fontSize: 7,
+    color: colors.neutral[400],
+    marginBottom: 2,
+  },
+  bar: {
+    width: '80%',
+    borderRadius: 3,
+    minHeight: 4,
+  },
+  barLabel: {
+    fontSize: 8,
+    color: colors.neutral[400],
+    marginTop: 3,
+  },
+  levelBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.accent.amber,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  levelProgressBarBg: {
+    width: '100%',
+    height: 12,
+    backgroundColor: colors.neutral[100],
+    borderRadius: 6,
+    marginTop: spacing[4],
+    marginBottom: spacing[2],
+    overflow: 'hidden',
+  },
+  levelProgressFill: {
+    height: '100%',
+    backgroundColor: colors.accent.amber,
+    borderRadius: 6,
+  },
+  levelProgressText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginBottom: spacing[2],
+  },
+  levelNeedText: {
+    fontSize: typography.size.base,
+    color: colors.neutral[700],
+    textAlign: 'center',
+  },
+  levelNeedHighlight: {
+    fontWeight: typography.weight.bold,
+    color: colors.accent.amber,
   },
 });
