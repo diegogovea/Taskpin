@@ -5,6 +5,7 @@ import { BlurView } from "expo-blur";
 import { useEffect } from "react";
 import { colors, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Tab icon component with modern styling
 function TabIcon({
@@ -46,6 +47,7 @@ function TabIcon({
 
 export default function TabsLayout() {
   const { user, isLoading } = useAuth();
+  const { palette } = useTheme();
   const router = useRouter();
 
   // 🔐 Protección: Si no hay sesión, redirigir al login
@@ -74,7 +76,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { backgroundColor: palette.surface }],
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
       }}

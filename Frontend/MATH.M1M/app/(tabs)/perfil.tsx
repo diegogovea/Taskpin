@@ -343,16 +343,6 @@ export default function PerfilScreen() {
           </View>
         </View>
 
-        {/* Log Out Button */}
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={22} color={colors.semantic.error} />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
-        </TouchableOpacity>
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>

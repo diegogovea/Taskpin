@@ -430,6 +430,63 @@ def update_user(user_id: int, user_data: UserUpdateSchema, current_user: TokenDa
     conn.update(user_id, data)
     return Response(status_code=HTTP_204_NO_CONTENT)
 
+class CambiarPasswordSchema(BaseModel):
+    contrasena_actual: str
+    nueva_contrasena: str
+
+
+class VerificarPasswordSchema(BaseModel):
+    contrasena: str
+
+
+@app.post("/api/usuario/{user_id}/verificar-password", status_code=HTTP_200_OK)
+def verificar_password(
+    user_id: int,
+    data: VerificarPasswordSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Verifica la contraseña del usuario sin modificar nada (PROTEGIDO)."""
+    verify_user_access(user_id, current_user)
+    existing_user = conn.read_one(user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if not conn.verify_password(data.contrasena, existing_user[3]):
+        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
+    return {"success": True}
+
+
+@app.put("/api/usuario/{user_id}/cambiar-password", status_code=HTTP_200_OK)
+def cambiar_password(
+    user_id: int,
+    data: CambiarPasswordSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    Cambiar la contraseña del usuario (PROTEGIDO).
+    Verifica la contraseña actual antes de actualizar.
+    """
+    verify_user_access(user_id, current_user)
+
+    if len(data.nueva_contrasena) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña debe tener al menos 6 caracteres"
+        )
+
+    existing_user = conn.read_one(user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Verificar contraseña actual
+    if not conn.verify_password(data.contrasena_actual, existing_user[3]):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+
+    # Actualizar a la nueva contraseña (hash lo maneja conn.update)
+    conn.update(user_id, {"contraseña": data.nueva_contrasena})
+
+    return {"success": True, "message": "Contraseña actualizada correctamente"}
+
+
 @app.delete("/api/usuario/{user_id}", status_code=HTTP_204_NO_CONTENT)
 def delete_user(user_id: int):
     """Eliminar usuario"""
