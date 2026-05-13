@@ -97,6 +97,53 @@ class EstadisticasConnection:
                     print(f"Error al actualizar puntos: {e}")
                     return None
     
+    def reset_racha_si_expirada(self, user_id: int):
+        """
+        Verifica si la racha del usuario está rota (sin actividad ayer ni hoy) y,
+        de ser así, la pone a 0 en BD y devuelve 0.
+
+        Llamar ANTES de exponer racha_actual al cliente (GET /estadisticas).
+
+        Returns:
+            int: racha_actual vigente (0 si se acaba de resetear, o la guardada si sigue viva)
+            None: si no existe el registro
+        """
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute("""
+                        SELECT racha_actual, ultima_actividad
+                        FROM estadisticas_usuario
+                        WHERE user_id = %s;
+                    """, (user_id,))
+                    result = cur.fetchone()
+                    if not result:
+                        return None
+
+                    racha_actual, ultima_actividad = result
+                    hoy = date.today()
+                    ayer = hoy - timedelta(days=1)
+
+                    # La racha sigue viva si la última actividad fue hoy o ayer
+                    racha_viva = ultima_actividad is not None and ultima_actividad >= ayer
+
+                    if not racha_viva and racha_actual != 0:
+                        cur.execute("""
+                            UPDATE estadisticas_usuario
+                            SET racha_actual = 0
+                            WHERE user_id = %s;
+                        """, (user_id,))
+                        conn.commit()
+                        return 0
+
+                    return racha_actual
+
+                except Exception as e:
+                    conn.rollback()
+                    print(f"Error al verificar expiración de racha: {e}")
+                    return None
+
     def actualizar_racha(self, user_id: int):
         """
         Actualiza la racha del usuario basándose en la última actividad.

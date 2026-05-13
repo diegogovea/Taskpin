@@ -1306,14 +1306,18 @@ def get_estadisticas_usuario(user_id: int):
         if not data:
             raise HTTPException(status_code=404, detail="Estadísticas no encontradas para este usuario")
         
-        # Extraer datos: (estadistica_id, user_id, puntos_totales, racha_actual, 
+        # Extraer datos: (estadistica_id, user_id, puntos_totales, racha_actual,
         #                 racha_maxima, nivel, ultima_actividad, fecha_creacion)
         puntos_totales = data[2]
-        racha_actual = data[3]
         racha_maxima = data[4]
         nivel = data[5]
         ultima_actividad = data[6]
-        
+
+        # Verificar si la racha expiró (sin actividad ayer ni hoy) y resetear en BD
+        racha_actual = stats_conn.reset_racha_si_expirada(user_id)
+        if racha_actual is None:
+            racha_actual = data[3]  # fallback al valor guardado si hay error
+
         # Calcular progreso al siguiente nivel
         progreso_siguiente = calcular_progreso_nivel(puntos_totales, nivel)
         
