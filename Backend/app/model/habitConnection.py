@@ -1,12 +1,46 @@
 import psycopg  # Importa el módulo psycopg para manejar excepciones
 from ..database import get_pool  # Importar pool de conexiones
+from datetime import date, timedelta
+
+
+def _calcular_racha_desde_fechas(fechas: list) -> int:
+    """
+    Calcula la racha activa (días consecutivos hasta hoy o ayer) a partir de
+    una lista de fechas de tipo date, ordenada de más reciente a más antigua.
+
+    Reglas:
+    - Si la fecha más reciente no es hoy ni ayer → racha = 0 (rota).
+    - Desde esa fecha hacia atrás, cuenta solo días estrictamente consecutivos.
+
+    Returns:
+        int: longitud de la racha activa (0 si está rota).
+    """
+    if not fechas:
+        return 0
+
+    hoy = date.today()
+    ayer = hoy - timedelta(days=1)
+
+    # La racha solo puede estar viva si el último día completado fue hoy o ayer
+    if fechas[0] not in (hoy, ayer):
+        return 0
+
+    racha = 1
+    for i in range(1, len(fechas)):
+        if fechas[i] == fechas[i - 1] - timedelta(days=1):
+            racha += 1
+        else:
+            break
+
+    return racha
+
 
 class habitConnection():
     """
     Clase para manejar operaciones de hábitos.
     Usa el pool de conexiones compartido.
     """
-    
+
     def __init__(self):
         # Ya no creamos conexión aquí, usamos el pool
         pass
@@ -185,25 +219,15 @@ class habitConnection():
                 """, (habito_usuario_id,))
                 dias_completados = cur.fetchone()[0]
                 
-                # Estadísticas: racha actual
+                # Estadísticas: racha actual (usa helper unificado)
                 cur.execute("""
-                    SELECT fecha FROM seguimiento_habitos 
+                    SELECT fecha FROM seguimiento_habitos
                     WHERE habito_usuario_id = %s AND completado = true
                     ORDER BY fecha DESC;
                 """, (habito_usuario_id,))
                 fechas = [row[0] for row in cur.fetchall()]
-                
-                racha_actual = 0
-                if fechas:
-                    from datetime import date, timedelta
-                    hoy = date.today()
-                    fecha_esperada = hoy
-                    for fecha in fechas:
-                        if fecha == fecha_esperada or fecha == fecha_esperada - timedelta(days=1):
-                            racha_actual += 1
-                            fecha_esperada = fecha - timedelta(days=1)
-                        else:
-                            break
+
+                racha_actual = _calcular_racha_desde_fechas(fechas)
                 
                 return {
                     'habito_usuario_id': habito_info[0],
@@ -236,9 +260,9 @@ class habitConnection():
                         INSERT INTO habitos_predeterminados 
                         (categoria_id, nombre, descripcion, frecuencia_recomendada, 
                          puntos_base, es_personalizado, creado_por_user_id)
-                        VALUES (6, %s, %s, 'diario', 10, true, %s)
+                        VALUES (6, %s, %s, %s, 10, true, %s)
                         RETURNING habito_id;
-                    """, (nombre, descripcion, user_id))
+                    """, (nombre, descripcion, frecuencia_personal, user_id))
                     habito_id = cur.fetchone()[0]
                     
                     # 2. Agregarlo automáticamente al usuario
@@ -439,8 +463,6 @@ class habitConnection():
 
     def get_habito_rachas(self, habito_usuario_id, user_id):
         """Obtiene estadísticas de rachas de un hábito"""
-        from datetime import date, timedelta
-        
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
@@ -506,19 +528,21 @@ class habitConnection():
                     'dias': (racha_fin - racha_inicio).days + 1
                 })
                 
-                # Determinar racha actual (si la última incluye hoy o ayer)
+                # Determinar racha actual usando el helper unificado
+                # fechas ya viene ordenada ASC; para el helper necesitamos DESC
+                fechas_desc = list(reversed(fechas))
+                racha_actual = _calcular_racha_desde_fechas(fechas_desc)
+
                 hoy = date.today()
                 ayer = hoy - timedelta(days=1)
                 ultima_racha = rachas[-1]
-                
-                if racha_fin == hoy or racha_fin == ayer:
-                    racha_actual = ultima_racha['dias']
+
+                if racha_actual > 0:
                     fecha_inicio_racha_actual = ultima_racha['inicio']
-                    # Marcar como racha activa (fin = null)
+                    # Si la racha llega hasta hoy, marcar fin como None (en curso)
                     if racha_fin == hoy:
                         ultima_racha['fin'] = None
                 else:
-                    racha_actual = 0
                     fecha_inicio_racha_actual = None
                 
                 # Encontrar racha máxima

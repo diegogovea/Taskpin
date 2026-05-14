@@ -8,6 +8,7 @@ import {
   ScrollView,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -31,6 +32,51 @@ interface Achievement {
   color: string;
   unlocked: boolean;
   description: string;
+  category: string;
+}
+
+// ── Componente reutilizable para cada logro ──
+function AchievementCard({ achievement, large }: { achievement: Achievement; large?: boolean }) {
+  return (
+    <View
+      style={[
+        styles.achievementItem,
+        large && styles.achievementItemLarge,
+        !achievement.unlocked && styles.achievementLocked,
+      ]}
+    >
+      <View
+        style={[
+          styles.achievementIcon,
+          large && styles.achievementIconLarge,
+          { backgroundColor: achievement.unlocked ? achievement.color + "20" : colors.neutral[100] },
+        ]}
+      >
+        <Ionicons
+          name={achievement.icon as any}
+          size={large ? 28 : 24}
+          color={achievement.unlocked ? achievement.color : colors.neutral[300]}
+        />
+      </View>
+      <Text
+        style={[
+          styles.achievementName,
+          !achievement.unlocked && styles.achievementNameLocked,
+        ]}
+        numberOfLines={2}
+      >
+        {achievement.name}
+      </Text>
+      <Text style={styles.achievementDesc} numberOfLines={2}>
+        {achievement.description}
+      </Text>
+      {achievement.unlocked && (
+        <View style={styles.unlockedBadge}>
+          <Ionicons name="checkmark" size={10} color={colors.neutral[0]} />
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function PerfilScreen() {
@@ -46,60 +92,150 @@ export default function PerfilScreen() {
     completionRate: 0,
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
 
-  // Logros basados en stats
-  const getAchievements = (): Achievement[] => {
-    return [
-      {
-        id: "first_habit",
-        name: "Primer Paso",
-        icon: "footsteps",
-        color: colors.secondary[500],
-        unlocked: stats.totalHabits >= 1,
-        description: "Crea tu primer hábito",
-      },
-      {
-        id: "streak_7",
-        name: "Guerrero Semanal",
-        icon: "flame",
-        color: colors.accent.amber,
-        unlocked: stats.streak >= 7,
-        description: "7 días de racha",
-      },
-      {
-        id: "streak_30",
-        name: "Maestro Mensual",
-        icon: "calendar",
-        color: colors.primary[600],
-        unlocked: stats.streak >= 30,
-        description: "30 días de racha",
-      },
-      {
-        id: "points_100",
-        name: "Coleccionista",
-        icon: "diamond",
-        color: colors.accent.cyan,
-        unlocked: stats.totalPoints >= 100,
-        description: "Gana 100 puntos",
-      },
-      {
-        id: "points_500",
-        name: "Cazador de Puntos",
-        icon: "trophy",
-        color: colors.accent.rose,
-        unlocked: stats.totalPoints >= 500,
-        description: "Gana 500 puntos",
-      },
-      {
-        id: "habits_5",
-        name: "Constructor",
-        icon: "construct",
-        color: colors.secondary[600],
-        unlocked: stats.totalHabits >= 5,
-        description: "Sigue 5 hábitos",
-      },
-    ];
-  };
+  // ── Logros basados en stats reales ──
+  const getAchievements = (): Achievement[] => [
+    // Hábitos
+    {
+      id: "first_habit",
+      name: "Primer Paso",
+      icon: "footsteps",
+      color: colors.secondary[500],
+      unlocked: stats.totalHabits >= 1,
+      description: "Añade tu primer hábito",
+      category: "Hábitos",
+    },
+    {
+      id: "habits_3",
+      name: "Triatleta",
+      icon: "barbell",
+      color: colors.secondary[400],
+      unlocked: stats.totalHabits >= 3,
+      description: "Sigue 3 hábitos a la vez",
+      category: "Hábitos",
+    },
+    {
+      id: "habits_5",
+      name: "Constructor",
+      icon: "construct",
+      color: colors.secondary[600],
+      unlocked: stats.totalHabits >= 5,
+      description: "Sigue 5 hábitos a la vez",
+      category: "Hábitos",
+    },
+    {
+      id: "habits_10",
+      name: "Colección Épica",
+      icon: "layers",
+      color: colors.primary[700],
+      unlocked: stats.totalHabits >= 10,
+      description: "Sigue 10 hábitos a la vez",
+      category: "Hábitos",
+    },
+    {
+      id: "perfect_day",
+      name: "Día Perfecto",
+      icon: "checkmark-circle",
+      color: colors.secondary[500],
+      unlocked: stats.totalHabits > 0 && stats.completionRate === 100,
+      description: "Completa el 100% de tus hábitos en un día",
+      category: "Hábitos",
+    },
+    // Racha
+    {
+      id: "streak_3",
+      name: "Arrancando",
+      icon: "flash",
+      color: colors.accent.amber,
+      unlocked: stats.streak >= 3,
+      description: "3 días de racha",
+      category: "Racha",
+    },
+    {
+      id: "streak_7",
+      name: "Guerrero Semanal",
+      icon: "flame",
+      color: colors.accent.amber,
+      unlocked: stats.streak >= 7,
+      description: "7 días de racha",
+      category: "Racha",
+    },
+    {
+      id: "streak_14",
+      name: "Imparable",
+      icon: "rocket",
+      color: colors.accent.rose,
+      unlocked: stats.streak >= 14,
+      description: "14 días de racha",
+      category: "Racha",
+    },
+    {
+      id: "streak_30",
+      name: "Maestro Mensual",
+      icon: "calendar",
+      color: colors.primary[600],
+      unlocked: stats.streak >= 30,
+      description: "30 días de racha",
+      category: "Racha",
+    },
+    {
+      id: "streak_100",
+      name: "Leyenda",
+      icon: "star",
+      color: "#F59E0B",
+      unlocked: stats.streak >= 100,
+      description: "100 días de racha",
+      category: "Racha",
+    },
+    // Puntos
+    {
+      id: "points_100",
+      name: "Coleccionista",
+      icon: "diamond",
+      color: colors.accent.cyan,
+      unlocked: stats.totalPoints >= 100,
+      description: "Acumula 100 puntos",
+      category: "Puntos",
+    },
+    {
+      id: "points_500",
+      name: "Cazador de Puntos",
+      icon: "trophy",
+      color: colors.accent.rose,
+      unlocked: stats.totalPoints >= 500,
+      description: "Acumula 500 puntos",
+      category: "Puntos",
+    },
+    {
+      id: "points_1000",
+      name: "Mil Glorias",
+      icon: "medal",
+      color: "#D97706",
+      unlocked: stats.totalPoints >= 1000,
+      description: "Acumula 1 000 puntos",
+      category: "Puntos",
+    },
+    // Nivel
+    {
+      id: "level_5",
+      name: "En Forma",
+      icon: "trending-up",
+      color: colors.primary[500],
+      unlocked: stats.level >= 5,
+      description: "Alcanza el nivel 5",
+      category: "Nivel",
+    },
+    {
+      id: "level_10",
+      name: "Élite",
+      icon: "infinite",
+      color: colors.primary[700],
+      unlocked: stats.level >= 10,
+      description: "Alcanza el nivel 10",
+      category: "Nivel",
+    },
+  ];
 
   const loadEstadisticas = async (userId: number) => {
     try {
@@ -195,6 +331,22 @@ export default function PerfilScreen() {
 
   const achievements = getAchievements();
   const unlockedCount = achievements.filter(a => a.unlocked).length;
+
+  // En el perfil sólo mostramos los 3 primeros desbloqueados
+  // (o los 3 primeros de la lista si no hay ninguno desbloqueado)
+  const previewAchievements = (() => {
+    const unlocked = achievements.filter(a => a.unlocked);
+    if (unlocked.length >= 3) return unlocked.slice(0, 3);
+    const locked = achievements.filter(a => !a.unlocked);
+    return [...unlocked, ...locked].slice(0, 3);
+  })();
+
+  // Agrupar todos los logros por categoría para el modal
+  const achievementsByCategory = achievements.reduce<Record<string, Achievement[]>>((acc, a) => {
+    if (!acc[a.category]) acc[a.category] = [];
+    acc[a.category].push(a);
+    return acc;
+  }, {});
 
   return (
     <SafeAreaView style={styles.container}>
@@ -302,59 +454,71 @@ export default function PerfilScreen() {
           </View>
         </View>
 
-        {/* Achievements */}
+        {/* Achievements — preview */}
         <View style={styles.achievementsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Logros</Text>
             <Text style={styles.sectionSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
           </View>
+
+          {/* Grid de 3 logros preview */}
           <View style={styles.achievementsGrid}>
-            {achievements.map((achievement) => (
-              <View 
-                key={achievement.id} 
-                style={[
-                  styles.achievementItem,
-                  !achievement.unlocked && styles.achievementLocked
-                ]}
-              >
-                <View 
-                  style={[
-                    styles.achievementIcon,
-                    { backgroundColor: achievement.unlocked ? achievement.color + "20" : colors.neutral[100] }
-                  ]}
-                >
-                  <Ionicons 
-                    name={achievement.icon as any} 
-                    size={24} 
-                    color={achievement.unlocked ? achievement.color : colors.neutral[300]} 
-                  />
-                </View>
-                <Text 
-                  style={[
-                    styles.achievementName,
-                    !achievement.unlocked && styles.achievementNameLocked
-                  ]}
-                >
-                  {achievement.name}
-                </Text>
-                <Text style={styles.achievementDesc}>{achievement.description}</Text>
-              </View>
+            {previewAchievements.map((achievement) => (
+              <AchievementCard key={achievement.id} achievement={achievement} />
             ))}
           </View>
-        </View>
 
-        {/* Log Out Button */}
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={22} color={colors.semantic.error} />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
-        </TouchableOpacity>
+          {/* Botón Ver más */}
+          <TouchableOpacity
+            style={styles.verMasBtn}
+            onPress={() => setShowAllAchievements(true)}
+          >
+            <Text style={styles.verMasText}>Ver todos los logros</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* ── Modal: Todos los logros ── */}
+
+      <Modal
+        visible={showAllAchievements}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAllAchievements(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          {/* Handle + header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Todos los logros</Text>
+            <Text style={styles.modalSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowAllAchievements(false)}
+            >
+              <Ionicons name="close" size={22} color={colors.neutral[600]} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalScroll}
+          >
+            {Object.entries(achievementsByCategory).map(([category, items]) => (
+              <View key={category} style={styles.modalCategory}>
+                <Text style={styles.modalCategoryTitle}>{category}</Text>
+                <View style={styles.achievementsGrid}>
+                  {items.map((achievement) => (
+                    <AchievementCard key={achievement.id} achievement={achievement} large />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -611,10 +775,97 @@ const styles = StyleSheet.create({
   achievementNameLocked: {
     color: colors.neutral[400],
   },
+  achievementItemLarge: {
+    width: "31%",
+  },
+  achievementIconLarge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
   achievementDesc: {
     fontSize: 10,
     color: colors.neutral[400],
     textAlign: "center",
+  },
+  unlockedBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.secondary[500],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Ver más button
+  verMasBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing[1],
+    marginTop: spacing[4],
+    paddingVertical: spacing[3],
+    borderRadius: radius.xl,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  verMasText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
+  },
+
+  // Modal logros
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.neutral[50],
+  },
+  modalHeader: {
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[5],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+    backgroundColor: colors.neutral[0],
+  },
+  modalTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
+  },
+  modalSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+  },
+  modalCloseBtn: {
+    position: "absolute",
+    top: spacing[5],
+    right: spacing[5],
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neutral[100],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalScroll: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[5],
+    paddingBottom: 40,
+  },
+  modalCategory: {
+    marginBottom: spacing[6],
+  },
+  modalCategoryTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[700],
+    marginBottom: spacing[3],
+    paddingLeft: spacing[1],
   },
 
   // Log Out

@@ -97,6 +97,53 @@ class EstadisticasConnection:
                     print(f"Error al actualizar puntos: {e}")
                     return None
     
+    def reset_racha_si_expirada(self, user_id: int):
+        """
+        Verifica si la racha del usuario está rota (sin actividad ayer ni hoy) y,
+        de ser así, la pone a 0 en BD y devuelve 0.
+
+        Llamar ANTES de exponer racha_actual al cliente (GET /estadisticas).
+
+        Returns:
+            int: racha_actual vigente (0 si se acaba de resetear, o la guardada si sigue viva)
+            None: si no existe el registro
+        """
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute("""
+                        SELECT racha_actual, ultima_actividad
+                        FROM estadisticas_usuario
+                        WHERE user_id = %s;
+                    """, (user_id,))
+                    result = cur.fetchone()
+                    if not result:
+                        return None
+
+                    racha_actual, ultima_actividad = result
+                    hoy = date.today()
+                    ayer = hoy - timedelta(days=1)
+
+                    # La racha sigue viva si la última actividad fue hoy o ayer
+                    racha_viva = ultima_actividad is not None and ultima_actividad >= ayer
+
+                    if not racha_viva and racha_actual != 0:
+                        cur.execute("""
+                            UPDATE estadisticas_usuario
+                            SET racha_actual = 0
+                            WHERE user_id = %s;
+                        """, (user_id,))
+                        conn.commit()
+                        return 0
+
+                    return racha_actual
+
+                except Exception as e:
+                    conn.rollback()
+                    print(f"Error al verificar expiración de racha: {e}")
+                    return None
+
     def actualizar_racha(self, user_id: int):
         """
         Actualiza la racha del usuario basándose en la última actividad.
@@ -227,21 +274,22 @@ class EstadisticasConnection:
     def _calcular_nivel_por_puntos(self, puntos_totales: int) -> int:
         """
         Calcula el nivel correspondiente a una cantidad de puntos.
-        
-        Escala:
-        - Nivel 1: 0-49 puntos
-        - Nivel 2: 50-149 puntos
-        - Nivel 3: 150-349 puntos
-        - Nivel 4: 350-749 puntos
-        - etc.
+        Usa la misma fórmula que calcular_nivel_desde_puntos en main.py:
+        puntos_para_subir_nivel(n) = 100 * n² + 100
+
+        - Nivel 1→2:  200 pts
+        - Nivel 2→3:  500 pts
+        - Nivel 3→4: 1 000 pts
+        - Nivel 4→5: 1 700 pts
         """
         nivel = 1
         puntos_acumulados = 0
-        puntos_necesarios = 50
-        
-        while puntos_acumulados + puntos_necesarios <= puntos_totales:
-            puntos_acumulados += puntos_necesarios
+
+        while True:
+            necesarios = 100 * (nivel ** 2) + 100
+            if puntos_acumulados + necesarios > puntos_totales:
+                break
+            puntos_acumulados += necesarios
             nivel += 1
-            puntos_necesarios *= 2  # Duplica cada nivel
-        
+
         return nivel

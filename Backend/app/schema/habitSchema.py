@@ -25,8 +25,8 @@ class AddHabitoToUserSchema(BaseModel):
 
     @validator('frecuencia_personal')
     def validate_frecuencia(cls, v):
-        if v not in ['diario', 'semanal', 'personalizado']:
-            raise ValueError('La frecuencia debe ser diario, semanal o personalizado')
+        if v not in ['diario', 'semanal', 'mensual', 'personalizado']:
+            raise ValueError('La frecuencia debe ser diario, semanal, mensual o personalizado')
         return v
 
 class AddMultipleHabitosSchema(BaseModel):
