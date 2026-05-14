@@ -216,21 +216,21 @@ export default function TimelinePlan() {
               <Ionicons name="checkmark-circle" size={20} color={colors.secondary[600]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.completadas}</Text>
-            <Text style={styles.statLabel}>Completadas</Text>
+            <Text style={styles.statLabel}>Fases completadas</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: colors.primary[100] }]}>
               <Ionicons name="play-circle" size={20} color={colors.primary[600]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.enProgreso}</Text>
-            <Text style={styles.statLabel}>En Progreso</Text>
+            <Text style={styles.statLabel}>Fases en progreso</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: colors.neutral[100] }]}>
               <Ionicons name="ellipse-outline" size={20} color={colors.neutral[500]} />
             </View>
             <Text style={styles.statValue}>{estadoCounts.pendientes}</Text>
-            <Text style={styles.statLabel}>Pendientes</Text>
+            <Text style={styles.statLabel}>Fases pendientes</Text>
           </View>
         </View>
 

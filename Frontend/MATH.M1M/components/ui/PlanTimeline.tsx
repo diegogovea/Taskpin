@@ -91,12 +91,12 @@ export default function PlanTimeline({ planInfo, fases, onFasePress }: PlanTimel
       {/* Header con info del día actual */}
       <View style={styles.header}>
         <View style={styles.dayInfo}>
-          <Text style={styles.dayLabel}>Current Day</Text>
+          <Text style={styles.dayLabel}>Día actual</Text>
           <Text style={styles.dayValue}>{dia_actual}</Text>
-          <Text style={styles.dayTotal}>of {dias_totales}</Text>
+          <Text style={styles.dayTotal}>de {dias_totales}</Text>
         </View>
         <View style={styles.progressInfo}>
-          <Text style={styles.progressLabel}>{planInfo.dias_restantes} days remaining</Text>
+          <Text style={styles.progressLabel}>{planInfo.dias_restantes} días restantes</Text>
         </View>
       </View>
 
@@ -195,7 +195,7 @@ export default function PlanTimeline({ planInfo, fases, onFasePress }: PlanTimel
               </View>
               <View style={styles.legendDetails}>
                 <Text style={styles.legendDays}>
-                  Days {fase.dia_inicio}-{fase.dia_fin}
+                  Días {fase.dia_inicio}-{fase.dia_fin}
                 </Text>
                 <Text style={[styles.legendProgress, { color: estadoColor }]}>
                   {fase.porcentaje_completado}%
@@ -204,7 +204,7 @@ export default function PlanTimeline({ planInfo, fases, onFasePress }: PlanTimel
               <View style={styles.legendTasks}>
                 <Ionicons name="checkbox-outline" size={12} color={colors.neutral[500]} />
                 <Text style={styles.legendTasksText}>
-                  {fase.tareas_completadas}/{fase.tareas_total} tasks
+                  {fase.tareas_completadas}/{fase.tareas_total} tareas
                 </Text>
               </View>
             </TouchableOpacity>

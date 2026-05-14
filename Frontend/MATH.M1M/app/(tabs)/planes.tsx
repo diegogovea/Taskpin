@@ -274,15 +274,15 @@ export default function PlanesScreen() {
             <View style={styles.statsContainer}>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{activePlans.length}</Text>
-                <Text style={styles.statLabel}>Activos</Text>
+                <Text style={styles.statLabel}>Planes activos</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{avgProgress}%</Text>
-                <Text style={styles.statLabel}>Promedio</Text>
+                <Text style={styles.statLabel}>Progreso</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{completedPlans.length}</Text>
-                <Text style={styles.statLabel}>Completados</Text>
+                <Text style={styles.statLabel}>Planes completados</Text>
               </View>
             </View>
 

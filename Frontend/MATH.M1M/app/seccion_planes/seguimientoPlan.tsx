@@ -11,6 +11,9 @@ import {
   RefreshControl,
   Modal,
   Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -97,6 +100,11 @@ export default function SeguimientoPlanScreen() {
   const [accionPendiente, setAccionPendiente] = useState<"pausar" | "reanudar" | "cancelar" | null>(null);
   const [procesandoAccion, setProcesandoAccion] = useState(false);
 
+  // Modal edición
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFechaObjetivo, setEditFechaObjetivo] = useState("");
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
   // =====================
   // FETCH DATA
   // =====================
@@ -163,6 +171,59 @@ export default function SeguimientoPlanScreen() {
     setShowActionMenu(false);
     setAccionPendiente(accion);
     setShowConfirmModal(true);
+  };
+
+  const abrirEditarPlan = () => {
+    // Pre-rellenar con la fecha objetivo actual si existe
+    const fechaActual = dashboard?.progreso_general
+      ? (() => {
+          const hoy = new Date();
+          const diasRestantes = dashboard.progreso_general.dias_totales - dashboard.progreso_general.dias_transcurridos;
+          const fechaObj = new Date(hoy.getTime() + diasRestantes * 86400000);
+          return fechaObj.toISOString().split('T')[0];
+        })()
+      : "";
+    setEditFechaObjetivo(fechaActual);
+    setShowActionMenu(false);
+    setShowEditModal(true);
+  };
+
+  const guardarEdicionPlan = async () => {
+    if (!editFechaObjetivo) {
+      Alert.alert("Error", "Ingresa una fecha objetivo válida");
+      return;
+    }
+    // Validar formato YYYY-MM-DD
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(editFechaObjetivo)) {
+      Alert.alert("Error", "Usa el formato AAAA-MM-DD (ejemplo: 2026-12-31)");
+      return;
+    }
+    // No permitir fechas pasadas
+    if (new Date(editFechaObjetivo) < new Date(new Date().toISOString().split('T')[0])) {
+      Alert.alert("Error", "La fecha objetivo no puede ser anterior a hoy");
+      return;
+    }
+    setGuardandoEdicion(true);
+    try {
+      const res = await authFetch(`/api/planes/${planUsuarioId}/editar`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha_objetivo: editFechaObjetivo }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setShowEditModal(false);
+        Alert.alert("Éxito", "Plan actualizado correctamente");
+        fetchDashboard();
+      } else {
+        Alert.alert("Error", json.detail || "No se pudo actualizar el plan");
+      }
+    } catch {
+      Alert.alert("Error", "Error de conexión. Intenta de nuevo.");
+    } finally {
+      setGuardandoEdicion(false);
+    }
   };
 
   const confirmarAccion = () => {
@@ -457,15 +518,15 @@ export default function SeguimientoPlanScreen() {
             <Text style={styles.quickActionText}>Línea de tiempo</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => Alert.alert('Próximamente', 'Las estadísticas del plan estarán disponibles en una futura actualización.')}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
-              <Ionicons name="stats-chart-outline" size={18} color={colors.secondary[600]} />
+          <View style={[styles.quickActionBtn, styles.quickActionBtnDisabled]}>
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.neutral[100] }]}>
+              <Ionicons name="stats-chart-outline" size={18} color={colors.neutral[400]} />
             </View>
-            <Text style={styles.quickActionText}>Estadísticas</Text>
-          </TouchableOpacity>
+            <Text style={[styles.quickActionText, { color: colors.neutral[400] }]}>Estadísticas</Text>
+            <View style={styles.proximamenteBadge}>
+              <Text style={styles.proximamenteText}>Pronto</Text>
+            </View>
+          </View>
           
           <TouchableOpacity 
             style={styles.quickActionBtn}
@@ -615,6 +676,19 @@ export default function SeguimientoPlanScreen() {
             <View style={styles.actionMenuHeader}>
               <Text style={styles.actionMenuTitle}>Opciones del Plan</Text>
             </View>
+
+            {/* Editar Plan — siempre disponible si está activo o pausado */}
+            {(estadoPlan === "activo" || estadoPlan === "pausado") && (
+              <TouchableOpacity style={styles.actionMenuItem} onPress={abrirEditarPlan}>
+                <View style={[styles.actionMenuIcon, { backgroundColor: colors.primary[100] }]}>
+                  <Ionicons name="create-outline" size={22} color={colors.primary[600]} />
+                </View>
+                <View style={styles.actionMenuTextContainer}>
+                  <Text style={styles.actionMenuItemText}>Editar Plan</Text>
+                  <Text style={styles.actionMenuItemSubtext}>Ajusta la fecha objetivo</Text>
+                </View>
+              </TouchableOpacity>
+            )}
             
             {estadoPlan === "activo" && (
               <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("pausar")}>
@@ -657,6 +731,60 @@ export default function SeguimientoPlanScreen() {
             </TouchableOpacity>
           </View>
         </Pressable>
+      </Modal>
+
+      {/* ── Editar Plan Modal ── */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.editModalOverlay}
+        >
+          <View style={styles.editModalSheet}>
+            <View style={styles.editModalHandle} />
+            <Text style={styles.editModalTitle}>Editar Plan</Text>
+            <Text style={styles.editModalSubtitle}>
+              Ajusta la fecha en la que quieres alcanzar tu objetivo
+            </Text>
+
+            <Text style={styles.editModalLabel}>Fecha objetivo</Text>
+            <TextInput
+              style={styles.editModalInput}
+              value={editFechaObjetivo}
+              onChangeText={setEditFechaObjetivo}
+              placeholder="AAAA-MM-DD  (ej. 2026-12-31)"
+              placeholderTextColor={colors.neutral[400]}
+              keyboardType="numeric"
+              maxLength={10}
+              autoFocus
+            />
+            <Text style={styles.editModalHint}>Formato: Año-Mes-Día</Text>
+
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity
+                style={styles.editModalCancelBtn}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.editModalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editModalSaveBtn, guardandoEdicion && { opacity: 0.6 }]}
+                onPress={guardarEdicionPlan}
+                disabled={guardandoEdicion}
+              >
+                {guardandoEdicion ? (
+                  <ActivityIndicator size="small" color={colors.neutral[0]} />
+                ) : (
+                  <Text style={styles.editModalSaveText}>Guardar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Confirm Modal */}
@@ -1113,6 +1241,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.sm,
   },
+  quickActionBtnDisabled: {
+    opacity: 0.6,
+  },
+  proximamenteBadge: {
+    marginTop: spacing[1],
+    backgroundColor: colors.neutral[100],
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+  },
+  proximamenteText: {
+    fontSize: 9,
+    color: colors.neutral[400],
+    fontWeight: typography.weight.medium,
+  },
   quickActionIcon: {
     width: 40,
     height: 40,
@@ -1131,5 +1274,89 @@ const styles = StyleSheet.create({
     fontSize: typography.size.base,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[600],
+  },
+
+  // ── Edit Plan Modal ──
+  editModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  editModalSheet: {
+    backgroundColor: colors.neutral[0],
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing[6],
+    paddingBottom: spacing[10],
+  },
+  editModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.neutral[300],
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing[5],
+  },
+  editModalTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    marginBottom: spacing[1],
+  },
+  editModalSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    marginBottom: spacing[5],
+    lineHeight: 20,
+  },
+  editModalLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
+  },
+  editModalInput: {
+    borderWidth: 1.5,
+    borderColor: colors.primary[300],
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.base,
+    color: colors.neutral[900],
+    backgroundColor: colors.neutral[50],
+  },
+  editModalHint: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+    marginTop: spacing[1],
+    marginBottom: spacing[5],
+  },
+  editModalButtons: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  editModalCancelBtn: {
+    flex: 1,
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    backgroundColor: colors.neutral[100],
+    alignItems: 'center',
+  },
+  editModalCancelText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[600],
+  },
+  editModalSaveBtn: {
+    flex: 1,
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+  },
+  editModalSaveText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[0],
   },
 });

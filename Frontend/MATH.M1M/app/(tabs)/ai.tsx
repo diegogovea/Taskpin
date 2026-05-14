@@ -195,7 +195,7 @@ export default function AIScreen() {
             <Text style={[styles.statNumber, { color: colors.secondary[600] }]}>
               {avgPrediction}%
             </Text>
-            <Text style={styles.statLabel}>Prom. Éxito</Text>
+            <Text style={styles.statLabel}>Prob. de éxito{"\n"}promedio</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -205,7 +205,7 @@ export default function AIScreen() {
             <Text style={[styles.statNumber, { color: colors.accent.amber }]}>
               {highConfidence}
             </Text>
-            <Text style={styles.statLabel}>Alta Conf.</Text>
+            <Text style={styles.statLabel}>Hábitos con{"\n"}≥80% de éxito</Text>
           </View>
         </View>
 
@@ -218,8 +218,8 @@ export default function AIScreen() {
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="checkmark-done-circle" size={48} color={colors.secondary[400]} />
               </View>
-              <Text style={styles.emptyTitle}>¡Todo al día!</Text>
-              <Text style={styles.emptySubtitle}>Ya tienes todos los hábitos sugeridos</Text>
+              <Text style={styles.emptyTitle}>¡Sin sugerencias nuevas!</Text>
+              <Text style={styles.emptySubtitle}>Ya tienes en tu lista todos los hábitos que te recomendaríamos. ¡Sigue así! 💪</Text>
             </View>
           ) : (
             recomendaciones.map((rec, index) => (
@@ -249,12 +249,12 @@ export default function AIScreen() {
                       {index === 0 && (
                         <View style={styles.topBadge}>
                           <Ionicons name="star" size={10} color={colors.neutral[0]} />
-                          <Text style={styles.topBadgeText}>TOP</Text>
+                          <Text style={styles.topBadgeText}>Mejor opción</Text>
                         </View>
                       )}
                     </View>
                     <View style={styles.habitMeta}>
-                      <Text style={styles.habitCategory}>{rec.categoria || "General"}</Text>
+                      <Text style={styles.habitCategory}>{rec.categoria || "Sin categoría"}</Text>
                       <View style={styles.habitPoints}>
                         <Ionicons name="people" size={12} color={colors.primary[500]} />
                         <Text style={styles.habitPointsText}>{Math.round(rec.score * 100)}% coincidencia</Text>
@@ -273,6 +273,7 @@ export default function AIScreen() {
         {/* Predictions Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Predicciones de Hoy</Text>
+          <Text style={styles.sectionSubtitle}>El porcentaje indica la probabilidad de que completes cada hábito hoy, basado en tu historial.</Text>
 
           {predicciones.length === 0 ? (
             <View style={styles.emptyState}>
@@ -430,7 +431,13 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[800],
+    marginBottom: spacing[2],
+  },
+  sectionSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
     marginBottom: spacing[4],
+    lineHeight: 18,
   },
   emptyState: {
     alignItems: "center",

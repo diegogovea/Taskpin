@@ -97,11 +97,11 @@ const MOOD_ICONS: Record<string, string> = {
 };
 
 const MOOD_LABELS: Record<string, string> = {
-  great: 'Great',
-  good: 'Good',
-  neutral: 'Neutral',
-  low: 'Low',
-  bad: 'Bad',
+  great: 'Excelente',
+  good: 'Bien',
+  neutral: 'Regular',
+  low: 'Bajo',
+  bad: 'Mal',
 };
 
 export default function HomeScreen() {
@@ -466,14 +466,9 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{getGreeting()}</Text>
-            {/* ✅ Usamos user del contexto */}
-            <Text style={styles.userName}>{(user?.nombre || "User").split(" ")[0]}</Text>
+            <Text style={styles.userName}>{(user?.nombre || "Usuario").split(" ")[0]}</Text>
             <Text style={styles.date}>{getCurrentDate()}</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color={colors.neutral[700]} />
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
         </View>
 
         {/* Stats Row */}

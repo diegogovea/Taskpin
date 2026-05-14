@@ -1753,6 +1753,64 @@ def actualizar_estado_plan(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Error al actualizar estado del plan: {str(e)}')
 
+class EditarPlanSchema(BaseModel):
+    fecha_objetivo: Optional[str] = None  # ISO date YYYY-MM-DD
+
+
+@app.put("/api/planes/{plan_usuario_id}/editar", status_code=HTTP_200_OK)
+def editar_plan(
+    plan_usuario_id: int,
+    data: EditarPlanSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """
+    PUT /api/planes/{id}/editar — Editar campos modificables del plan (PROTEGIDO).
+    Actualmente permite cambiar la fecha objetivo.
+    """
+    try:
+        from datetime import date as _date
+        from .database import get_pool
+
+        pool = get_pool()
+        with pool.connection() as db_conn:
+            with db_conn.cursor() as cur:
+                # Verificar propiedad
+                cur.execute(
+                    "SELECT plan_usuario_id FROM planes_usuario WHERE plan_usuario_id=%s AND user_id=%s",
+                    (plan_usuario_id, current_user.user_id)
+                )
+                if not cur.fetchone():
+                    raise HTTPException(status_code=403, detail="No tienes permiso sobre este plan")
+
+                updates = []
+                params: list = []
+
+                if data.fecha_objetivo is not None:
+                    try:
+                        fecha_obj = _date.fromisoformat(data.fecha_objetivo)
+                    except ValueError:
+                        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Usa YYYY-MM-DD")
+                    updates.append("fecha_objetivo = %s")
+                    params.append(fecha_obj)
+
+                if not updates:
+                    raise HTTPException(status_code=400, detail="No se proporcionaron campos para actualizar")
+
+                params.append(plan_usuario_id)
+                cur.execute(
+                    f"UPDATE planes_usuario SET {', '.join(updates)} WHERE plan_usuario_id = %s",
+                    params
+                )
+                db_conn.commit()
+
+        return {"success": True, "message": "Plan actualizado correctamente"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al editar el plan: {str(e)}")
+
+
 @app.get("/api/planes/{plan_usuario_id}/hoy", response_model=DashboardPlanResponseSchema)
 def get_dashboard_plan_hoy(plan_usuario_id: int, fecha: Optional[str] = None, current_user: TokenData = Depends(verify_token)):
     """GET /api/planes/1/hoy - Dashboard completo del plan para hoy (PROTEGIDO)"""
