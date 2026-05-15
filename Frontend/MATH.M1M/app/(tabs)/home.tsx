@@ -34,6 +34,9 @@ interface HabitoHoy {
   categoria_nombre: string;
   completado_hoy: boolean;
   puntos_base: number;
+  color?: string | null;
+  icono?: string | null;
+  tipo?: string | null;
 }
 
 interface PuntosHistorialItem {
@@ -547,9 +550,11 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.habitsList}>
               {habitosHoy.slice(0, 3).map((habito) => {
-                const catColor = habito.categoria_id
-                  ? getCategoryColor(habito.categoria_id)
-                  : getCategoryColorByName(habito.categoria_nombre);
+                // Color personal del hábito tiene prioridad sobre el de categoría
+                const catColor = habito.color
+                  || (habito.categoria_id
+                    ? getCategoryColor(habito.categoria_id)
+                    : getCategoryColorByName(habito.categoria_nombre));
                 return (
                   <View key={habito.habito_usuario_id} style={styles.habitItem}>
                     <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />

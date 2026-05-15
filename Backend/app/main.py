@@ -356,11 +356,13 @@ def login(user_data: LoginData):
     # IMPORTANTE: Crear sesión en la tabla control
     control_id = conn.create_session(user[0])  # user[0] es user_id
     
-    # Crear token JWT (incluir control_id para identificar sesión)
+    # Crear token JWT con expiración de 30 días
+    expire = datetime.utcnow() + timedelta(days=30)
     token_data = {
-        "sub": user[2],      # sub = correo
-        "user_id": user[0],  # user_id
-        "control_id": control_id  # ID de la sesión
+        "sub": user[2],           # correo
+        "user_id": user[0],       # user_id
+        "control_id": control_id, # ID de la sesión
+        "exp": expire,
     }
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
     
@@ -728,7 +730,13 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                         hu.fecha_agregado,
                         COALESCE(sh.completado, false) as completado_hoy,
                         sh.hora_completado,
-                        sh.notas
+                        sh.notas,
+                        hu.color,
+                        hu.icono,
+                        hu.tipo,
+                        hu.fecha_fin,
+                        hu.meta_valor,
+                        hu.meta_unidad
                     FROM habitos_usuario hu
                     INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
                     INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
@@ -757,7 +765,13 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                 "fecha_agregado": data[9],
                 "completado_hoy": data[10],
                 "hora_completado": data[11],
-                "notas": data[12]
+                "notas": data[12],
+                "color": data[13],
+                "icono": data[14],
+                "tipo": data[15] or "bueno",
+                "fecha_fin": data[16].isoformat() if data[16] else None,
+                "meta_valor": float(data[17]) if data[17] else None,
+                "meta_unidad": data[18]
             }
             habits.append(habit_dict)
         
@@ -1163,7 +1177,13 @@ def create_habito_personalizado(
             user_id=user_id,
             nombre=data.nombre,
             descripcion=data.descripcion,
-            frecuencia_personal=data.frecuencia_personal
+            frecuencia_personal=data.frecuencia_personal,
+            color=data.color,
+            icono=data.icono,
+            tipo=data.tipo or 'bueno',
+            fecha_fin=data.fecha_fin,
+            meta_valor=data.meta_valor,
+            meta_unidad=data.meta_unidad,
         )
         
         return {
