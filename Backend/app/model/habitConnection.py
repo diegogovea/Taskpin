@@ -198,7 +198,13 @@ class habitConnection():
                         h.frecuencia_recomendada,
                         c.nombre as categoria_nombre,
                         c.icono as categoria_icono,
-                        c.categoria_id
+                        c.categoria_id,
+                        hu.color,
+                        hu.icono,
+                        hu.tipo,
+                        hu.fecha_fin,
+                        hu.meta_valor,
+                        hu.meta_unidad
                     FROM habitos_usuario hu
                     INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
                     INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
@@ -233,7 +239,7 @@ class habitConnection():
                     'habito_usuario_id': habito_info[0],
                     'user_id': habito_info[1],
                     'habito_id': habito_info[2],
-                    'fecha_agregado': habito_info[3],
+                    'fecha_agregado': habito_info[3].isoformat() if habito_info[3] else None,
                     'activo': habito_info[4],
                     'frecuencia_personal': habito_info[5],
                     'nombre': habito_info[6],
@@ -243,13 +249,22 @@ class habitConnection():
                     'categoria_nombre': habito_info[10],
                     'categoria_icono': habito_info[11],
                     'categoria_id': habito_info[12],
+                    'color': habito_info[13],
+                    'icono': habito_info[14],
+                    'tipo': habito_info[15] or 'bueno',
+                    'fecha_fin': habito_info[16].isoformat() if habito_info[16] else None,
+                    'meta_valor': float(habito_info[17]) if habito_info[17] else None,
+                    'meta_unidad': habito_info[18],
                     'estadisticas': {
                         'dias_completados': dias_completados,
                         'racha_actual': racha_actual,
                     }
                 }
 
-    def create_habito_personalizado(self, user_id, nombre, descripcion=None, frecuencia_personal='diario'):
+    def create_habito_personalizado(
+        self, user_id, nombre, descripcion=None, frecuencia_personal='diario',
+        color=None, icono=None, tipo='bueno', fecha_fin=None, meta_valor=None, meta_unidad=None
+    ):
         """Crea un hábito personalizado y lo agrega automáticamente al usuario"""
         pool = get_pool()
         with pool.connection() as conn:
@@ -265,12 +280,15 @@ class habitConnection():
                     """, (nombre, descripcion, frecuencia_personal, user_id))
                     habito_id = cur.fetchone()[0]
                     
-                    # 2. Agregarlo automáticamente al usuario
+                    # 2. Agregarlo al usuario con todos los campos opcionales
                     cur.execute("""
-                        INSERT INTO habitos_usuario (user_id, habito_id, frecuencia_personal, activo)
-                        VALUES (%s, %s, %s, true)
+                        INSERT INTO habitos_usuario
+                            (user_id, habito_id, frecuencia_personal, activo,
+                             color, icono, tipo, fecha_fin, meta_valor, meta_unidad)
+                        VALUES (%s, %s, %s, true, %s, %s, %s, %s, %s, %s)
                         RETURNING habito_usuario_id;
-                    """, (user_id, habito_id, frecuencia_personal))
+                    """, (user_id, habito_id, frecuencia_personal,
+                          color, icono, tipo, fecha_fin, meta_valor, meta_unidad))
                     habito_usuario_id = cur.fetchone()[0]
                     
                     conn.commit()
@@ -281,7 +299,10 @@ class habitConnection():
                         'descripcion': descripcion,
                         'puntos_base': 10,
                         'frecuencia_personal': frecuencia_personal,
-                        'categoria_nombre': 'My Custom Habits'
+                        'color': color,
+                        'icono': icono,
+                        'tipo': tipo,
+                        'categoria_nombre': 'Mis hábitos personalizados'
                     }
                 except Exception as e:
                     conn.rollback()
@@ -409,9 +430,9 @@ class habitConnection():
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
-                # Verificar que el hábito pertenece al usuario
+                # Obtener nombre y fecha de cuando se agregó el hábito
                 cur.execute("""
-                    SELECT hu.habito_usuario_id, h.nombre
+                    SELECT hu.habito_usuario_id, h.nombre, hu.fecha_agregado
                     FROM habitos_usuario hu
                     JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
                     WHERE hu.habito_usuario_id = %s AND hu.user_id = %s AND hu.activo = true;
@@ -421,9 +442,15 @@ class habitConnection():
                 if not habito_info:
                     return None
                 
-                # Generar lista de los últimos N días
                 hoy = date.today()
-                fechas = [hoy - timedelta(days=i) for i in range(dias)]
+                fecha_agregado = habito_info[2]
+                
+                # Días reales desde que el usuario agregó el hábito (mínimo 1)
+                dias_activo = (hoy - fecha_agregado).days + 1 if fecha_agregado else dias
+                # El denominador es el menor entre los días solicitados y los días que lleva activo
+                dias_efectivos = min(dias, dias_activo)
+                
+                fechas = [hoy - timedelta(days=i) for i in range(dias_efectivos)]
                 
                 # Obtener registros de seguimiento existentes
                 cur.execute("""
@@ -432,7 +459,7 @@ class habitConnection():
                     WHERE habito_usuario_id = %s 
                       AND fecha >= %s
                     ORDER BY fecha DESC;
-                """, (habito_usuario_id, hoy - timedelta(days=dias)))
+                """, (habito_usuario_id, hoy - timedelta(days=dias_efectivos)))
                 
                 registros = {row[0]: {'completado': row[1], 'hora': row[2]} 
                             for row in cur.fetchall()}
@@ -455,9 +482,9 @@ class habitConnection():
                     'nombre': habito_info[1],
                     'dias': historial,
                     'resumen': {
-                        'total_dias': dias,
+                        'total_dias': dias_efectivos,
                         'dias_completados': dias_completados,
-                        'porcentaje_completado': round((dias_completados / dias) * 100, 1) if dias > 0 else 0
+                        'porcentaje_completado': round((dias_completados / dias_efectivos) * 100, 1) if dias_efectivos > 0 else 0
                     }
                 }
 

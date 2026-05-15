@@ -2,6 +2,12 @@ from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime, date
 
+FRECUENCIAS_VALIDAS = [
+    'diario', 'semanal', 'mensual',
+    'cada_2_dias', 'cada_2_semanas', 'cada_2_meses',
+    'personalizado'
+]
+
 class CategoriaHabitoSchema(BaseModel):
     categoria_id: int
     nombre: str
@@ -25,8 +31,8 @@ class AddHabitoToUserSchema(BaseModel):
 
     @validator('frecuencia_personal')
     def validate_frecuencia(cls, v):
-        if v not in ['diario', 'semanal', 'mensual', 'personalizado']:
-            raise ValueError('La frecuencia debe ser diario, semanal, mensual o personalizado')
+        if v not in FRECUENCIAS_VALIDAS:
+            raise ValueError(f'Frecuencia inválida. Opciones: {", ".join(FRECUENCIAS_VALIDAS)}')
         return v
 
 class AddMultipleHabitosSchema(BaseModel):
@@ -62,17 +68,22 @@ class HabitoFrecuenciaUpdateSchema(BaseModel):
 
     @validator('frecuencia_personal')
     def validate_frecuencia(cls, v):
-        allowed = ['diario', 'semanal', 'mensual', 'personalizado']
-        if v not in allowed:
-            raise ValueError(f'La frecuencia debe ser: {", ".join(allowed)}')
+        if v not in FRECUENCIAS_VALIDAS:
+            raise ValueError(f'Frecuencia inválida. Opciones: {", ".join(FRECUENCIAS_VALIDAS)}')
         return v
 
 
 class HabitoPersonalizadoCreateSchema(BaseModel):
-    """Schema para crear un hábito personalizado"""
+    """Schema para crear un hábito personalizado (con todos los campos opcionales)"""
     nombre: str
     descripcion: Optional[str] = None
     frecuencia_personal: Optional[str] = 'diario'
+    color: Optional[str] = None          # hex, e.g. '#6366F1'
+    icono: Optional[str] = None          # Ionicon name, e.g. 'book-outline'
+    tipo: Optional[str] = 'bueno'        # 'bueno' | 'por_eliminar'
+    fecha_fin: Optional[date] = None
+    meta_valor: Optional[float] = None
+    meta_unidad: Optional[str] = None
 
     @validator('nombre')
     def validate_nombre(cls, v):
@@ -93,9 +104,21 @@ class HabitoPersonalizadoCreateSchema(BaseModel):
 
     @validator('frecuencia_personal')
     def validate_frecuencia(cls, v):
-        allowed = ['diario', 'semanal', 'mensual', 'personalizado']
-        if v not in allowed:
-            raise ValueError(f'La frecuencia debe ser: {", ".join(allowed)}')
+        if v not in FRECUENCIAS_VALIDAS:
+            raise ValueError(f'Frecuencia inválida. Opciones: {", ".join(FRECUENCIAS_VALIDAS)}')
+        return v
+
+    @validator('color')
+    def validate_color(cls, v):
+        import re
+        if v is not None and not re.match(r'^#[0-9A-Fa-f]{6}$', v):
+            raise ValueError('El color debe ser un hex válido, ej. #6366F1')
+        return v
+
+    @validator('tipo')
+    def validate_tipo(cls, v):
+        if v not in ('bueno', 'por_eliminar'):
+            raise ValueError('El tipo debe ser bueno o por_eliminar')
         return v
 
 
@@ -103,6 +126,12 @@ class HabitoPersonalizadoUpdateSchema(BaseModel):
     """Schema para editar un hábito personalizado"""
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    tipo: Optional[str] = None
+    fecha_fin: Optional[date] = None
+    meta_valor: Optional[float] = None
+    meta_unidad: Optional[str] = None
 
     @validator('nombre')
     def validate_nombre(cls, v):
@@ -120,4 +149,17 @@ class HabitoPersonalizadoUpdateSchema(BaseModel):
             v = v.strip()
             if len(v) > 500:
                 raise ValueError('La descripción no puede exceder 500 caracteres')
+        return v
+
+    @validator('color')
+    def validate_color(cls, v):
+        import re
+        if v is not None and not re.match(r'^#[0-9A-Fa-f]{6}$', v):
+            raise ValueError('El color debe ser un hex válido, ej. #6366F1')
+        return v
+
+    @validator('tipo')
+    def validate_tipo(cls, v):
+        if v is not None and v not in ('bueno', 'por_eliminar'):
+            raise ValueError('El tipo debe ser bueno o por_eliminar')
         return v

@@ -32,6 +32,9 @@ interface HabitoHoy {
   completado_hoy: boolean;
   hora_completado: string | null;
   notas: string | null;
+  color?: string | null;
+  icono?: string | null;
+  tipo?: string | null;
 }
 
 interface Estadisticas {
@@ -272,13 +275,20 @@ export default function HabitosScreen() {
           <View style={styles.habitsSection}>
             <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
             {habitos.map((habito) => {
-              const catColor = habito.categoria_id
-                ? getCategoryColor(habito.categoria_id)
-                : getCategoryColorByName(habito.categoria_nombre);
+              // Color personal del hábito tiene prioridad sobre el color de categoría
+              const catColor = habito.color
+                || (habito.categoria_id
+                  ? getCategoryColor(habito.categoria_id)
+                  : getCategoryColorByName(habito.categoria_nombre));
+              const habitIcono = habito.icono || null;
               return (
               <View
                 key={habito.habito_usuario_id}
-                style={[styles.habitCard, habito.completado_hoy && styles.habitCardCompleted]}
+                style={[
+                  styles.habitCard,
+                  habito.completado_hoy && styles.habitCardCompleted,
+                  habito.tipo === 'por_eliminar' && styles.habitCardWarning,
+                ]}
               >
                 <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
                 <View style={styles.habitContent}>
@@ -307,15 +317,18 @@ export default function HabitosScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.habitNameRow}>
+                      {habitIcono && (
+                        <Ionicons name={habitIcono as any} size={15} color={catColor} style={{ marginRight: 4 }} />
+                      )}
                       <Text
                         style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
                       >
                         {habito.nombre}
                       </Text>
-                      {habito.categoria_nombre === "My Custom Habits" && (
-                        <View style={styles.customBadge}>
-                          <Ionicons name="sparkles" size={10} color={colors.primary[600]} />
-                          <Text style={styles.customBadgeText}>Personal</Text>
+                      {habito.tipo === 'por_eliminar' && (
+                        <View style={[styles.customBadge, { backgroundColor: '#FEE2E2' }]}>
+                          <Ionicons name="warning" size={10} color="#EF4444" />
+                          <Text style={[styles.customBadgeText, { color: '#EF4444' }]}>Eliminar</Text>
                         </View>
                       )}
                     </View>
@@ -556,6 +569,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary[50],
     borderWidth: 1,
     borderColor: colors.secondary[200],
+  },
+  habitCardWarning: {
+    borderLeftWidth: 0,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   habitContent: {
     flexDirection: "row",

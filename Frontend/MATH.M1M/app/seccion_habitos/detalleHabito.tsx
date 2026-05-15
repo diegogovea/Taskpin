@@ -31,6 +31,12 @@ interface HabitoDetalle {
   categoria_nombre: string;
   categoria_icono: string;
   categoria_id: number;
+  color?: string | null;
+  icono?: string | null;
+  tipo?: string | null;
+  fecha_fin?: string | null;
+  meta_valor?: number | null;
+  meta_unidad?: string | null;
   estadisticas: {
     dias_completados: number;
     racha_actual: number;
@@ -61,9 +67,12 @@ interface RachasData {
 }
 
 const FRECUENCIAS = [
-  { value: 'diario', label: 'Diario', icon: 'today' },
-  { value: 'semanal', label: 'Semanal', icon: 'calendar' },
-  { value: 'mensual', label: 'Mensual', icon: 'calendar-outline' },
+  { value: 'diario',         label: 'Cada día',       icon: 'sunny-outline' },
+  { value: 'cada_2_dias',    label: 'Cada 2 días',    icon: 'partly-sunny-outline' },
+  { value: 'semanal',        label: 'Cada semana',    icon: 'calendar-outline' },
+  { value: 'cada_2_semanas', label: 'Cada 2 semanas', icon: 'calendar-clear-outline' },
+  { value: 'mensual',        label: 'Cada mes',       icon: 'calendar-number-outline' },
+  { value: 'cada_2_meses',   label: 'Cada 2 meses',  icon: 'time-outline' },
 ];
 
 // Map category names to colors
@@ -364,6 +373,47 @@ export default function DetalleHabitoScreen() {
               </Text>
               <Text style={styles.monthStatLabel}>Tasa de éxito</Text>
             </View>
+          </View>
+        )}
+
+        {/* Extra info: meta, fecha fin, tipo */}
+        {(habito.meta_valor || habito.fecha_fin || habito.tipo === 'por_eliminar') && (
+          <View style={styles.extraInfoCard}>
+            {habito.tipo === 'por_eliminar' && (
+              <View style={styles.extraInfoRow}>
+                <View style={[styles.extraInfoIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="warning" size={16} color="#EF4444" />
+                </View>
+                <View>
+                  <Text style={styles.extraInfoLabel}>Tipo</Text>
+                  <Text style={[styles.extraInfoValue, { color: '#EF4444' }]}>Hábito a eliminar</Text>
+                </View>
+              </View>
+            )}
+            {habito.meta_valor != null && (
+              <View style={styles.extraInfoRow}>
+                <View style={[styles.extraInfoIcon, { backgroundColor: '#EDE9FE' }]}>
+                  <Ionicons name="flag" size={16} color="#8B5CF6" />
+                </View>
+                <View>
+                  <Text style={styles.extraInfoLabel}>Meta diaria</Text>
+                  <Text style={styles.extraInfoValue}>{habito.meta_valor} {habito.meta_unidad}</Text>
+                </View>
+              </View>
+            )}
+            {habito.fecha_fin && (
+              <View style={styles.extraInfoRow}>
+                <View style={[styles.extraInfoIcon, { backgroundColor: '#FFEDD5' }]}>
+                  <Ionicons name="calendar-clear" size={16} color="#F97316" />
+                </View>
+                <View>
+                  <Text style={styles.extraInfoLabel}>Finaliza el</Text>
+                  <Text style={styles.extraInfoValue}>
+                    {new Date(habito.fecha_fin).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -717,6 +767,30 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: colors.neutral[200],
     marginHorizontal: spacing[3],
+  },
+  extraInfoCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginTop: spacing[4],
+    gap: spacing[4],
+    ...shadows.sm,
+  },
+  extraInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  extraInfoIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  extraInfoLabel: {
+    fontSize: typography.size.xs, color: colors.neutral[500],
+  },
+  extraInfoValue: {
+    fontSize: typography.size.sm, fontWeight: typography.weight.semibold,
+    color: colors.neutral[800], marginTop: 2,
   },
   streaksCard: {
     flexDirection: 'row',
