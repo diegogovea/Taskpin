@@ -178,13 +178,28 @@ class habitConnection():
                 conn.commit()
                 return result
 
+    def _columnas_extra_existen(self, cur) -> bool:
+        """Verifica si las columnas de la migración 011 ya existen en habitos_usuario."""
+        cur.execute("""
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_name = 'habitos_usuario' AND column_name = 'color';
+        """)
+        return cur.fetchone()[0] > 0
+
     def get_habito_usuario_detalle(self, habito_usuario_id, user_id):
         """Obtiene el detalle completo de un hábito del usuario incluyendo estadísticas"""
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
-                # Info básica del hábito
-                cur.execute("""
+                # Verificar si las columnas extra ya existen (migración 011)
+                tiene_extra = self._columnas_extra_existen(cur)
+
+                if tiene_extra:
+                    extra_select = ", hu.color, hu.icono, hu.tipo, hu.fecha_fin, hu.meta_valor, hu.meta_unidad"
+                else:
+                    extra_select = ", NULL as color, NULL as icono, NULL as tipo, NULL as fecha_fin, NULL as meta_valor, NULL as meta_unidad"
+
+                cur.execute(f"""
                     SELECT 
                         hu.habito_usuario_id,
                         hu.user_id,
@@ -198,13 +213,8 @@ class habitConnection():
                         h.frecuencia_recomendada,
                         c.nombre as categoria_nombre,
                         c.icono as categoria_icono,
-                        c.categoria_id,
-                        hu.color,
-                        hu.icono,
-                        hu.tipo,
-                        hu.fecha_fin,
-                        hu.meta_valor,
-                        hu.meta_unidad
+                        c.categoria_id
+                        {extra_select}
                     FROM habitos_usuario hu
                     INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
                     INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
@@ -225,14 +235,13 @@ class habitConnection():
                 """, (habito_usuario_id,))
                 dias_completados = cur.fetchone()[0]
                 
-                # Estadísticas: racha actual (usa helper unificado)
+                # Estadísticas: racha actual
                 cur.execute("""
                     SELECT fecha FROM seguimiento_habitos
                     WHERE habito_usuario_id = %s AND completado = true
                     ORDER BY fecha DESC;
                 """, (habito_usuario_id,))
                 fechas = [row[0] for row in cur.fetchall()]
-
                 racha_actual = _calcular_racha_desde_fechas(fechas)
                 
                 return {

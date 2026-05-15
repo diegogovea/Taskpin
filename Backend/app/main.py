@@ -716,7 +716,19 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
         pool = get_pool()
         with pool.connection() as db_conn:
             with db_conn.cursor() as cur:
+                # Verificar si las columnas extra ya existen (migración 011)
                 cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_name = 'habitos_usuario' AND column_name = 'color';
+                """)
+                tiene_extra = cur.fetchone()[0] > 0
+
+                if tiene_extra:
+                    extra_cols = ", hu.color, hu.icono, hu.tipo, hu.fecha_fin, hu.meta_valor, hu.meta_unidad"
+                else:
+                    extra_cols = ", NULL as color, NULL as icono, NULL as tipo, NULL as fecha_fin, NULL as meta_valor, NULL as meta_unidad"
+
+                cur.execute(f"""
                     SELECT 
                         hu.habito_usuario_id,
                         hu.user_id,
@@ -730,13 +742,8 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                         hu.fecha_agregado,
                         COALESCE(sh.completado, false) as completado_hoy,
                         sh.hora_completado,
-                        sh.notas,
-                        hu.color,
-                        hu.icono,
-                        hu.tipo,
-                        hu.fecha_fin,
-                        hu.meta_valor,
-                        hu.meta_unidad
+                        sh.notas
+                        {extra_cols}
                     FROM habitos_usuario hu
                     INNER JOIN habitos_predeterminados h ON hu.habito_id = h.habito_id
                     INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
@@ -1145,10 +1152,6 @@ def get_habito_usuario_detalle(
         detalle = habit_conn.get_habito_usuario_detalle(habito_usuario_id, user_id)
         if not detalle:
             raise HTTPException(status_code=404, detail="Hábito no encontrado")
-        
-        # Convertir fecha a string para JSON
-        if detalle.get('fecha_agregado'):
-            detalle['fecha_agregado'] = detalle['fecha_agregado'].isoformat()
         
         return {"success": True, "data": detalle}
     except HTTPException:
