@@ -217,7 +217,13 @@ def verify_user_access(user_id_param: int, current_user: TokenData) -> bool:
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://taskpin.netlify.app",
+        "http://localhost:8081",
+        "http://localhost:19006",
+        "http://localhost:3000",
+        "exp://localhost:8081",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

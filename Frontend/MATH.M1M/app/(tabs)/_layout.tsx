@@ -2,10 +2,13 @@ import { Tabs, useRouter } from "expo-router";
 import { View, Platform, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { colors, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useTutorial } from "../../contexts/TutorialContext";
+import { TutorialTab } from "../../constants/tutorialSteps";
+import TutorialOverlay from "../../components/ui/TutorialOverlay";
 
 // Tab icon component with modern styling
 function TabIcon({
@@ -45,10 +48,26 @@ function TabIcon({
   );
 }
 
+const TAB_ROUTES: Record<TutorialTab, string> = {
+  home: "/(tabs)/home",
+  habitos: "/(tabs)/habitos",
+  planes: "/(tabs)/planes",
+  ai: "/(tabs)/ai",
+  perfil: "/(tabs)/perfil",
+};
+
 export default function TabsLayout() {
   const { user, isLoading } = useAuth();
   const { palette } = useTheme();
   const router = useRouter();
+  const { setTabChangeHandler } = useTutorial();
+
+  // Registrar el handler para cambio de tab desde el tutorial
+  useEffect(() => {
+    setTabChangeHandler((tab: TutorialTab) => {
+      router.push(TAB_ROUTES[tab] as any);
+    });
+  }, [setTabChangeHandler]);
 
   // 🔐 Protección: Si no hay sesión, redirigir al login
   useEffect(() => {
@@ -73,6 +92,7 @@ export default function TabsLayout() {
 
   // Si hay usuario, mostrar las tabs normalmente
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -122,6 +142,8 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <TutorialOverlay />
+    </>
   );
 }
 
