@@ -225,21 +225,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>o</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Buttons */}
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={20} color={colors.neutral[700]} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-apple" size={20} color={colors.neutral[700]} />
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Register Link */}
@@ -369,34 +354,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: spacing[8],
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.neutral[200],
-  },
-  dividerText: {
-    paddingHorizontal: spacing[4],
-    fontSize: typography.size.sm,
-    color: colors.neutral[400],
-  },
-  socialButtons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: spacing[4],
-  },
-  socialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    backgroundColor: colors.neutral[100],
-    justifyContent: "center",
-    alignItems: "center",
   },
   registerContainer: {
     flexDirection: "row",

@@ -16,13 +16,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 
 const ONBOARDING_KEY = "@taskpin_onboarding_completed";
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Proporciones fijas para que las 3 pantallas se vean iguales
-const TITLE_FONT_SIZE = 32;
-const DESCRIPTION_FONT_SIZE = 18;
-const DESCRIPTION_LINE_HEIGHT = 28;
-const ILLUSTRATION_HEIGHT = 600;
+const TITLE_FONT_SIZE = SCREEN_HEIGHT < 700 ? 26 : 30;
+const DESCRIPTION_FONT_SIZE = SCREEN_HEIGHT < 700 ? 15 : 16;
+const DESCRIPTION_LINE_HEIGHT = DESCRIPTION_FONT_SIZE * 1.6;
+// La imagen ocupa ~38% de la pantalla, dejando espacio para texto y botones
+const ILLUSTRATION_HEIGHT = Math.round(SCREEN_HEIGHT * 0.38);
 const CONTENT_PADDING_H = spacing[5];
 
 const SLIDES = [
@@ -237,44 +237,43 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: spacing[4],
+    paddingTop: spacing[2],
     alignItems: "center",
+    justifyContent: "space-between",
   },
   title: {
     fontSize: TITLE_FONT_SIZE,
     fontWeight: typography.weight.bold,
     color: colors.neutral[900],
-    marginBottom: spacing[4],
+    marginBottom: spacing[3],
     letterSpacing: -0.5,
-    lineHeight: TITLE_FONT_SIZE * 1.15,
+    lineHeight: TITLE_FONT_SIZE * 1.2,
     textAlign: "center",
   },
   description: {
     fontSize: DESCRIPTION_FONT_SIZE,
     color: colors.neutral[500],
     lineHeight: DESCRIPTION_LINE_HEIGHT,
-    marginBottom: spacing[5],
-    minHeight: DESCRIPTION_LINE_HEIGHT * 3,
+    marginBottom: spacing[3],
     textAlign: "center",
-    paddingHorizontal: spacing[2],
+    paddingHorizontal: spacing[3],
   },
   illustrationContainer: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
   },
   illustrationImage: {
-    width: SCREEN_WIDTH - spacing[8],
+    width: SCREEN_WIDTH - spacing[10],
     height: ILLUSTRATION_HEIGHT,
   },
   dots: {
     flexDirection: "row",
     justifyContent: "center",
     gap: spacing[2],
-    marginTop: spacing[5],
-    marginBottom: spacing[2],
-    minHeight: 24,
+    marginTop: spacing[3],
+    marginBottom: spacing[1],
+    minHeight: 20,
   },
   dot: {
     width: 8,
@@ -287,8 +286,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingTop: spacing[2],
-    paddingBottom: spacing[8],
-    minHeight: 64,
+    paddingBottom: SCREEN_HEIGHT < 700 ? spacing[4] : spacing[6],
+    minHeight: 56,
   },
   buttonRow: {
     flexDirection: "row",

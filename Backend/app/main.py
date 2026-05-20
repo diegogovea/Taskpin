@@ -356,8 +356,8 @@ def login(user_data: LoginData):
     # IMPORTANTE: Crear sesión en la tabla control
     control_id = conn.create_session(user[0])  # user[0] es user_id
     
-    # Crear token JWT con expiración de 30 días
-    expire = datetime.utcnow() + timedelta(days=30)
+    # Crear token JWT con expiración de 7 días
+    expire = datetime.utcnow() + timedelta(days=7)
     token_data = {
         "sub": user[2],           # correo
         "user_id": user[0],       # user_id
