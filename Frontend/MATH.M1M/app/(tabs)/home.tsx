@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTutorial } from "../../contexts/TutorialContext";
 import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
 import ReflectionModal from "../../components/ui/ReflectionModal";
 import { useWebSocket, HabitCompletedEvent, HabitUncompletedEvent } from "../../hooks/useWebSocket";
@@ -109,9 +110,8 @@ const MOOD_LABELS: Record<string, string> = {
 
 export default function HomeScreen() {
   const router = useRouter();
-  
-  // ✅ Obtenemos user y authFetch del contexto
   const { user, isLoading: authLoading, authFetch } = useAuth();
+  const { restart } = useTutorial();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -472,6 +472,13 @@ export default function HomeScreen() {
             <Text style={styles.userName}>{(user?.nombre || "Usuario").split(" ")[0]}</Text>
             <Text style={styles.date}>{getCurrentDate()}</Text>
           </View>
+          <TouchableOpacity
+            onPress={restart}
+            style={styles.tutorialBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="help-circle-outline" size={24} color={colors.neutral[400]} />
+          </TouchableOpacity>
         </View>
 
         {/* Stats Row */}
@@ -922,6 +929,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: spacing[6],
+  },
+  tutorialBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neutral[100],
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing[1],
   },
   greeting: {
     fontSize: typography.size.base,

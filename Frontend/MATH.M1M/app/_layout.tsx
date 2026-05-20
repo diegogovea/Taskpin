@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "../contexts/AuthContext";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
+import { TutorialProvider } from "../contexts/TutorialContext";
 
 function AppStack() {
   const { isDark } = useTheme();
@@ -20,7 +21,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppStack />
+        <TutorialProvider>
+          <AppStack />
+        </TutorialProvider>
       </AuthProvider>
     </ThemeProvider>
   );

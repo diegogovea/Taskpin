@@ -16,13 +16,14 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
-import { useAuth } from "../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
+import { useAuth } from "../contexts/AuthContext";
+import { useTutorial } from "../contexts/TutorialContext";
 
 export default function SignInScreen() {
   const router = useRouter();
   
-  // ✅ Usamos el register del AuthContext
   const { register, user, isLoading: authLoading } = useAuth();
+  const { scheduleTutorial } = useTutorial();
 
   // 🔐 Si ya hay sesión, redirigir a home
   useEffect(() => {
@@ -110,7 +111,8 @@ export default function SignInScreen() {
       );
 
       if (result.success) {
-        // El registro + login fueron exitosos, ir a bienvenida
+        // Programar el tutorial para que aparezca en Home
+        await scheduleTutorial();
         router.replace("/bienvenida");
       } else {
         Alert.alert("Error", result.message || "Error al crear la cuenta");
