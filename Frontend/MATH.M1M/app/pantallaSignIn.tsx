@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
@@ -14,22 +13,24 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 import { useAuth } from "../contexts/AuthContext";
 import { useTutorial } from "../contexts/TutorialContext";
 
+interface FieldErrors {
+  nombre: string;
+  correo: string;
+  contraseña: string;
+  confirmar: string;
+}
+
 export default function SignInScreen() {
   const router = useRouter();
-  
   const { register, user, isLoading: authLoading } = useAuth();
   const { scheduleTutorial } = useTutorial();
 
-  // 🔐 Si ya hay sesión, redirigir a home
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace("/(tabs)/home");
-    }
+    if (!authLoading && user) router.replace("/(tabs)/home");
   }, [user, authLoading]);
 
   const [nombre, setNombre] = useState("");
@@ -40,324 +41,261 @@ export default function SignInScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Focus states
   const [nameFocused, setNameFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused] = useState(false);
 
+  const [errors, setErrors] = useState<FieldErrors>({ nombre: "", correo: "", contraseña: "", confirmar: "" });
+  const [serverError, setServerError] = useState("");
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const bannerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const showBanner = (msg: string) => {
+    setServerError(msg);
+    bannerAnim.setValue(0);
+    Animated.spring(bannerAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }).start();
+    setTimeout(() => {
+      Animated.timing(bannerAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setServerError(""));
+    }, 4000);
+  };
+
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const validateField = (field: keyof FieldErrors, value: string): string => {
+    switch (field) {
+      case "nombre":
+        if (!value.trim()) return "El nombre es obligatorio";
+        if (value.trim().length < 2) return "El nombre debe tener al menos 2 caracteres";
+        return "";
+      case "correo":
+        if (!value.trim()) return "El correo es obligatorio";
+        if (!validateEmail(value)) return "Ingresa un correo válido (ej: usuario@correo.com)";
+        return "";
+      case "contraseña":
+        if (!value) return "La contraseña es obligatoria";
+        if (value.length < 8) return "Mínimo 8 caracteres";
+        return "";
+      case "confirmar":
+        if (!value) return "Confirma tu contraseña";
+        if (value !== contraseña) return "Las contraseñas no coinciden";
+        return "";
+      default:
+        return "";
+    }
+  };
+
+  const handleBlur = (field: keyof FieldErrors, value: string) => {
+    const err = validateField(field, value);
+    setErrors(prev => ({ ...prev, [field]: err }));
   };
 
   const handleRegister = async () => {
-    if (!nombre.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu nombre");
-      return;
-    }
+    const newErrors: FieldErrors = {
+      nombre: validateField("nombre", nombre),
+      correo: validateField("correo", correo),
+      contraseña: validateField("contraseña", contraseña),
+      confirmar: validateField("confirmar", confirmarContraseña),
+    };
+    setErrors(newErrors);
 
-    if (!correo.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu correo");
-      return;
-    }
-
-    if (!validateEmail(correo)) {
-      Alert.alert("Error", "Por favor ingresa un correo válido");
-      return;
-    }
-
-    if (!contraseña.trim()) {
-      Alert.alert("Error", "Por favor ingresa una contraseña");
-      return;
-    }
-
-    if (contraseña.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-
-    if (contraseña !== confirmarContraseña) {
-      Alert.alert("Error", "Las contraseñas no coinciden");
-      return;
-    }
+    if (Object.values(newErrors).some(e => e !== "")) return;
 
     setLoading(true);
+    setServerError("");
 
     try {
-      // ✅ Usamos register del AuthContext (registra + hace login automático)
-      const result = await register(
-        nombre.trim(),
-        correo.trim().toLowerCase(),
-        contraseña
-      );
-
+      const result = await register(nombre.trim(), correo.trim().toLowerCase(), contraseña);
       if (result.success) {
-        // Programar el tutorial para que aparezca en Home
         await scheduleTutorial();
         router.replace("/bienvenida");
       } else {
-        Alert.alert("Error", result.message || "Error al crear la cuenta");
+        const msg = result.message || "Error al crear la cuenta";
+        if (msg.toLowerCase().includes("correo") || msg.toLowerCase().includes("email") || msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exist")) {
+          setErrors(prev => ({ ...prev, correo: "Este correo ya está registrado" }));
+        } else {
+          showBanner(msg);
+        }
       }
-    } catch (error: any) {
-      Alert.alert("Error", "Algo salió mal. Por favor intenta de nuevo.");
+    } catch {
+      showBanner("Sin conexión. Verifica tu internet e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Password strength indicator
   const getPasswordStrength = () => {
     if (!contraseña) return { level: 0, text: "", color: colors.neutral[300] };
-    if (contraseña.length < 6) return { level: 1, text: "Débil", color: colors.semantic.error };
-    if (contraseña.length < 10) return { level: 2, text: "Regular", color: colors.semantic.warning };
+    if (contraseña.length < 8) return { level: 1, text: "Débil", color: colors.semantic.error };
+    if (contraseña.length < 12) return { level: 2, text: "Regular", color: colors.semantic.warning };
     return { level: 3, text: "Fuerte", color: colors.semantic.success };
   };
 
   const passwordStrength = getPasswordStrength();
 
+  const hasError = (field: keyof FieldErrors) => errors[field] !== "";
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.replace("/login")}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/login")}>
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
 
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           {/* Logo */}
           <View style={styles.logoContainer}>
-            <Image
-              source={require("../components/images/iconoLogo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <Image source={require("../components/images/iconoLogo.png")} style={styles.logo} resizeMode="contain" />
           </View>
 
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Crear cuenta</Text>
-            <Text style={styles.subtitle}>
-              Comienza tu camino hacia mejores hábitos hoy
-            </Text>
+            <Text style={styles.subtitle}>Comienza tu camino hacia mejores hábitos hoy</Text>
           </View>
+
+          {/* ── Server Error Banner ── */}
+          {serverError !== "" && (
+            <Animated.View style={[styles.errorBanner, { opacity: bannerAnim, transform: [{ scale: bannerAnim }] }]}>
+              <View style={styles.errorBannerIcon}>
+                <Ionicons name="alert-circle" size={20} color="#EF4444" />
+              </View>
+              <Text style={styles.errorBannerText}>{serverError}</Text>
+              <TouchableOpacity onPress={() => setServerError("")} style={{ padding: 4 }}>
+                <Ionicons name="close" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Form */}
           <View style={styles.form}>
-            {/* Name Input */}
+            {/* Nombre */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Nombre completo</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  nameFocused && styles.inputContainerFocused,
-                ]}
-              >
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={nameFocused ? colors.primary[600] : colors.neutral[400]}
-                  style={styles.inputIcon}
-                />
+              <View style={[styles.inputContainer, nameFocused && styles.inputContainerFocused, hasError("nombre") && styles.inputContainerError]}>
+                <Ionicons name="person-outline" size={20} color={hasError("nombre") ? "#EF4444" : nameFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Tu nombre"
                   placeholderTextColor={colors.neutral[400]}
                   value={nombre}
-                  onChangeText={setNombre}
+                  onChangeText={t => { setNombre(t); if (errors.nombre) setErrors(p => ({ ...p, nombre: "" })); }}
                   autoCapitalize="words"
                   onFocus={() => setNameFocused(true)}
-                  onBlur={() => setNameFocused(false)}
+                  onBlur={() => { setNameFocused(false); handleBlur("nombre", nombre); }}
                 />
               </View>
+              {hasError("nombre") && <FieldError msg={errors.nombre} />}
             </View>
 
-            {/* Email Input */}
+            {/* Correo */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Correo electrónico</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  emailFocused && styles.inputContainerFocused,
-                ]}
-              >
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={emailFocused ? colors.primary[600] : colors.neutral[400]}
-                  style={styles.inputIcon}
-                />
+              <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused, hasError("correo") && styles.inputContainerError]}>
+                <Ionicons name="mail-outline" size={20} color={hasError("correo") ? "#EF4444" : emailFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="tucorreo@email.com"
                   placeholderTextColor={colors.neutral[400]}
                   keyboardType="email-address"
                   value={correo}
-                  onChangeText={setCorreo}
+                  onChangeText={t => { setCorreo(t); if (errors.correo) setErrors(p => ({ ...p, correo: "" })); }}
                   autoCapitalize="none"
                   autoCorrect={false}
                   onFocus={() => setEmailFocused(true)}
-                  onBlur={() => setEmailFocused(false)}
+                  onBlur={() => { setEmailFocused(false); handleBlur("correo", correo); }}
                 />
               </View>
+              {hasError("correo") && <FieldError msg={errors.correo} />}
             </View>
 
-            {/* Password Input */}
+            {/* Contraseña */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Contraseña</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  passwordFocused && styles.inputContainerFocused,
-                ]}
-              >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={passwordFocused ? colors.primary[600] : colors.neutral[400]}
-                  style={styles.inputIcon}
-                />
+              <View style={[styles.inputContainer, passwordFocused && styles.inputContainerFocused, hasError("contraseña") && styles.inputContainerError]}>
+                <Ionicons name="lock-closed-outline" size={20} color={hasError("contraseña") ? "#EF4444" : passwordFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="••••••••"
+                  placeholder="Mínimo 8 caracteres"
                   placeholderTextColor={colors.neutral[400]}
                   secureTextEntry={!showPassword}
                   value={contraseña}
-                  onChangeText={setContraseña}
+                  onChangeText={t => { setContraseña(t); if (errors.contraseña) setErrors(p => ({ ...p, contraseña: "" })); }}
                   autoCapitalize="none"
                   onFocus={() => setPasswordFocused(true)}
-                  onBlur={() => setPasswordFocused(false)}
+                  onBlur={() => { setPasswordFocused(false); handleBlur("contraseña", contraseña); }}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color={colors.neutral[400]}
-                  />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.neutral[400]} />
                 </TouchableOpacity>
               </View>
-              {/* Password Strength */}
               {contraseña.length > 0 && (
                 <View style={styles.strengthContainer}>
                   <View style={styles.strengthBars}>
-                    {[1, 2, 3].map((level) => (
-                      <View
-                        key={level}
-                        style={[
-                          styles.strengthBar,
-                          {
-                            backgroundColor:
-                              level <= passwordStrength.level
-                                ? passwordStrength.color
-                                : colors.neutral[200],
-                          },
-                        ]}
-                      />
+                    {[1, 2, 3].map(level => (
+                      <View key={level} style={[styles.strengthBar, { backgroundColor: level <= passwordStrength.level ? passwordStrength.color : colors.neutral[200] }]} />
                     ))}
                   </View>
-                  <Text
-                    style={[styles.strengthText, { color: passwordStrength.color }]}
-                  >
-                    {passwordStrength.text}
-                  </Text>
+                  <Text style={[styles.strengthText, { color: passwordStrength.color }]}>{passwordStrength.text}</Text>
+                </View>
+              )}
+              {hasError("contraseña") && <FieldError msg={errors.contraseña} />}
+            </View>
+
+            {/* Confirmar contraseña */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirmar contraseña</Text>
+              <View style={[styles.inputContainer, confirmFocused && styles.inputContainerFocused, hasError("confirmar") && styles.inputContainerError]}>
+                <Ionicons name="lock-closed-outline" size={20} color={hasError("confirmar") ? "#EF4444" : confirmFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Repite tu contraseña"
+                  placeholderTextColor={colors.neutral[400]}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmarContraseña}
+                  onChangeText={t => { setConfirmarContraseña(t); if (errors.confirmar) setErrors(p => ({ ...p, confirmar: "" })); }}
+                  autoCapitalize="none"
+                  onFocus={() => setConfirmFocused(true)}
+                  onBlur={() => { setConfirmFocused(false); handleBlur("confirmar", confirmarContraseña); }}
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton}>
+                  <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.neutral[400]} />
+                </TouchableOpacity>
+              </View>
+              {hasError("confirmar") && <FieldError msg={errors.confirmar} />}
+              {!hasError("confirmar") && confirmarContraseña.length > 0 && contraseña === confirmarContraseña && (
+                <View style={styles.successRow}>
+                  <Ionicons name="checkmark-circle" size={14} color={colors.semantic.success} />
+                  <Text style={styles.successText}>Las contraseñas coinciden</Text>
                 </View>
               )}
             </View>
 
-            {/* Confirm Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirmar contraseña</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  confirmFocused && styles.inputContainerFocused,
-                  confirmarContraseña.length > 0 &&
-                    contraseña !== confirmarContraseña &&
-                    styles.inputContainerError,
-                ]}
-              >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={confirmFocused ? colors.primary[600] : colors.neutral[400]}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor={colors.neutral[400]}
-                  secureTextEntry={!showConfirmPassword}
-                  value={confirmarContraseña}
-                  onChangeText={setConfirmarContraseña}
-                  autoCapitalize="none"
-                  onFocus={() => setConfirmFocused(true)}
-                  onBlur={() => setConfirmFocused(false)}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={styles.eyeButton}
-                >
-                  <Ionicons
-                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color={colors.neutral[400]}
-                  />
-                </TouchableOpacity>
-              </View>
-              {confirmarContraseña.length > 0 && contraseña !== confirmarContraseña && (
-                <Text style={styles.errorText}>Las contraseñas no coinciden</Text>
-              )}
-            </View>
-
-            {/* Register Button */}
+            {/* Botón */}
             <TouchableOpacity
               style={[styles.registerButton, loading && styles.registerButtonDisabled]}
               onPress={handleRegister}
               disabled={loading}
               activeOpacity={0.9}
             >
-              <Text style={styles.registerButtonText}>
-                {loading ? "Creando cuenta..." : "Crear Cuenta"}
-              </Text>
+              {loading ? (
+                <View style={styles.loadingRow}>
+                  <Ionicons name="reload-outline" size={18} color={colors.neutral[0]} style={{ marginRight: 8 }} />
+                  <Text style={styles.registerButtonText}>Creando cuenta...</Text>
+                </View>
+              ) : (
+                <Text style={styles.registerButtonText}>Crear Cuenta</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -371,6 +309,15 @@ export default function SignInScreen() {
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function FieldError({ msg }: { msg: string }) {
+  return (
+    <View style={styles.fieldErrorRow}>
+      <Ionicons name="alert-circle" size={13} color="#EF4444" />
+      <Text style={styles.fieldErrorText}>{msg}</Text>
+    </View>
   );
 }
 
@@ -394,13 +341,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing[4],
   },
-  content: {
-    flex: 1,
-  },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: spacing[4],
-  },
+  content: { flex: 1 },
+  logoContainer: { alignItems: "center", marginBottom: spacing[4] },
   logo: {
     width: 72,
     height: 72,
@@ -411,9 +353,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  header: {
-    marginBottom: spacing[6],
-  },
+  header: { marginBottom: spacing[5] },
   title: {
     fontSize: typography.size["3xl"],
     fontWeight: typography.weight.bold,
@@ -426,12 +366,36 @@ const styles = StyleSheet.create({
     color: colors.neutral[500],
     lineHeight: 24,
   },
-  form: {
+  // ── Error Banner ──
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    marginBottom: spacing[4],
+    gap: spacing[2],
+  },
+  errorBannerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FEE2E2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorBannerText: {
     flex: 1,
+    fontSize: typography.size.sm,
+    color: "#B91C1C",
+    lineHeight: 18,
   },
-  inputGroup: {
-    marginBottom: spacing[5],
-  },
+  // ── Form ──
+  form: { flex: 1 },
+  inputGroup: { marginBottom: spacing[4] },
   label: {
     fontSize: typography.size.sm,
     fontWeight: typography.weight.medium,
@@ -452,44 +416,52 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[0],
   },
   inputContainerError: {
-    borderColor: colors.semantic.error,
+    borderColor: "#EF4444",
+    backgroundColor: "#FFF5F5",
   },
-  inputIcon: {
-    marginRight: spacing[3],
-  },
+  inputIcon: { marginRight: spacing[3] },
   input: {
     flex: 1,
     paddingVertical: spacing[4],
     fontSize: typography.size.base,
     color: colors.neutral[900],
   },
-  eyeButton: {
-    padding: spacing[2],
+  eyeButton: { padding: spacing[2] },
+  // ── Inline field error ──
+  fieldErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[1],
+    marginTop: spacing[2],
   },
+  fieldErrorText: {
+    fontSize: typography.size.xs,
+    color: "#EF4444",
+    flex: 1,
+  },
+  // ── Confirm match success ──
+  successRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[1],
+    marginTop: spacing[2],
+  },
+  successText: {
+    fontSize: typography.size.xs,
+    color: colors.semantic.success,
+  },
+  // ── Password strength ──
   strengthContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: spacing[2],
     gap: spacing[3],
   },
-  strengthBars: {
-    flexDirection: "row",
-    gap: spacing[1],
-  },
-  strengthBar: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-  },
-  strengthText: {
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.medium,
-  },
-  errorText: {
-    fontSize: typography.size.sm,
-    color: colors.semantic.error,
-    marginTop: spacing[1],
-  },
+  strengthBars: { flexDirection: "row", gap: spacing[1] },
+  strengthBar: { width: 32, height: 4, borderRadius: 2 },
+  strengthText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium },
+  // ── Button ──
+  loadingRow: { flexDirection: "row", alignItems: "center" },
   registerButton: {
     backgroundColor: colors.primary[600],
     paddingVertical: spacing[5],
@@ -508,16 +480,14 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
   },
+  // ── Footer ──
   loginContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     paddingTop: spacing[8],
   },
-  loginText: {
-    fontSize: typography.size.base,
-    color: colors.neutral[500],
-  },
+  loginText: { fontSize: typography.size.base, color: colors.neutral[500] },
   loginLink: {
     fontSize: typography.size.base,
     fontWeight: typography.weight.semibold,

@@ -178,6 +178,23 @@ class habitConnection():
                 conn.commit()
                 return result
 
+    def update_habito_campos_extra(self, habito_usuario_id, color=None, icono=None, tipo=None, fecha_fin=None, meta_valor=None, meta_unidad=None):
+        """Actualiza los campos extra de un hábito del usuario (color, icono, tipo, fecha_fin, meta)"""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                if not self._columnas_extra_existen(cur):
+                    return None
+                cur.execute("""
+                    UPDATE habitos_usuario
+                    SET color = %s, icono = %s, tipo = %s, fecha_fin = %s, meta_valor = %s, meta_unidad = %s
+                    WHERE habito_usuario_id = %s AND activo = true
+                    RETURNING habito_usuario_id, color, icono, tipo, fecha_fin, meta_valor, meta_unidad;
+                """, (color, icono, tipo, fecha_fin, meta_valor, meta_unidad, habito_usuario_id))
+                result = cur.fetchone()
+                conn.commit()
+                return result
+
     def _columnas_extra_existen(self, cur) -> bool:
         """Verifica si las columnas de la migración 011 ya existen en habitos_usuario."""
         cur.execute("""

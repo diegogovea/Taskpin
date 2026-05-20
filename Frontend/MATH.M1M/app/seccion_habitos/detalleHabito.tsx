@@ -7,6 +7,11 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -75,7 +80,18 @@ const FRECUENCIAS = [
   { value: 'cada_2_meses',   label: 'Cada 2 meses',  icon: 'time-outline' },
 ];
 
-// Map category names to colors
+const PRESET_COLORS = [
+  '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
+  '#F97316', '#F59E0B', '#10B981', '#14B8A6',
+  '#3B82F6', '#06B6D4', '#84CC16', '#64748B',
+];
+
+const PRESET_ICONS = [
+  'leaf-outline', 'fitness-outline', 'barbell-outline', 'bicycle-outline',
+  'heart-outline', 'water-outline', 'moon-outline', 'sunny-outline',
+  'book-outline', 'musical-notes-outline', 'brush-outline', 'code-slash-outline',
+  'restaurant-outline', 'walk-outline', 'medkit-outline', 'brain',
+];
 
 export default function DetalleHabitoScreen() {
   const router = useRouter();
@@ -94,6 +110,14 @@ export default function DetalleHabitoScreen() {
   
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editColor, setEditColor] = useState<string | null>(null);
+  const [editIcono, setEditIcono] = useState<string | null>(null);
+  const [editTipo, setEditTipo] = useState<string>('bueno');
+  const [editFechaFin, setEditFechaFin] = useState('');
+  const [editMetaValor, setEditMetaValor] = useState('');
+  const [editMetaUnidad, setEditMetaUnidad] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
     message: '',
@@ -238,6 +262,59 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  const openEditModal = () => {
+    setEditColor(habito?.color || null);
+    setEditIcono(habito?.icono || null);
+    setEditTipo(habito?.tipo || 'bueno');
+    setEditFechaFin(habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '');
+    setEditMetaValor(habito?.meta_valor != null ? String(habito.meta_valor) : '');
+    setEditMetaUnidad(habito?.meta_unidad || '');
+    setShowEditModal(true);
+  };
+
+  const saveEditExtras = async () => {
+    if (!user?.user_id || !habito_usuario_id || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const body: Record<string, unknown> = {
+        color: editColor || null,
+        icono: editIcono || null,
+        tipo: editTipo || null,
+        fecha_fin: editFechaFin || null,
+        meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
+        meta_unidad: editMetaUnidad || null,
+      };
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habito_usuario_id}/campos-extra`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setHabito(prev => prev ? {
+          ...prev,
+          color: editColor,
+          icono: editIcono,
+          tipo: editTipo,
+          fecha_fin: editFechaFin || null,
+          meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
+          meta_unidad: editMetaUnidad || null,
+        } : null);
+        setShowEditModal(false);
+        setToast({ visible: true, message: 'Hábito actualizado', type: 'success' });
+      } else {
+        setToast({ visible: true, message: data.detail || 'Error al guardar', type: 'error' });
+      }
+    } catch {
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 
@@ -287,7 +364,9 @@ export default function DetalleHabitoScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalle del hábito</Text>
-        <View style={{ width: 44 }} />
+        <TouchableOpacity style={styles.editHeaderBtn} onPress={openEditModal}>
+          <Ionicons name="create-outline" size={22} color={colors.primary[600]} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -509,6 +588,129 @@ export default function DetalleHabitoScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: colors.neutral[50] }}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            {/* Modal Header */}
+            <View style={styles.editModalHeader}>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={styles.editModalCancel}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={styles.editModalTitle}>Personalizar hábito</Text>
+              <TouchableOpacity onPress={saveEditExtras} disabled={savingEdit}>
+                <Text style={[styles.editModalSave, savingEdit && { opacity: 0.5 }]}>
+                  {savingEdit ? 'Guardando...' : 'Guardar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing[5] }}>
+              {/* Color */}
+              <Text style={styles.editSectionLabel}>Color</Text>
+              <View style={styles.colorGrid}>
+                {PRESET_COLORS.map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorSwatch, { backgroundColor: c }, editColor === c && styles.colorSwatchSelected]}
+                    onPress={() => setEditColor(c)}
+                  >
+                    {editColor === c && <Ionicons name="checkmark" size={16} color="#fff" />}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.colorSwatch, { backgroundColor: colors.neutral[100] }, !editColor && styles.colorSwatchSelected]}
+                  onPress={() => setEditColor(null)}
+                >
+                  <Ionicons name="close" size={16} color={colors.neutral[500]} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Icono */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5] }]}>Icono</Text>
+              <View style={styles.iconGrid}>
+                {PRESET_ICONS.map(ic => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[styles.iconSwatch, editIcono === ic && styles.iconSwatchSelected]}
+                    onPress={() => setEditIcono(ic)}
+                  >
+                    <Ionicons name={ic as any} size={22} color={editIcono === ic ? colors.primary[600] : colors.neutral[500]} />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.iconSwatch, !editIcono && styles.iconSwatchSelected]}
+                  onPress={() => setEditIcono(null)}
+                >
+                  <Ionicons name="close-circle-outline" size={22} color={colors.neutral[400]} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Tipo */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5] }]}>Tipo</Text>
+              <View style={styles.tipoRow}>
+                <TouchableOpacity
+                  style={[styles.tipoBtn, editTipo === 'bueno' && styles.tipoBtnSelected]}
+                  onPress={() => setEditTipo('bueno')}
+                >
+                  <Ionicons name="trending-up" size={16} color={editTipo === 'bueno' ? colors.secondary[600] : colors.neutral[400]} />
+                  <Text style={[styles.tipoBtnText, editTipo === 'bueno' && { color: colors.secondary[600] }]}>Hábito positivo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tipoBtn, editTipo === 'por_eliminar' && styles.tipoBtnDanger]}
+                  onPress={() => setEditTipo('por_eliminar')}
+                >
+                  <Ionicons name="trending-down" size={16} color={editTipo === 'por_eliminar' ? '#EF4444' : colors.neutral[400]} />
+                  <Text style={[styles.tipoBtnText, editTipo === 'por_eliminar' && { color: '#EF4444' }]}>Hábito a eliminar</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Meta diaria */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5] }]}>Meta diaria (opcional)</Text>
+              <View style={styles.metaRow}>
+                <TextInput
+                  style={[styles.metaInput, { flex: 1 }]}
+                  placeholder="Ej: 30"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="decimal-pad"
+                  value={editMetaValor}
+                  onChangeText={setEditMetaValor}
+                />
+                <TextInput
+                  style={[styles.metaInput, { flex: 2 }]}
+                  placeholder="Ej: minutos, vasos, km..."
+                  placeholderTextColor={colors.neutral[400]}
+                  value={editMetaUnidad}
+                  onChangeText={setEditMetaUnidad}
+                />
+              </View>
+
+              {/* Fecha fin */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5] }]}>Fecha de fin (opcional)</Text>
+              <TextInput
+                style={styles.metaInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.neutral[400]}
+                value={editFechaFin}
+                onChangeText={setEditFechaFin}
+                keyboardType="numbers-and-punctuation"
+              />
+              <Text style={styles.editHint}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         visible={showDeleteModal}
@@ -592,6 +794,125 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: typography.size.lg,
     fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  editHeaderBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+    backgroundColor: colors.neutral[0],
+  },
+  editModalTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  editModalCancel: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+  },
+  editModalSave: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
+  },
+  editSectionLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[3],
+  },
+  editHint: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+    marginTop: spacing[2],
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[3],
+  },
+  colorSwatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorSwatchSelected: {
+    borderWidth: 3,
+    borderColor: colors.neutral[900],
+  },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+  },
+  iconSwatch: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconSwatchSelected: {
+    backgroundColor: colors.primary[50],
+    borderWidth: 2,
+    borderColor: colors.primary[400],
+  },
+  tipoRow: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  tipoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+  },
+  tipoBtnSelected: {
+    backgroundColor: colors.secondary[50],
+    borderWidth: 1.5,
+    borderColor: colors.secondary[400],
+  },
+  tipoBtnDanger: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  tipoBtnText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    fontWeight: typography.weight.medium,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  metaInput: {
+    backgroundColor: colors.neutral[0],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.base,
     color: colors.neutral[900],
   },
   content: {

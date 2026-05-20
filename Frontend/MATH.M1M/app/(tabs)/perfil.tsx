@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface Stats {
   totalHabits: number;
@@ -82,6 +83,7 @@ function AchievementCard({ achievement, large }: { achievement: Achievement; lar
 export default function PerfilScreen() {
   const router = useRouter();
   const { user, authFetch, logout } = useAuth();
+  const { palette } = useTheme();
   
   const [stats, setStats] = useState<Stats>({
     totalHabits: 0,
@@ -332,13 +334,11 @@ export default function PerfilScreen() {
   const achievements = getAchievements();
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
-  // En el perfil sólo mostramos los 3 primeros desbloqueados
-  // (o los 3 primeros de la lista si no hay ninguno desbloqueado)
+  // En el perfil mostramos 6 logros: primero los desbloqueados, luego los bloqueados
   const previewAchievements = (() => {
     const unlocked = achievements.filter(a => a.unlocked);
-    if (unlocked.length >= 3) return unlocked.slice(0, 3);
     const locked = achievements.filter(a => !a.unlocked);
-    return [...unlocked, ...locked].slice(0, 3);
+    return [...unlocked, ...locked].slice(0, 6);
   })();
 
   // Agrupar todos los logros por categoría para el modal
@@ -349,7 +349,7 @@ export default function PerfilScreen() {
   }, {});
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -358,124 +358,104 @@ export default function PerfilScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Perfil</Text>
+          <Text style={[styles.headerTitle, { color: palette.text }]}>Mi Perfil</Text>
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => router.push("/configuracion")}
           >
-            <Ionicons name="settings-outline" size={24} color={colors.neutral[700]} />
+            <Ionicons name="settings-outline" size={24} color={palette.text} />
           </TouchableOpacity>
         </View>
 
-        {/* Profile Card con Stats Integrados */}
-        <View style={styles.profileCard}>
+        {/* Identity Card — horizontal y compacto */}
+        <View style={styles.identityCard}>
           <LinearGradient
             colors={colors.gradients.primary}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.profileGradient}
+            style={styles.identityCard}
           >
-            {/* Avatar y Nombre */}
-            <View style={styles.profileTop}>
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>{getInitials(user?.nombre || "User")}</Text>
+            {/* Fila superior: avatar + info */}
+            <View style={styles.identityRow}>
+              {/* Avatar */}
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatarContainer}>
+                  <Text style={styles.avatarText}>{getInitials(user?.nombre || "U")}</Text>
+                </View>
+                {/* Badge de nivel sobre el avatar */}
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelBadgeText}>Nv.{stats.level}</Text>
+                </View>
               </View>
-              <Text style={styles.profileName}>{user?.nombre || "User"}</Text>
-              <Text style={styles.profileEmail}>{user?.correo || ""}</Text>
-            </View>
 
-            {/* Stats integrados */}
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="flame" size={18} color={colors.accent.amber} />
-                </View>
-                <Text style={styles.statValue}>{stats.streak}</Text>
-                <Text style={styles.statLabel}>Racha</Text>
-              </View>
-              
-              <View style={styles.statDivider} />
-              
-              <View style={styles.statItem}>
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="diamond" size={18} color={colors.accent.cyan} />
-                </View>
-                <Text style={styles.statValue}>{stats.totalPoints}</Text>
-                <Text style={styles.statLabel}>Puntos</Text>
-              </View>
-              
-              <View style={styles.statDivider} />
-              
-              <View style={styles.statItem}>
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="trophy" size={18} color={colors.accent.amber} />
-                </View>
-                <Text style={styles.statValue}>{stats.level}</Text>
-                <Text style={styles.statLabel}>Nivel</Text>
+              {/* Nombre + correo */}
+              <View style={styles.identityInfo}>
+                <Text style={styles.identityName} numberOfLines={1}>
+                  {user?.nombre || "Usuario"}
+                </Text>
+                <Text style={styles.identityEmail} numberOfLines={1}>
+                  {user?.correo || ""}
+                </Text>
               </View>
             </View>
 
-            {/* Level Progress */}
-            <View style={styles.levelProgressContainer}>
-              <View style={styles.levelProgressBar}>
-                <View style={[styles.levelProgressFill, { width: `${getLevelProgress()}%` }]} />
+            {/* Barra de XP */}
+            <View style={styles.xpSection}>
+              <View style={styles.xpBarBg}>
+                <View style={[styles.xpBarFill, { width: `${getLevelProgress()}%` }]} />
               </View>
-              <Text style={styles.levelProgressText}>
+              <Text style={styles.xpLabel}>
                 {Math.round(getLevelProgress())}% para Nivel {stats.level + 1}
               </Text>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Today's Progress */}
-        <View style={styles.todayCard}>
-          <View style={styles.todayHeader}>
-            <Ionicons name="today" size={20} color={colors.primary[600]} />
-            <Text style={styles.todayTitle}>Progreso de Hoy</Text>
+        {/* Stats únicos — no repetidos en Home */}
+        <View style={[styles.uniqueStatsRow, { backgroundColor: palette.surface }]}>
+          <View style={styles.uniqueStatCard}>
+            <Ionicons name="list-circle" size={28} color={colors.primary[500]} />
+            <Text style={[styles.uniqueStatValue, { color: palette.text }]}>{stats.totalHabits}</Text>
+            <Text style={[styles.uniqueStatLabel, { color: palette.textMuted }]}>Hábitos activos</Text>
           </View>
-          <View style={styles.todayContent}>
-            <View style={styles.todayStats}>
-              <Text style={styles.todayNumber}>{stats.completedToday}</Text>
-              <Text style={styles.todayOf}>de</Text>
-              <Text style={styles.todayNumber}>{stats.totalHabits}</Text>
-            </View>
-            <Text style={styles.todayLabel}>hábitos completados</Text>
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBar}>
-                <LinearGradient
-                  colors={colors.gradients.secondary}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.progressFill, { width: `${stats.completionRate}%` }]}
-                />
-              </View>
-              <Text style={styles.progressPercent}>{stats.completionRate}%</Text>
-            </View>
+          <View style={[styles.uniqueStatDivider, { backgroundColor: palette.border }]} />
+          <View style={styles.uniqueStatCard}>
+            <Ionicons name="ribbon" size={28} color={colors.accent.amber} />
+            <Text style={[styles.uniqueStatValue, { color: palette.text }]}>{unlockedCount}</Text>
+            <Text style={[styles.uniqueStatLabel, { color: palette.textMuted }]}>Logros obtenidos</Text>
+          </View>
+          <View style={[styles.uniqueStatDivider, { backgroundColor: palette.border }]} />
+          <View style={styles.uniqueStatCard}>
+            <Ionicons name="checkmark-done-circle" size={28} color={colors.secondary[500]} />
+            <Text style={[styles.uniqueStatValue, { color: palette.text }]}>{stats.completionRate}%</Text>
+            <Text style={[styles.uniqueStatLabel, { color: palette.textMuted }]}>Tasa de éxito</Text>
           </View>
         </View>
 
         {/* Achievements — preview */}
-        <View style={styles.achievementsSection}>
+        <View style={[styles.achievementsSection, { backgroundColor: palette.surface }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Logros</Text>
-            <Text style={styles.sectionSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Logros</Text>
+            <Text style={[styles.sectionSubtitle, { color: palette.textMuted }]}>{unlockedCount} de {achievements.length} desbloqueados</Text>
           </View>
 
-          {/* Grid de 3 logros preview */}
+          {/* Grid de 6 logros preview (2 filas × 3 columnas) */}
           <View style={styles.achievementsGrid}>
             {previewAchievements.map((achievement) => (
               <AchievementCard key={achievement.id} achievement={achievement} />
             ))}
           </View>
 
-          {/* Botón Ver más */}
-          <TouchableOpacity
-            style={styles.verMasBtn}
-            onPress={() => setShowAllAchievements(true)}
-          >
-            <Text style={styles.verMasText}>Ver todos los logros</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
-          </TouchableOpacity>
+          {/* Botón Ver todos */}
+          {achievements.length > 6 && (
+            <TouchableOpacity
+              style={styles.verMasBtn}
+              onPress={() => setShowAllAchievements(true)}
+            >
+              <Text style={styles.verMasText}>Ver todos los logros ({achievements.length})</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary[600]} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ height: 100 }} />
@@ -489,9 +469,9 @@ export default function PerfilScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAllAchievements(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: palette.bg }]}>
           {/* Handle + header */}
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
             <Text style={styles.modalTitle}>Todos los logros</Text>
             <Text style={styles.modalSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
             <TouchableOpacity
@@ -556,170 +536,120 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
 
-  // Profile Card
-  profileCard: {
+  // Identity Card
+  identityCard: {
     borderRadius: radius["2xl"],
     overflow: "hidden",
-    marginBottom: spacing[5],
+    marginBottom: spacing[4],
     ...shadows.lg,
     shadowColor: colors.primary[600],
+    padding: spacing[5],
   },
-  profileGradient: {
-    padding: spacing[6],
-  },
-  profileTop: {
+  identityRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: spacing[6],
+    gap: spacing[4],
+    marginBottom: spacing[4],
+  },
+  avatarWrap: {
+    position: "relative",
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: spacing[3],
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   avatarText: {
-    fontSize: typography.size["2xl"],
+    fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,
     color: colors.neutral[0],
   },
-  profileName: {
+  levelBadge: {
+    position: "absolute",
+    bottom: -4,
+    right: -4,
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.md,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    ...shadows.sm,
+  },
+  levelBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.weight.bold,
+    color: colors.primary[600],
+  },
+  identityInfo: {
+    flex: 1,
+  },
+  identityName: {
     fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,
     color: colors.neutral[0],
     marginBottom: spacing[1],
   },
-  profileEmail: {
+  identityEmail: {
     fontSize: typography.size.sm,
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.75)",
   },
 
-  // Stats Row
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    marginBottom: spacing[4],
+  // XP bar
+  xpSection: {
+    gap: spacing[2],
   },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing[2],
-  },
-  statValue: {
-    fontSize: typography.size.xl,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[0],
-  },
-  statLabel: {
-    fontSize: typography.size.xs,
-    color: "rgba(255,255,255,0.7)",
-    marginTop: spacing[1],
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-
-  // Level Progress
-  levelProgressContainer: {
-    alignItems: "center",
-  },
-  levelProgressBar: {
+  xpBarBg: {
     width: "100%",
-    height: 6,
+    height: 7,
     backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: "hidden",
   },
-  levelProgressFill: {
+  xpBarFill: {
     height: "100%",
     backgroundColor: colors.neutral[0],
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  levelProgressText: {
+  xpLabel: {
     fontSize: typography.size.xs,
     color: "rgba(255,255,255,0.7)",
-    marginTop: spacing[2],
+    textAlign: "right",
   },
 
-  // Today Card
-  todayCard: {
+  // Unique stats row
+  uniqueStatsRow: {
+    flexDirection: "row",
     backgroundColor: colors.neutral[0],
     borderRadius: radius.xl,
-    padding: spacing[5],
+    padding: spacing[4],
     marginBottom: spacing[5],
+    alignItems: "center",
     ...shadows.sm,
   },
-  todayHeader: {
-    flexDirection: "row",
+  uniqueStatCard: {
+    flex: 1,
     alignItems: "center",
-    gap: spacing[2],
-    marginBottom: spacing[4],
+    gap: spacing[1],
   },
-  todayTitle: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[800],
+  uniqueStatDivider: {
+    width: 1,
+    height: 48,
+    backgroundColor: colors.neutral[100],
+    marginHorizontal: spacing[2],
   },
-  todayContent: {
-    alignItems: "center",
-  },
-  todayStats: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: spacing[2],
-  },
-  todayNumber: {
-    fontSize: typography.size["3xl"],
+  uniqueStatValue: {
+    fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,
     color: colors.neutral[900],
   },
-  todayOf: {
-    fontSize: typography.size.base,
-    color: colors.neutral[400],
-  },
-  todayLabel: {
-    fontSize: typography.size.sm,
+  uniqueStatLabel: {
+    fontSize: typography.size.xs,
     color: colors.neutral[500],
-    marginBottom: spacing[4],
-  },
-  progressBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    gap: spacing[3],
-  },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: colors.neutral[100],
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  progressPercent: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.secondary[600],
-    minWidth: 40,
+    textAlign: "center",
   },
 
   // Achievements

@@ -79,7 +79,7 @@ export default function LoadingScreen() {
 
           {/* Brand Name */}
           <Text style={styles.brandName}>taskpin</Text>
-          <Text style={styles.tagline}>Build better habits</Text>
+          <Text style={styles.tagline}>Construye mejores hábitos</Text>
 
           {/* Progress Section */}
           <View style={styles.progressSection}>
@@ -98,7 +98,7 @@ export default function LoadingScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Loading your journey...</Text>
+          <Text style={styles.footerText}>Preparando tu experiencia...</Text>
         </View>
       </LinearGradient>
     </View>

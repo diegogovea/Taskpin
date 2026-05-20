@@ -1,6 +1,6 @@
 # Backend/app/main.py
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT
@@ -25,7 +25,8 @@ from .schema.habitSchema import (
     HabitoResponseSchema,
     HabitoFrecuenciaUpdateSchema,
     HabitoPersonalizadoCreateSchema,
-    HabitoPersonalizadoUpdateSchema
+    HabitoPersonalizadoUpdateSchema,
+    HabitoCamposExtraUpdateSchema
 )
 
 # IMPORTACIONES PARA PLANES
@@ -707,12 +708,29 @@ def get_user_habito_ids(user_id: int, current_user: TokenData = Depends(verify_t
         raise HTTPException(status_code=500, detail=f"Error al obtener IDs de hábitos: {str(e)}")
 
 @app.get("/api/usuario/{user_id}/habitos/hoy", status_code=HTTP_200_OK)
-def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify_token)):
-    """Obtener hábitos del usuario con su estado de hoy (PROTEGIDO)"""
+def get_user_habits_today(
+    user_id: int,
+    fecha: Optional[str] = Query(None, description="Fecha en formato YYYY-MM-DD. Si se omite, usa la fecha actual."),
+    current_user: TokenData = Depends(verify_token)
+):
+    """Obtener hábitos del usuario con su estado para una fecha dada (PROTEGIDO).
+    
+    Si no se pasa ?fecha=, usa CURRENT_DATE.
+    """
+    from datetime import date as date_type
     try:
         # Verificar acceso
         verify_user_access(user_id, current_user)
         
+        # Resolver la fecha objetivo
+        if fecha:
+            try:
+                target_date = date_type.fromisoformat(fecha)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD.")
+        else:
+            target_date = date_type.today()
+
         # Verificar que el usuario existe
         existing_user = conn.read_one(user_id)
         if not existing_user:
@@ -755,11 +773,11 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                     INNER JOIN categorias_habitos c ON h.categoria_id = c.categoria_id
                     LEFT JOIN seguimiento_habitos sh ON (
                         sh.habito_usuario_id = hu.habito_usuario_id 
-                        AND sh.fecha = CURRENT_DATE
+                        AND sh.fecha = %s
                     )
                     WHERE hu.user_id = %s AND hu.activo = true
                     ORDER BY h.categoria_id, h.nombre;
-                """, (user_id,))
+                """, (target_date, user_id))
                 
                 habits_data = cur.fetchall()
         
@@ -801,7 +819,7 @@ def get_user_habits_today(user_id: int, current_user: TokenData = Depends(verify
                     "total": total_habitos,
                     "completados": completados,
                     "pendientes": pendientes,
-                    "fecha": "today"
+                    "fecha": target_date.isoformat()
                 }
             }
         }
@@ -1138,6 +1156,33 @@ def update_habito_frecuencia(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al actualizar frecuencia: {str(e)}")
+
+@app.put("/api/usuario/{user_id}/habito/{habito_usuario_id}/campos-extra", status_code=HTTP_200_OK)
+def update_habito_campos_extra(
+    user_id: int,
+    habito_usuario_id: int,
+    data: HabitoCamposExtraUpdateSchema,
+    current_user: TokenData = Depends(verify_token)
+):
+    """Actualizar campos extra (color, icono, tipo, fecha_fin, meta) de un hábito del usuario (PROTEGIDO)"""
+    try:
+        verify_user_access(user_id, current_user)
+        result = habit_conn.update_habito_campos_extra(
+            habito_usuario_id,
+            color=data.color,
+            icono=data.icono,
+            tipo=data.tipo,
+            fecha_fin=data.fecha_fin,
+            meta_valor=data.meta_valor,
+            meta_unidad=data.meta_unidad,
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado o migración pendiente")
+        return {"success": True, "message": "Hábito actualizado correctamente"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar hábito: {str(e)}")
 
 @app.get("/api/usuario/{user_id}/habito/{habito_usuario_id}/detalle", status_code=HTTP_200_OK)
 def get_habito_usuario_detalle(

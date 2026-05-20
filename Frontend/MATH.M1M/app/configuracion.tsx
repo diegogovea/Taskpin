@@ -16,7 +16,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
@@ -24,7 +23,6 @@ import { API_BASE_URL } from "../constants/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 
-const ONBOARDING_KEY = "@taskpin_onboarding_completed";
 
 interface UserData {
   user_id: string | null;
@@ -108,7 +106,7 @@ export default function ConfiguracionScreen() {
       }
     }
 
-    if (!editPassword) {
+    if (editField === "correo" && !editPassword) {
       setEditPasswordError("Ingresa tu contraseña para confirmar");
       return;
     }
@@ -117,20 +115,22 @@ export default function ConfiguracionScreen() {
     setEditPasswordError("");
 
     try {
-      // 1. Verificar contraseña
-      const verifyRes = await authFetch(`/api/usuario/${userData.user_id}/verificar-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contrasena: editPassword }),
-      });
+      // Para cambio de correo, verificar contraseña primero
+      if (editField === "correo") {
+        const verifyRes = await authFetch(`/api/usuario/${userData.user_id}/verificar-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contrasena: editPassword }),
+        });
 
-      if (!verifyRes.ok) {
-        const verifyData = await verifyRes.json();
-        setEditPasswordError(verifyData.detail || "Contraseña incorrecta");
-        return;
+        if (!verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          setEditPasswordError(verifyData.detail || "Contraseña incorrecta");
+          return;
+        }
       }
 
-      // 2. Actualizar el campo
+      // Actualizar el campo
       const updateRes = await authFetch(`/api/usuario/${userData.user_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -211,19 +211,6 @@ export default function ConfiguracionScreen() {
     router.canGoBack() ? router.back() : router.replace("/(tabs)/home");
   };
 
-  // Para pruebas: borra la clave de onboarding y vuelve a Loading → verás onboarding de nuevo
-  const handleResetOnboarding = async () => {
-    try {
-      await AsyncStorage.removeItem(ONBOARDING_KEY);
-      Alert.alert(
-        "Onboarding reiniciado",
-        "La próxima vez que abras la app verás las pantallas de onboarding de nuevo. Yendo a carga ahora.",
-        [{ text: "OK", onPress: () => router.replace("/loading") }]
-      );
-    } catch {
-      Alert.alert("Error", "No se pudo reiniciar el onboarding");
-    }
-  };
 
   const SettingItem = ({
     icon,
@@ -381,13 +368,6 @@ export default function ConfiguracionScreen() {
           <Text style={[styles.sectionTitle, { color: palette.textMuted }]}>Cuenta</Text>
           <View style={[styles.sectionCard, { backgroundColor: palette.surface }]}>
             <SettingItem
-              icon="play-circle-outline"
-              title="Ver onboarding de nuevo (pruebas)"
-              onPress={handleResetOnboarding}
-              showChevron={false}
-            />
-            <View style={[styles.settingDivider, { backgroundColor: palette.border }]} />
-            <SettingItem
               icon="log-out"
               title="Cerrar Sesión"
               onPress={() => setLogoutModalVisible(true)}
@@ -445,39 +425,42 @@ export default function ConfiguracionScreen() {
                 autoFocus
               />
 
-              {/* Confirmación de contraseña */}
-              <View style={styles.editPwdHeader}>
-                <Ionicons name="lock-closed-outline" size={14} color={palette.textMuted} />
-                <Text style={[styles.inputLabel, { color: palette.textMuted, marginBottom: 0 }]}>
-                  Confirma con tu contraseña
-                </Text>
-              </View>
-              <View style={[
-                styles.pwdInputRow,
-                { backgroundColor: palette.surface, borderColor: editPasswordError ? colors.semantic.error : palette.border }
-              ]}>
-                <TextInput
-                  style={[styles.pwdInput, { color: palette.text }]}
-                  value={editPassword}
-                  onChangeText={(t) => { setEditPassword(t); setEditPasswordError(""); }}
-                  placeholder="Tu contraseña actual"
-                  placeholderTextColor={palette.textMuted}
-                  secureTextEntry={!showEditPassword}
-                  autoCapitalize="none"
-                  returnKeyType="done"
-                  onSubmitEditing={saveEdit}
-                />
-                <TouchableOpacity onPress={() => setShowEditPassword(v => !v)} style={styles.eyeBtn}>
-                  <Ionicons name={showEditPassword ? "eye-off" : "eye"} size={20} color={palette.textMuted} />
-                </TouchableOpacity>
-              </View>
+              {/* Confirmación de contraseña (solo para cambio de correo) */}
+              {editField === "correo" && (
+                <>
+                  <View style={styles.editPwdHeader}>
+                    <Ionicons name="lock-closed-outline" size={14} color={palette.textMuted} />
+                    <Text style={[styles.inputLabel, { color: palette.textMuted, marginBottom: 0 }]}>
+                      Confirma con tu contraseña
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.pwdInputRow,
+                    { backgroundColor: palette.surface, borderColor: editPasswordError ? colors.semantic.error : palette.border }
+                  ]}>
+                    <TextInput
+                      style={[styles.pwdInput, { color: palette.text }]}
+                      value={editPassword}
+                      onChangeText={(t) => { setEditPassword(t); setEditPasswordError(""); }}
+                      placeholder="Tu contraseña actual"
+                      placeholderTextColor={palette.textMuted}
+                      secureTextEntry={!showEditPassword}
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                      onSubmitEditing={saveEdit}
+                    />
+                    <TouchableOpacity onPress={() => setShowEditPassword(v => !v)} style={styles.eyeBtn}>
+                      <Ionicons name={showEditPassword ? "eye-off" : "eye"} size={20} color={palette.textMuted} />
+                    </TouchableOpacity>
+                  </View>
 
-              {/* Error inline de contraseña */}
-              {editPasswordError !== "" && (
-                <View style={styles.inlineError}>
-                  <Ionicons name="alert-circle" size={14} color={colors.semantic.error} />
-                  <Text style={styles.inlineErrorText}>{editPasswordError}</Text>
-                </View>
+                  {editPasswordError !== "" && (
+                    <View style={styles.inlineError}>
+                      <Ionicons name="alert-circle" size={14} color={colors.semantic.error} />
+                      <Text style={styles.inlineErrorText}>{editPasswordError}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           </SafeAreaView>

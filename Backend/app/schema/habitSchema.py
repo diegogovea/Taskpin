@@ -122,6 +122,16 @@ class HabitoPersonalizadoCreateSchema(BaseModel):
         return v
 
 
+class HabitoCamposExtraUpdateSchema(BaseModel):
+    """Schema para actualizar campos extra de cualquier hábito de usuario (color, icono, tipo, meta, fecha_fin)"""
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    tipo: Optional[str] = None
+    fecha_fin: Optional[date] = None
+    meta_valor: Optional[float] = None
+    meta_unidad: Optional[str] = None
+
+
 class HabitoPersonalizadoUpdateSchema(BaseModel):
     """Schema para editar un hábito personalizado"""
     nombre: Optional[str] = None
