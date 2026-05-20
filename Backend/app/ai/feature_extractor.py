@@ -316,90 +316,80 @@ class FeatureExtractor:
     def get_training_data_for_predictor(self, min_records: int = 100) -> Tuple[np.ndarray, np.ndarray]:
         """
         Prepara datos de entrenamiento para el modelo de predicción.
-        
-        Obtiene historial de todos los usuarios y construye un dataset
-        con features y labels (completado/no completado).
-        
-        Args:
-            min_records: Mínimo de registros requeridos
-            
-        Returns:
-            Tuple de:
-            - X: numpy array de features (n_samples, n_features)
-            - y: numpy array de labels (n_samples,) - 1=completado, 0=no
+
+        Optimizado: carga TODO el historial en memoria con un solo query y
+        calcula las features en Python, evitando N subqueries a la BD.
         """
         X_list = []
         y_list = []
-        
+
         with self.pool.connection() as conn:
             with conn.cursor() as cur:
-                # Obtener historial con features calculables
+                # Un solo query: todos los registros + fecha_agregado del hábito
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         sh.habito_usuario_id,
                         sh.fecha,
                         sh.completado,
-                        hu.user_id,
                         hu.fecha_agregado
                     FROM seguimiento_habitos sh
-                    INNER JOIN habitos_usuario hu ON sh.habito_usuario_id = hu.habito_usuario_id
-                    WHERE sh.fecha < CURRENT_DATE  -- Solo datos pasados
-                    ORDER BY sh.fecha;
+                    INNER JOIN habitos_usuario hu
+                        ON sh.habito_usuario_id = hu.habito_usuario_id
+                    WHERE sh.fecha < CURRENT_DATE
+                    ORDER BY sh.habito_usuario_id, sh.fecha;
                 """)
-                
                 registros = cur.fetchall()
-                
-                # Para cada registro, calcular features del día anterior
-                # (simulamos que predecimos basándonos en datos disponibles)
-                for habito_usuario_id, fecha, completado, user_id, fecha_agregado in registros:
-                    # Calcular features para ese día
-                    dia_semana = fecha.weekday()
-                    dias_desde_agregado = (fecha - fecha_agregado).days if fecha_agregado else 0
-                    
-                    # Obtener historial previo a esa fecha
-                    cur.execute("""
-                        SELECT fecha, completado
-                        FROM seguimiento_habitos
-                        WHERE habito_usuario_id = %s
-                          AND fecha < %s
-                          AND fecha >= %s
-                        ORDER BY fecha DESC;
-                    """, (habito_usuario_id, fecha, fecha - timedelta(days=30)))
-                    
-                    historial_previo = {row[0]: row[1] for row in cur.fetchall()}
-                    
-                    # Calcular features
-                    ayer = fecha - timedelta(days=1)
-                    completado_ayer = 1 if historial_previo.get(ayer, False) else 0
-                    
-                    # Tasa últimos 7 días antes de esta fecha
-                    dias_7 = [(fecha - timedelta(days=i)) for i in range(1, 8)]
-                    completados_7 = sum(1 for d in dias_7 if historial_previo.get(d, False))
-                    tasa_7 = completados_7 / 7.0
-                    
-                    # Racha antes de esta fecha
-                    racha = 0
-                    fecha_check = ayer
-                    while historial_previo.get(fecha_check, False):
-                        racha += 1
-                        fecha_check -= timedelta(days=1)
-                    
-                    # Feature vector (sin hora porque es dato histórico)
-                    # [dia_semana, racha, tasa_7, completado_ayer, dias_agregado]
-                    features = [
-                        dia_semana,
-                        racha,
-                        tasa_7,
-                        completado_ayer,
-                        min(dias_desde_agregado, 365)  # Cap a 1 año
-                    ]
-                    
-                    X_list.append(features)
-                    y_list.append(1 if completado else 0)
-        
+
+        if not registros:
+            return np.array([], dtype=np.float32), np.array([], dtype=np.int32)
+
+        # Agrupar historial por habito_usuario_id en memoria
+        # {habito_usuario_id: {fecha: completado}}
+        historial: Dict[int, Dict] = {}
+        fecha_agregado_map: Dict[int, date] = {}
+
+        for hu_id, fecha, completado, fecha_agregado in registros:
+            if hu_id not in historial:
+                historial[hu_id] = {}
+                fecha_agregado_map[hu_id] = fecha_agregado
+            historial[hu_id][fecha] = completado
+
+        # Calcular features en Python sin más queries
+        for hu_id, fecha, completado, fecha_agregado in registros:
+            hist = historial[hu_id]
+            fa = fecha_agregado_map[hu_id]
+
+            dia_semana = fecha.weekday()
+            dias_desde_agregado = (fecha - fa).days if fa else 0
+
+            ayer = fecha - timedelta(days=1)
+            completado_ayer = 1 if hist.get(ayer, False) else 0
+
+            # Tasa últimos 7 días antes de esta fecha
+            completados_7 = sum(
+                1 for i in range(1, 8) if hist.get(fecha - timedelta(days=i), False)
+            )
+            tasa_7 = completados_7 / 7.0
+
+            # Racha antes de esta fecha
+            racha = 0
+            fecha_check = ayer
+            while hist.get(fecha_check, False):
+                racha += 1
+                fecha_check -= timedelta(days=1)
+
+            X_list.append([
+                dia_semana,
+                racha,
+                tasa_7,
+                completado_ayer,
+                min(dias_desde_agregado, 365),
+            ])
+            y_list.append(1 if completado else 0)
+
         if len(X_list) < min_records:
             print(f"Advertencia: Solo {len(X_list)} registros disponibles (mínimo: {min_records})")
-        
+
         return np.array(X_list, dtype=np.float32), np.array(y_list, dtype=np.int32)
     
     # ========================================

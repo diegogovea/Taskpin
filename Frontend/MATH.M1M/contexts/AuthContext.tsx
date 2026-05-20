@@ -95,28 +95,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function loadStoredSession() {
     try {
       console.log('[Auth] Cargando sesión guardada...');
-      
-      // Leer datos guardados
+
       const [storedToken, storedUser] = await AsyncStorage.multiGet([
         'auth_token',
-        'auth_user'
+        'auth_user',
       ]);
-      
+
       const tokenValue = storedToken[1];
       const userValue = storedUser[1];
-      
-      if (tokenValue && userValue) {
-        // Hay sesión guardada, restaurarla
-        setToken(tokenValue);
-        setUser(JSON.parse(userValue));
-        console.log('[Auth] Sesión restaurada');
-      } else {
+
+      if (!tokenValue || !userValue) {
         console.log('[Auth] No hay sesión guardada');
+        return;
       }
+
+      // Verificar expiración decodificando el payload del JWT localmente
+      // (sin llamada al backend para no perder sesión por problemas de red)
+      const isExpired = (() => {
+        try {
+          const payloadB64 = tokenValue.split('.')[1];
+          const json = JSON.parse(
+            decodeURIComponent(
+              atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            )
+          );
+          return typeof json.exp === 'number' && json.exp < Math.floor(Date.now() / 1000);
+        } catch {
+          return false; // Si no podemos decodificar, asumir válido
+        }
+      })();
+
+      if (isExpired) {
+        console.log('[Auth] Token expirado, cerrando sesión...');
+        await AsyncStorage.multiRemove([
+          'auth_token', 'auth_user', 'nombre', 'correo', 'user_id',
+        ]);
+        return;
+      }
+
+      // Token válido → restaurar sesión
+      setToken(tokenValue);
+      setUser(JSON.parse(userValue));
+      console.log('[Auth] Sesión restaurada');
     } catch (error) {
       console.error('[Auth] Error cargando sesión:', error);
     } finally {
-      // Ya terminamos de cargar (haya o no sesión)
       setIsLoading(false);
     }
   }

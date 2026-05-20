@@ -197,57 +197,55 @@ def assign_habitos(cur, user_id, habitos, num_habitos, dias_historial):
 def generate_historial(cur, user_id, habitos, perfil_config, dias_historial):
     """
     Genera historial de seguimiento para TODOS los días.
-    IMPORTANTE: Inserta tanto completados como NO completados.
+    Usa batch insert (executemany) para minimizar round-trips a la BD.
     """
     get_prob = perfil_config["get_prob"]
     hoy = date.today()
-    
+
     total_completados = 0
     total_no_completados = 0
     total_puntos = 0
-    
+
+    # Acumular todas las filas en memoria y enviarlas en un solo batch
+    rows = []
+
     for habito in habitos:
         hu_id = habito["habito_usuario_id"]
         puntos = habito["puntos"]
         fecha_inicio = habito["fecha_agregado"]
         total_dias = dias_historial
-        
+
         fecha_actual = fecha_inicio
         dias_desde_inicio = 0
-        
+
         while fecha_actual < hoy:
-            dia_semana = fecha_actual.weekday()  # 0=Lunes, 6=Domingo
-            
-            # Calcular probabilidad según perfil
+            dia_semana = fecha_actual.weekday()
             prob = get_prob(dia_semana, dias_desde_inicio, total_dias)
             completado = random.random() < prob
-            
-            # INSERTAR SIEMPRE (completado o no)
-            try:
-                if completado:
-                    hora = f"{random.randint(6, 22):02d}:{random.randint(0, 59):02d}:00"
-                    cur.execute("""
-                        INSERT INTO seguimiento_habitos 
-                        (habito_usuario_id, fecha, completado, hora_completado)
-                        VALUES (%s, %s, true, %s)
-                        ON CONFLICT (habito_usuario_id, fecha) DO UPDATE SET completado = true;
-                    """, (hu_id, fecha_actual, hora))
-                    total_completados += 1
-                    total_puntos += puntos
-                else:
-                    cur.execute("""
-                        INSERT INTO seguimiento_habitos 
-                        (habito_usuario_id, fecha, completado, hora_completado)
-                        VALUES (%s, %s, false, NULL)
-                        ON CONFLICT (habito_usuario_id, fecha) DO UPDATE SET completado = false;
-                    """, (hu_id, fecha_actual))
-                    total_no_completados += 1
-            except Exception:
-                pass
-            
+
+            if completado:
+                hora = f"{random.randint(6, 22):02d}:{random.randint(0, 59):02d}:00"
+                rows.append((hu_id, fecha_actual, True, hora))
+                total_completados += 1
+                total_puntos += puntos
+            else:
+                rows.append((hu_id, fecha_actual, False, None))
+                total_no_completados += 1
+
             fecha_actual += timedelta(days=1)
             dias_desde_inicio += 1
-    
+
+    # Batch insert en un solo round-trip
+    if rows:
+        cur.executemany("""
+            INSERT INTO seguimiento_habitos
+            (habito_usuario_id, fecha, completado, hora_completado)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (habito_usuario_id, fecha) DO UPDATE
+              SET completado = EXCLUDED.completado,
+                  hora_completado = EXCLUDED.hora_completado;
+        """, rows)
+
     return total_completados, total_no_completados, total_puntos
 
 
