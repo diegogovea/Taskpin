@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,27 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { getCategoryColor } from "../../constants/categoryColors";
+import { getCategoryColor, traducirCategoria } from "../../constants/categoryColors";
+import { safeIcon } from "../../utils/safeIcon";
+
+// Los iconos de categoría en la BD son emojis; los mapeamos a Ionicons válidos
+const CATEGORIA_ICON_MAP: Record<string, string> = {
+  "Bienestar Diario":            "leaf-outline",
+  "Energía y Movimiento":        "flash-outline",
+  "Mente y Enfoque":             "bulb-outline",
+  "Orden y Hogar":               "home-outline",
+  "Finanzas y Control Personal": "cash-outline",
+};
+
+function getCategoriaIcon(nombre: string, rawIcono: string | null | undefined): string {
+  if (CATEGORIA_ICON_MAP[nombre]) return CATEGORIA_ICON_MAP[nombre];
+  return safeIcon(rawIcono, "leaf-outline");
+}
 import { ConfirmModal } from "../../components/modals";
 import { Toast, HabitCalendar } from "../../components/ui";
 
@@ -81,6 +96,23 @@ const FRECUENCIAS = [
   { value: 'cada_2_meses',   label: 'Cada 2 meses',  icon: 'time-outline' },
 ];
 
+const FREQ_UNITS = [
+  { value: 'dias',    label: 'días' },
+  { value: 'semanas', label: 'semanas' },
+  { value: 'meses',   label: 'meses' },
+];
+
+function getFrecuenciaLabel(value: string): string {
+  const preset = FRECUENCIAS.find((f) => f.value === value);
+  if (preset) return preset.label;
+  const match = value.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+  if (match) {
+    const unitMap: Record<string, string> = { dias: 'días', semanas: 'semanas', meses: 'meses' };
+    return `Cada ${match[1]} ${unitMap[match[2]] ?? match[2]}`;
+  }
+  return value;
+}
+
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
   '#F97316', '#F59E0B', '#10B981', '#14B8A6',
@@ -88,10 +120,12 @@ const PRESET_COLORS = [
 ];
 
 const PRESET_ICONS = [
-  'leaf-outline', 'fitness-outline', 'barbell-outline', 'bicycle-outline',
-  'heart-outline', 'water-outline', 'moon-outline', 'sunny-outline',
-  'book-outline', 'musical-notes-outline', 'brush-outline', 'code-slash-outline',
-  'restaurant-outline', 'walk-outline', 'medkit-outline', 'brain',
+  'leaf-outline',          'fitness-outline',       'barbell-outline',       'bicycle-outline',
+  'heart-outline',         'water-outline',         'moon-outline',          'sunny-outline',
+  'book-outline',          'musical-notes-outline', 'brush-outline',         'code-outline',
+  'fast-food-outline',     'walk-outline',          'medkit-outline',        'sparkles-outline',
+  'trophy-outline',        'star-outline',          'people-outline',        'school-outline',
+  'stopwatch-outline',     'headset-outline',       'pencil-outline',        'flag-outline',
 ];
 
 export default function DetalleHabitoScreen() {
@@ -110,13 +144,20 @@ export default function DetalleHabitoScreen() {
   const [historialResumen, setHistorialResumen] = useState<HistorialResumen | null>(null);
   const [rachas, setRachas] = useState<RachasData | null>(null);
   
+  // Frecuencia personalizada
+  const [customFreqNum, setCustomFreqNum] = useState('');
+  const [customFreqUnit, setCustomFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
+
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editNombre, setEditNombre] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
   const [editColor, setEditColor] = useState<string | null>(null);
   const [editIcono, setEditIcono] = useState<string | null>(null);
   const [editTipo, setEditTipo] = useState<string>('bueno');
   const [editFechaFin, setEditFechaFin] = useState('');
+  const [editFechaFinDisplay, setEditFechaFinDisplay] = useState('');
   const [editMetaValor, setEditMetaValor] = useState('');
   const [editMetaUnidad, setEditMetaUnidad] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -181,17 +222,50 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      const loadAllData = async () => {
+        setLoading(true);
+        await Promise.all([
+          fetchHabitoDetalle(),
+          fetchHistorial(),
+          fetchRachas(),
+        ]);
+        setLoading(false);
+      };
+      if (user?.user_id && habito_usuario_id) {
+        loadAllData();
+      }
+    }, [user?.user_id, habito_usuario_id])
+  );
+
+  // Inicializar panel de frecuencia con el valor actual del hábito
   useEffect(() => {
-    const loadAllData = async () => {
-      await Promise.all([
-        fetchHabitoDetalle(),
-        fetchHistorial(),
-        fetchRachas(),
-      ]);
-      setLoading(false);
-    };
-    loadAllData();
-  }, [user?.user_id, habito_usuario_id]);
+    if (!habito) return;
+    const match = habito.frecuencia_personal.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+    if (match) {
+      setCustomFreqNum(match[1]);
+      setCustomFreqUnit(match[2] as 'dias' | 'semanas' | 'meses');
+    } else if (habito.frecuencia_personal === 'diario') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('dias');
+    } else if (habito.frecuencia_personal === 'semanal') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('semanas');
+    } else if (habito.frecuencia_personal === 'mensual') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('meses');
+    } else if (habito.frecuencia_personal === 'cada_2_dias') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('dias');
+    } else if (habito.frecuencia_personal === 'cada_2_semanas') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('semanas');
+    } else if (habito.frecuencia_personal === 'cada_2_meses') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('meses');
+    }
+  }, [habito?.frecuencia_personal]);
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -264,11 +338,40 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  // Convierte DD/MM/AAAA a YYYY-MM-DD para el backend
+  const displayToIso = (display: string): string => {
+    const digits = display.replace(/\D/g, '');
+    if (digits.length !== 8) return '';
+    const dd = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const yyyy = digits.slice(4, 8);
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Convierte YYYY-MM-DD a DD/MM/AAAA para mostrarlo
+  const isoToDisplay = (iso: string): string => {
+    if (!iso || iso.length < 10) return '';
+    const [yyyy, mm, dd] = iso.slice(0, 10).split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  // Formatea el input mientras el usuario escribe, insertando / automaticamente
+  const formatDateInput = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
   const openEditModal = () => {
+    setEditNombre(habito?.nombre || '');
+    setEditDescripcion(habito?.descripcion || '');
     setEditColor(habito?.color || null);
     setEditIcono(habito?.icono || null);
     setEditTipo(habito?.tipo || 'bueno');
-    setEditFechaFin(habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '');
+    const rawFecha = habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '';
+    setEditFechaFin(rawFecha);
+    setEditFechaFinDisplay(isoToDisplay(rawFecha));
     setEditMetaValor(habito?.meta_valor != null ? String(habito.meta_valor) : '');
     setEditMetaUnidad(habito?.meta_unidad || '');
     setShowEditModal(true);
@@ -278,11 +381,14 @@ export default function DetalleHabitoScreen() {
     if (!user?.user_id || !habito_usuario_id || savingEdit) return;
     setSavingEdit(true);
     try {
+      const isoFecha = displayToIso(editFechaFinDisplay);
       const body: Record<string, unknown> = {
+        nombre: editNombre.trim() || null,
+        descripcion: editDescripcion.trim() || null,
         color: editColor || null,
         icono: editIcono || null,
         tipo: editTipo || null,
-        fecha_fin: editFechaFin || null,
+        fecha_fin: isoFecha || null,
         meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
         meta_unidad: editMetaUnidad || null,
       };
@@ -298,10 +404,12 @@ export default function DetalleHabitoScreen() {
       if (data.success) {
         setHabito(prev => prev ? {
           ...prev,
+          nombre: editNombre.trim() || prev.nombre,
+          descripcion: editDescripcion.trim() || null,
           color: editColor,
           icono: editIcono,
           tipo: editTipo,
-          fecha_fin: editFechaFin || null,
+          fecha_fin: isoFecha || null,
           meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
           meta_unidad: editMetaUnidad || null,
         } : null);
@@ -379,16 +487,19 @@ export default function DetalleHabitoScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={[styles.iconContainer, { backgroundColor: categoryColor + '15' }]}>
-            <Ionicons 
-              name={(habito.categoria_icono || 'leaf') as any} 
-              size={40} 
-              color={categoryColor} 
+            <Ionicons
+              name={(habito.icono
+                ? safeIcon(habito.icono, 'leaf-outline')
+                : getCategoriaIcon(habito.categoria_nombre, habito.categoria_icono)
+              ) as any}
+              size={40}
+              color={categoryColor}
             />
           </View>
           <Text style={[styles.habitName, { color: palette.heading }]}>{habito.nombre}</Text>
           <View style={styles.categoryBadge}>
             <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
-              {habito.categoria_nombre}
+              {traducirCategoria(habito.categoria_nombre)}
             </Text>
           </View>
         </View>
@@ -434,7 +545,33 @@ export default function DetalleHabitoScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Historial</Text>
           <View style={styles.calendarContainer}>
-            <HabitCalendar historial={historial} />
+            <HabitCalendar
+              historial={historial}
+              onDayPress={async (fecha, completado) => {
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+                if (fecha === todayStr) {
+                  try {
+                    const res = await authFetch(
+                      `/api/usuario/${user?.user_id}/habito/${habito_usuario_id}/toggle`,
+                      { method: "POST" }
+                    );
+                    const data = await res.json();
+                    if (data.success) {
+                      await fetchHistorial();
+                      setToast({ visible: true, message: data.completado ? "Hábito completado hoy" : "Marcado como no completado", type: "success" });
+                    }
+                  } catch {
+                    setToast({ visible: true, message: "Error al actualizar", type: "error" });
+                  }
+                } else {
+                  const [y, m, d] = fecha.split("-");
+                  const label = `${parseInt(d)}/${parseInt(m)}/${y}`;
+                  const estado = completado === true ? "Completado" : completado === false ? "No cumplido" : "Sin registro";
+                  setToast({ visible: true, message: `${label}: ${estado}`, type: "success" });
+                }
+              }}
+            />
           </View>
         </View>
 
@@ -528,44 +665,51 @@ export default function DetalleHabitoScreen() {
         {/* Frequency Selector */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Frecuencia</Text>
-          <View style={styles.frequencyContainer}>
-            {FRECUENCIAS.map((freq) => {
-              const isSelected = habito.frecuencia_personal === freq.value;
-              return (
-                <TouchableOpacity
-                  key={freq.value}
-                  style={[
-                    styles.frequencyOption,
-                    isSelected && styles.frequencyOptionSelected,
-                  ]}
-                  onPress={() => updateFrecuencia(freq.value)}
-                  disabled={updating}
-                >
-                  {updating && isSelected ? (
-                    <ActivityIndicator size="small" color={colors.primary[600]} />
-                  ) : (
-                    <>
-                      <Ionicons 
-                        name={freq.icon as any} 
-                        size={20} 
-                        color={isSelected ? colors.primary[600] : colors.neutral[400]} 
-                      />
-                      <Text style={[
-                        styles.frequencyLabel,
-                        isSelected && styles.frequencyLabelSelected,
-                      ]}>
-                        {freq.label}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.selectedIndicator}>
-                          <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
-                        </View>
-                      )}
-                    </>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+          <View style={[styles.customFreqPanel, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+            <Text style={[styles.customFreqLabel, { color: palette.textMuted }]}>
+              Actual: <Text style={{ color: palette.text, fontWeight: '600' }}>{getFrecuenciaLabel(habito.frecuencia_personal)}</Text>
+            </Text>
+            <View style={styles.customFreqRow}>
+              <TextInput
+                style={[styles.customFreqInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="3"
+                placeholderTextColor={palette.textSubtle}
+                keyboardType="number-pad"
+                value={customFreqNum}
+                onChangeText={(t) => setCustomFreqNum(t.replace(/\D/g, ''))}
+                maxLength={3}
+              />
+              <View style={styles.customFreqUnits}>
+                {FREQ_UNITS.map((u) => (
+                  <TouchableOpacity
+                    key={u.value}
+                    style={[
+                      styles.customFreqUnitChip,
+                      { backgroundColor: palette.surface, borderColor: palette.border },
+                      customFreqUnit === u.value && styles.customFreqUnitChipSelected,
+                    ]}
+                    onPress={() => setCustomFreqUnit(u.value as 'dias' | 'semanas' | 'meses')}
+                  >
+                    <Text style={[
+                      styles.customFreqUnitText,
+                      { color: palette.textMuted },
+                      customFreqUnit === u.value && { color: colors.primary[600], fontWeight: '600' },
+                    ]}>
+                      {u.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.customFreqConfirmBtn, { opacity: customFreqNum ? 1 : 0.4 }]}
+              disabled={!customFreqNum || updating}
+              onPress={() => updateFrecuencia(`cada_${customFreqNum}_${customFreqUnit}`)}
+            >
+              <Text style={styles.customFreqConfirmText}>
+                {updating ? 'Guardando...' : customFreqNum ? `Guardar: cada ${customFreqNum} ${FREQ_UNITS.find(u => u.value === customFreqUnit)?.label}` : 'Ingresa un número'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -616,8 +760,31 @@ export default function DetalleHabitoScreen() {
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing[5] }}>
+              {/* Nombre */}
+              <Text style={[styles.editSectionLabel, { color: palette.heading }]}>Nombre</Text>
+              <TextInput
+                style={[styles.editTextInput, { backgroundColor: palette.surfaceAlt, color: palette.text, borderColor: palette.border }]}
+                value={editNombre}
+                onChangeText={setEditNombre}
+                placeholder="Nombre del hábito"
+                placeholderTextColor={palette.subtext}
+                maxLength={80}
+              />
+
+              {/* Descripcion */}
+              <Text style={[styles.editSectionLabel, { color: palette.heading, marginTop: spacing[4] }]}>Descripcion</Text>
+              <TextInput
+                style={[styles.editTextInput, { backgroundColor: palette.surfaceAlt, color: palette.text, borderColor: palette.border, minHeight: 72, textAlignVertical: 'top' }]}
+                value={editDescripcion}
+                onChangeText={setEditDescripcion}
+                placeholder="Descripcion del habito (opcional)"
+                placeholderTextColor={palette.subtext}
+                multiline
+                maxLength={200}
+              />
+
               {/* Color */}
-              <Text style={[styles.editSectionLabel, { color: palette.heading }]}>Color</Text>
+              <Text style={[styles.editSectionLabel, { color: palette.heading, marginTop: spacing[4] }]}>Color</Text>
               <View style={styles.colorGrid}>
                 {PRESET_COLORS.map(c => (
                   <TouchableOpacity
@@ -697,15 +864,37 @@ export default function DetalleHabitoScreen() {
 
               {/* Fecha fin */}
               <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Fecha de fin (opcional)</Text>
-              <TextInput
-                style={[styles.metaInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={palette.textSubtle}
-                value={editFechaFin}
-                onChangeText={setEditFechaFin}
-                keyboardType="numbers-and-punctuation"
-              />
-              <Text style={[styles.editHint, { color: palette.textSubtle }]}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
+              <View style={[styles.metaInput, {
+                backgroundColor: palette.inputBg,
+                borderColor: palette.border,
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: spacing[3],
+              }]}>
+                <Ionicons name="calendar-outline" size={18} color={palette.icon} style={{ marginRight: spacing[2] }} />
+                <TextInput
+                  style={{ flex: 1, fontSize: typography.size.base, color: palette.text }}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor={palette.textSubtle}
+                  keyboardType="numeric"
+                  value={editFechaFinDisplay}
+                  maxLength={10}
+                  onChangeText={(raw) => {
+                    const formatted = formatDateInput(raw);
+                    setEditFechaFinDisplay(formatted);
+                    setEditFechaFin(displayToIso(formatted));
+                  }}
+                />
+                {editFechaFinDisplay.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => { setEditFechaFinDisplay(''); setEditFechaFin(''); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={palette.iconSubtle} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={[styles.editHint, { color: palette.textSubtle, marginTop: spacing[1] }]}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
 
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -835,6 +1024,13 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     color: colors.neutral[700],
     marginBottom: spacing[3],
+  },
+  editTextInput: {
+    borderWidth: 1,
+    borderRadius: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.base,
   },
   editHint: {
     fontSize: typography.size.xs,
@@ -1034,6 +1230,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Custom frequency panel
+  customFreqPanel: {
+    marginTop: spacing[3],
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing[4],
+    gap: spacing[3],
+  },
+  customFreqLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: '600',
+    marginBottom: spacing[1],
+  },
+  customFreqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  customFreqInput: {
+    width: 64,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    fontSize: typography.size.xl,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  customFreqUnits: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  customFreqUnitChip: {
+    flex: 1,
+    paddingVertical: spacing[2],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  customFreqUnitChipSelected: {
+    borderColor: colors.primary[500],
+    backgroundColor: colors.primary[50],
+  },
+  customFreqUnitText: {
+    fontSize: typography.size.xs,
+    fontWeight: '500',
+  },
+  customFreqConfirmBtn: {
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.lg,
+    paddingVertical: spacing[3],
+    alignItems: 'center',
+  },
+  customFreqConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: typography.size.sm,
+  },
+
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1137,4 +1393,5 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     color: colors.neutral[500],
   },
+
 });

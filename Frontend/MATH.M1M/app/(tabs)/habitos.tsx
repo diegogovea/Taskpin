@@ -18,7 +18,8 @@ import { colors, typography, spacing, radius, shadows } from "../../constants/th
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
+import { getCategoryColor, getCategoryColorByName, traducirCategoria } from "../../constants/categoryColors";
+import { safeIcon } from "../../utils/safeIcon";
 
 interface HabitoHoy {
   habito_usuario_id: number;
@@ -405,7 +406,7 @@ export default function HabitosScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={styles.habitNameRow}>
                         {habitIcono && (
-                          <Ionicons name={habitIcono as any} size={15} color={catColor} style={{ marginRight: 4 }} />
+                          <Ionicons name={safeIcon(habitIcono) as any} size={15} color={catColor} style={{ marginRight: 4 }} />
                         )}
                         <Text
                           style={[styles.habitName, { color: palette.text }, habito.completado_hoy && styles.habitNameCompleted]}
@@ -420,7 +421,7 @@ export default function HabitosScreen() {
                         )}
                       </View>
                       <View style={styles.habitMeta}>
-                        <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
+                        <Text style={[styles.habitCategory, { color: catColor }]}>{traducirCategoria(habito.categoria_nombre)}</Text>
                         <View style={styles.habitPoints}>
                           <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
                           <Text style={styles.habitPointsText}>{habito.puntos_base}</Text>

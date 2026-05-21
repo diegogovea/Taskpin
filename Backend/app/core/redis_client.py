@@ -202,9 +202,16 @@ class RedisClient:
         return self.get_json(key)
     
     def invalidate_user_cache(self, user_id: int) -> None:
-        """Invalida todo el cache de un usuario."""
-        self.delete(f"predictions:user:{user_id}")
-        self.delete(f"recommendations:user:{user_id}")
+        """Invalida todo el cache de un usuario (borra por patron)."""
+        if not self.is_connected:
+            return
+        try:
+            pattern = self._make_key(f"*user:{user_id}*")
+            keys = self._client.keys(pattern)
+            if keys:
+                self._client.delete(*keys)
+        except Exception as e:
+            print(f"[Redis] invalidate_user_cache error: {e}")
     
     # ==================== STATS ====================
     

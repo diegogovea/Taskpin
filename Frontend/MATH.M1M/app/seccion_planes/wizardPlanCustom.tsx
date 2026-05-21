@@ -130,8 +130,15 @@ export default function WizardPlanCustom() {
   const [tareaError, setTareaError] = useState('');
   const [showTareaDatePicker, setShowTareaDatePicker] = useState(false);
 
+  // ── A2: fase inline expandida (id de la fase cuyas tareas están visibles) ──
+  const [expandedFaseId, setExpandedFaseId] = useState<string | null>(null);
+
+  // ── A3: quick-add tarea (estado para input rápido por fase) ──
+  const [quickTaskTitle, setQuickTaskTitle] = useState<Record<string, string>>({});
+
   const diasUsados = config.fases.reduce((acc, f) => acc + f.duracion_dias, 0);
   const diasRestantes = config.plazo_dias - diasUsados;
+  const totalTareas = config.fases.reduce((a, f) => a + f.tareas.length, 0);
 
   // =====================
   // HANDLERS
@@ -152,6 +159,15 @@ export default function WizardPlanCustom() {
     if (step === 2) {
       if (config.fases.length === 0) {
         setStepError('Agrega al menos una fase a tu plan');
+        return;
+      }
+      const totalT = config.fases.reduce((a, f) => a + f.tareas.length, 0);
+      if (totalT === 0) {
+        setStepError('Agrega al menos una tarea a alguna fase');
+        return;
+      }
+      if (diasUsados > config.plazo_dias) {
+        setStepError(`Te excediste por ${diasUsados - config.plazo_dias} días. Ajusta las fases o aumenta el plazo.`);
         return;
       }
     }
@@ -233,6 +249,26 @@ export default function WizardPlanCustom() {
     setTempTarea({ titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '', fecha_limite: null });
     setEditingTareaId('new');
     setEditingFaseId2(faseId);
+  };
+
+  // A3: agregar tarea rápida sin abrir modal
+  const quickAddTarea = (faseId: string) => {
+    const titulo = (quickTaskTitle[faseId] || '').trim();
+    if (titulo.length < 3) return;
+    const nueva: Tarea = {
+      id: generateId(),
+      titulo,
+      descripcion: '',
+      tipo: 'diaria',
+      prioridad: 'media',
+      notas: '',
+      fecha_limite: null,
+    };
+    setConfig(prev => ({
+      ...prev,
+      fases: prev.fases.map(f => (f.id === faseId ? { ...f, tareas: [...f.tareas, nueva] } : f)),
+    }));
+    setQuickTaskTitle(prev => ({ ...prev, [faseId]: '' }));
   };
 
   const openEditTarea = (faseId: string, tarea: Tarea) => {
@@ -437,174 +473,459 @@ export default function WizardPlanCustom() {
     </ScrollView>
   );
 
-  // ── STEP 2 ──
-  const renderStep2 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.stepTitle, { color: palette.heading }]}>Divídelo en fases</Text>
-      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>
-        Plan de {config.plazo_dias} días — divide el tiempo en etapas
-      </Text>
-
-      <View style={styles.daysProgress}>
-        <View style={styles.daysProgressBar}>
-          <View style={[styles.daysProgressFill, { width: `${Math.min(100, (diasUsados / config.plazo_dias) * 100)}%` }]} />
-        </View>
-        <Text style={styles.daysProgressText}>
-          {diasUsados} de {config.plazo_dias} días asignados ({diasRestantes >= 0 ? diasRestantes : 0} restantes)
-        </Text>
-      </View>
-
-      {config.fases.map((fase, index) => (
-        <View key={fase.id} style={styles.faseCard}>
-          <View style={styles.faseHeader}>
-            <View style={styles.faseBadge}>
-              <Text style={styles.faseBadgeText}>Fase {index + 1}</Text>
-            </View>
-            <View style={styles.faseActions}>
-              <TouchableOpacity onPress={() => openEditFase(fase)}>
-                <Ionicons name="create-outline" size={20} color={colors.neutral[500]} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteFase(fase.id)}>
-                <Ionicons name="trash-outline" size={20} color={colors.semantic.error} />
-              </TouchableOpacity>
-            </View>
+  // ── A1: Barra flotante de progreso (compartida en pasos 2 y 3) ──
+  const renderProgressBar = () => {
+    const pct = Math.min(100, (diasUsados / config.plazo_dias) * 100);
+    const overBudget = diasUsados > config.plazo_dias;
+    return (
+      <View style={[styles.progressStrip, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+        <View style={styles.progressStripRow}>
+          <View style={styles.progressStripStat}>
+            <Ionicons name="calendar-outline" size={14} color={colors.primary[600]} />
+            <Text style={[styles.progressStripText, { color: palette.text }]}>
+              <Text style={{ fontWeight: '700' }}>{diasUsados}</Text>/{config.plazo_dias} días
+            </Text>
           </View>
-          <Text style={styles.faseTitulo}>{fase.titulo}</Text>
-          <Text style={styles.faseDuracion}>{fase.duracion_dias} días</Text>
-          {fase.descripcion ? <Text style={styles.faseDesc}>{fase.descripcion}</Text> : null}
-        </View>
-      ))}
-
-      <TouchableOpacity style={[styles.addButton, diasRestantes <= 0 && { opacity: 0.4 }]} onPress={openNewFase} disabled={diasRestantes <= 0}>
-        <Ionicons name="add" size={22} color={colors.primary[600]} />
-        <Text style={styles.addButtonText}>
-          {diasRestantes <= 0 ? 'Sin días disponibles' : 'Agregar Fase'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-
-  // ── STEP 3 ──
-  const renderStep3 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.stepTitle, { color: palette.heading }]}>Agrega tareas a cada fase</Text>
-      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>Define lo que harás en cada etapa</Text>
-
-      {config.fases.map((fase, faseIndex) => (
-        <View key={fase.id} style={styles.faseTasksCard}>
-          <View style={styles.faseTasksHeader}>
-            <Text style={styles.faseTasksTitle}>Fase {faseIndex + 1}: {fase.titulo}</Text>
-            <Text style={styles.faseTasksDuration}>{fase.duracion_dias} días</Text>
+          <View style={styles.progressStripStat}>
+            <Ionicons name="layers-outline" size={14} color={colors.secondary[600]} />
+            <Text style={[styles.progressStripText, { color: palette.text }]}>
+              <Text style={{ fontWeight: '700' }}>{config.fases.length}</Text> {config.fases.length === 1 ? 'fase' : 'fases'}
+            </Text>
           </View>
-
-          {fase.tareas.map((tarea) => (
-            <TouchableOpacity key={tarea.id} style={styles.tareaItem} onPress={() => openEditTarea(fase.id, tarea)} activeOpacity={0.7}>
-              <View style={styles.tareaInfo}>
-                <View style={[styles.tareaTipoBadge, { backgroundColor: getTipoColor(tarea.tipo) + '20' }]}>
-                  <Text style={[styles.tareaTipoText, { color: getTipoColor(tarea.tipo) }]}>{tarea.tipo}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tareaTitulo}>{tarea.titulo}</Text>
-                  {tarea.fecha_limite && (
-                    <Text style={styles.tareaFecha}>
-                      <Ionicons name="calendar-outline" size={11} /> {tarea.fecha_limite}
-                    </Text>
-                  )}
-                </View>
-                <View style={[styles.prioridadDot, { backgroundColor: getPrioridadColor(tarea.prioridad) }]} />
-              </View>
-              <TouchableOpacity onPress={() => deleteTarea(fase.id, tarea.id)} style={{ padding: 4 }}>
-                <Ionicons name="close-circle" size={20} color={colors.neutral[300]} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity style={styles.addTaskBtn} onPress={() => openNewTarea(fase.id)}>
-            <Ionicons name="add" size={18} color={colors.primary[600]} />
-            <Text style={styles.addTaskBtnText}>Agregar Tarea</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Resumen del Plan</Text>
-        {[
-          ['Meta', config.meta_principal],
-          ['Duración', `${config.plazo_dias} días`],
-          ['Fases', String(config.fases.length)],
-          ['Total de tareas', String(config.fases.reduce((a, f) => a + f.tareas.length, 0))],
-        ].map(([label, value]) => (
-          <View key={label} style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{label}:</Text>
-            <Text style={styles.summaryValue}>{value}</Text>
+          <View style={styles.progressStripStat}>
+            <Ionicons name="checkbox-outline" size={14} color={colors.accent.amber} />
+            <Text style={[styles.progressStripText, { color: palette.text }]}>
+              <Text style={{ fontWeight: '700' }}>{totalTareas}</Text> {totalTareas === 1 ? 'tarea' : 'tareas'}
+            </Text>
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-
-  // ── FASE MODAL ──
-  const renderFaseModal = () => (
-    <Modal
-      visible={editingFaseId !== null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => { setEditingFaseId(null); setFaseError(''); }}
-    >
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.editModal}>
-        <ScrollView contentContainerStyle={styles.editModalContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.editModalTitle}>
-            {editingFaseId === 'new' ? 'Nueva Fase' : 'Editar Fase'}
+        </View>
+        <View style={[styles.progressStripBar, { backgroundColor: palette.surfaceAlt }]}>
+          <View
+            style={[
+              styles.progressStripFill,
+              { width: `${pct}%`, backgroundColor: overBudget ? colors.semantic.error : colors.primary[500] },
+            ]}
+          />
+        </View>
+        {overBudget && (
+          <Text style={styles.progressStripWarn}>
+            ⚠ Te pasaste por {diasUsados - config.plazo_dias} días. Reduce alguna fase o aumenta el plazo.
           </Text>
+        )}
+      </View>
+    );
+  };
 
-          <Text style={[styles.inputLabel, { color: palette.text }]}>Título *</Text>
-          <TextInput
-            style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
-            placeholder="Ej: Fundamentos"
-            placeholderTextColor={palette.textSubtle}
-            value={tempFase.titulo}
-            onChangeText={(t) => { setTempFase({ ...tempFase, titulo: t }); setFaseError(''); }}
-          />
+  // ── A2: Card de fase con inline-edit + lista de tareas expandible (A3) ──
+  const renderFaseCard = (fase: Fase, index: number) => {
+    const isEditing = editingFaseId === fase.id;
+    const isExpanded = expandedFaseId === fase.id;
+    const diasDisp = diasRestantes + (isEditing ? fase.duracion_dias : 0);
 
-          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Descripción (opcional)</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea, { marginBottom: spacing[3] }]}
-            placeholder="¿Qué harás en esta fase?"
-            placeholderTextColor={palette.textSubtle}
-            value={tempFase.descripcion}
-            onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
-            multiline
-          />
-
-          <View style={styles.durationRow}>
-            <Text style={[styles.inputLabel, { color: palette.text }]}>Duración:</Text>
-            <TextInput
-              style={styles.smallInput}
-              keyboardType="number-pad"
-              value={tempFase.duracion_dias}
-              onChangeText={(t) => { setTempFase({ ...tempFase, duracion_dias: t.replace(/[^0-9]/g, '') }); setFaseError(''); }}
-              selectTextOnFocus
+    return (
+      <View key={fase.id} style={[styles.faseCardV2, { backgroundColor: palette.surface, borderColor: isExpanded ? colors.primary[300] : palette.border }]}>
+        {/* Header */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => !isEditing && setExpandedFaseId(isExpanded ? null : fase.id)}
+          style={styles.faseCardV2Header}
+        >
+          <View style={styles.faseBadge}>
+            <Text style={styles.faseBadgeText}>Fase {index + 1}</Text>
+          </View>
+          <View style={styles.faseCardV2Title}>
+            <Text style={[styles.faseTitulo, { color: palette.heading }]} numberOfLines={1}>{fase.titulo}</Text>
+            <Text style={[styles.faseDuracion, { color: palette.textMuted }]}>
+              {fase.duracion_dias} días · {fase.tareas.length} {fase.tareas.length === 1 ? 'tarea' : 'tareas'}
+            </Text>
+          </View>
+          <View style={styles.faseActions}>
+            <TouchableOpacity onPress={() => openEditFase(fase)} style={styles.iconBtn}>
+              <Ionicons name="create-outline" size={18} color={palette.icon} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => deleteFase(fase.id)} style={styles.iconBtn}>
+              <Ionicons name="trash-outline" size={18} color={colors.semantic.error} />
+            </TouchableOpacity>
+            <Ionicons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={palette.iconSubtle}
+              style={{ marginLeft: spacing[1] }}
             />
-            <Text style={[styles.inputLabel, { color: palette.text }]}>días</Text>
           </View>
-          <Text style={styles.durationHint}>
-            Días disponibles: {diasRestantes + (editingFaseId !== 'new' ? (config.fases.find(f => f.id === editingFaseId)?.duracion_dias || 0) : 0)}
+        </TouchableOpacity>
+
+        {/* Inline edit form */}
+        {isEditing && (
+          <View style={[styles.inlineEditBox, { backgroundColor: palette.surfaceAlt, borderColor: colors.primary[300] }]}>
+            <Text style={[styles.inputLabel, { color: palette.text }]}>Título</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+              placeholder="Ej: Fundamentos"
+              placeholderTextColor={palette.textSubtle}
+              value={tempFase.titulo}
+              onChangeText={(t) => { setTempFase({ ...tempFase, titulo: t }); setFaseError(''); }}
+            />
+            <Text style={[styles.inputLabel, { color: palette.text, marginTop: spacing[3] }]}>Descripción (opcional)</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+              placeholder="¿Qué harás en esta fase?"
+              placeholderTextColor={palette.textSubtle}
+              value={tempFase.descripcion}
+              onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
+              multiline
+            />
+            <View style={styles.durationRow}>
+              <Text style={[styles.inputLabel, { color: palette.text }]}>Duración:</Text>
+              <TextInput
+                style={[styles.smallInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                keyboardType="number-pad"
+                value={tempFase.duracion_dias}
+                onChangeText={(t) => { setTempFase({ ...tempFase, duracion_dias: t.replace(/[^0-9]/g, '') }); setFaseError(''); }}
+                selectTextOnFocus
+              />
+              <Text style={[styles.inputLabel, { color: palette.text }]}>días</Text>
+              <Text style={[styles.durationHint, { marginTop: 0, marginLeft: 'auto' }]}>
+                disp. {diasDisp}
+              </Text>
+            </View>
+            {faseError !== '' && <InlineError msg={faseError} />}
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditingFaseId(null); setFaseError(''); }}>
+                <Text style={styles.cancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveFase}>
+                <Text style={styles.saveBtnText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Description preview */}
+        {!isEditing && fase.descripcion ? (
+          <Text style={[styles.faseDesc, { color: palette.textMuted }]} numberOfLines={isExpanded ? undefined : 2}>
+            {fase.descripcion}
           </Text>
+        ) : null}
 
-          {faseError !== '' && <InlineError msg={faseError} />}
+        {/* Tasks list (expanded) */}
+        {!isEditing && isExpanded && (
+          <View style={styles.faseTasksContainer}>
+            <View style={[styles.faseTasksSep, { backgroundColor: palette.border }]} />
+            {fase.tareas.length === 0 ? (
+              <Text style={[styles.noTasksText, { color: palette.textSubtle }]}>
+                Aún no hay tareas en esta fase
+              </Text>
+            ) : (
+              fase.tareas.map((tarea) => (
+                <View key={tarea.id} style={styles.tareaItem}>
+                  <TouchableOpacity
+                    style={styles.tareaInfo}
+                    onPress={() => openEditTarea(fase.id, tarea)}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.tareaTipoBadge, { backgroundColor: getTipoColor(tarea.tipo) + '20' }]}>
+                      <Text style={[styles.tareaTipoText, { color: getTipoColor(tarea.tipo) }]}>{tarea.tipo}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.tareaTitulo, { color: palette.text }]} numberOfLines={1}>{tarea.titulo}</Text>
+                      {tarea.fecha_limite && (
+                        <Text style={[styles.tareaFecha, { color: palette.textSubtle }]}>
+                          <Ionicons name="calendar-outline" size={11} /> {tarea.fecha_limite}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={[styles.prioridadDot, { backgroundColor: getPrioridadColor(tarea.prioridad) }]} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteTarea(fase.id, tarea.id)} style={{ padding: 4 }}>
+                    <Ionicons name="close-circle" size={18} color={palette.iconSubtle} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
 
-          <View style={styles.editModalButtons}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditingFaseId(null); setFaseError(''); }}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={saveFase}>
-              <Text style={styles.saveBtnText}>Guardar</Text>
+            {/* A3: Quick-add tarea */}
+            <View style={styles.quickAddRow}>
+              <TextInput
+                style={[styles.quickAddInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="+ Tarea rápida (presiona enter)"
+                placeholderTextColor={palette.textSubtle}
+                value={quickTaskTitle[fase.id] || ''}
+                onChangeText={(t) => setQuickTaskTitle(prev => ({ ...prev, [fase.id]: t }))}
+                onSubmitEditing={() => quickAddTarea(fase.id)}
+                returnKeyType="done"
+              />
+              {(quickTaskTitle[fase.id] || '').trim().length >= 3 && (
+                <TouchableOpacity style={styles.quickAddBtn} onPress={() => quickAddTarea(fase.id)}>
+                  <Ionicons name="checkmark" size={18} color={colors.neutral[0]} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity style={styles.addTaskBtn} onPress={() => openNewTarea(fase.id)}>
+              <Ionicons name="add-circle-outline" size={16} color={colors.primary[600]} />
+              <Text style={styles.addTaskBtnText}>Agregar con detalles</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+        )}
+      </View>
+    );
+  };
+
+  // ── STEP 2: Fases + Tareas en una sola pantalla (A2 + A3) ──
+  const renderStep2 = () => (
+    <View style={{ flex: 1 }}>
+      {renderProgressBar()}
+      <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.stepTitle, { color: palette.heading }]}>Construye tu plan</Text>
+        <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>
+          Divide los {config.plazo_dias} días en fases y agrega tareas dentro de cada una
+        </Text>
+
+        {config.fases.length === 0 && (
+          <View style={[styles.emptyHint, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary[600]} />
+            <Text style={[styles.emptyHintText, { color: palette.textMuted }]}>
+              Empieza creando tu primera fase. Cada fase representa una etapa de tu plan.
+            </Text>
+          </View>
+        )}
+
+        {config.fases.map((fase, index) => renderFaseCard(fase, index))}
+
+        {/* Nueva fase inline */}
+        {editingFaseId === 'new' ? (
+          <View style={[styles.faseCardV2, { backgroundColor: palette.surface, borderColor: colors.primary[300] }]}>
+            <View style={styles.faseCardV2Header}>
+              <View style={styles.faseBadge}>
+                <Text style={styles.faseBadgeText}>Nueva</Text>
+              </View>
+              <Text style={[styles.faseCardV2HeaderTitle, { color: palette.heading }]}>Nueva fase</Text>
+            </View>
+            <View style={[styles.inlineEditBox, { backgroundColor: palette.surfaceAlt, borderColor: colors.primary[300] }]}>
+              <Text style={[styles.inputLabel, { color: palette.text }]}>Título</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="Ej: Fundamentos"
+                placeholderTextColor={palette.textSubtle}
+                value={tempFase.titulo}
+                onChangeText={(t) => { setTempFase({ ...tempFase, titulo: t }); setFaseError(''); }}
+                autoFocus
+              />
+              <Text style={[styles.inputLabel, { color: palette.text, marginTop: spacing[3] }]}>Descripción (opcional)</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="¿Qué harás en esta fase?"
+                placeholderTextColor={palette.textSubtle}
+                value={tempFase.descripcion}
+                onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
+                multiline
+              />
+              <View style={styles.durationRow}>
+                <Text style={[styles.inputLabel, { color: palette.text }]}>Duración:</Text>
+                <TextInput
+                  style={[styles.smallInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                  keyboardType="number-pad"
+                  value={tempFase.duracion_dias}
+                  onChangeText={(t) => { setTempFase({ ...tempFase, duracion_dias: t.replace(/[^0-9]/g, '') }); setFaseError(''); }}
+                  selectTextOnFocus
+                />
+                <Text style={[styles.inputLabel, { color: palette.text }]}>días</Text>
+                <Text style={[styles.durationHint, { marginTop: 0, marginLeft: 'auto' }]}>disp. {diasRestantes}</Text>
+              </View>
+              {faseError !== '' && <InlineError msg={faseError} />}
+              <View style={styles.editModalButtons}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditingFaseId(null); setFaseError(''); }}>
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={() => {
+                    const dias = parseInt(tempFase.duracion_dias);
+                    const willBeNew = editingFaseId === 'new';
+                    saveFase();
+                    if (willBeNew && !isNaN(dias) && tempFase.titulo.trim().length >= 3) {
+                      setTimeout(() => {
+                        setConfig(curr => {
+                          const lastFase = curr.fases[curr.fases.length - 1];
+                          if (lastFase) setExpandedFaseId(lastFase.id);
+                          return curr;
+                        });
+                      }, 50);
+                    }
+                  }}
+                >
+                  <Text style={styles.saveBtnText}>Crear fase</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.addButton, diasRestantes <= 0 && { opacity: 0.4 }]}
+            onPress={openNewFase}
+            disabled={diasRestantes <= 0}
+          >
+            <Ionicons name="add" size={22} color={colors.primary[600]} />
+            <Text style={styles.addButtonText}>
+              {diasRestantes <= 0 ? 'Sin días disponibles' : 'Agregar Fase'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Sugerencia rápida */}
+        {config.fases.length > 0 && (
+          <View style={[styles.tipCard, { backgroundColor: colors.primary[50] }]}>
+            <Ionicons name="bulb-outline" size={16} color={colors.primary[600]} />
+            <Text style={styles.tipText}>
+              Tip: toca una fase para expandir sus tareas. Usa el input de tarea rápida para agregar varias seguidas.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
+
+  // ── STEP 3: Resumen visual antes de crear (A4) ──
+  const renderStep3 = () => {
+    const sinTareas = config.fases.filter(f => f.tareas.length === 0);
+    const pctDias = Math.min(100, (diasUsados / config.plazo_dias) * 100);
+    const tareasPorTipo = {
+      diaria: 0, semanal: 0, 'única': 0 as number,
+    };
+    config.fases.forEach(f => f.tareas.forEach(t => { (tareasPorTipo as any)[t.tipo] = ((tareasPorTipo as any)[t.tipo] || 0) + 1; }));
+
+    return (
+      <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.stepTitle, { color: palette.heading }]}>Revisa y crea</Text>
+        <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>
+          Verifica todo antes de lanzar tu plan
+        </Text>
+
+        {/* Hero summary card */}
+        <View style={styles.heroSummary}>
+          <Text style={styles.heroSummaryLabel}>Tu meta</Text>
+          <Text style={styles.heroSummaryMeta}>{config.meta_principal}</Text>
+          {config.descripcion ? (
+            <Text style={styles.heroSummaryDesc} numberOfLines={3}>{config.descripcion}</Text>
+          ) : null}
+          <View style={styles.heroChips}>
+            <View style={styles.heroChip}>
+              <Ionicons name="hourglass-outline" size={14} color={colors.neutral[0]} />
+              <Text style={styles.heroChipText}>{config.plazo_dias} días</Text>
+            </View>
+            <View style={styles.heroChip}>
+              <Ionicons name="speedometer-outline" size={14} color={colors.neutral[0]} />
+              <Text style={styles.heroChipText}>{config.dificultad}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Stats grid */}
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: palette.surface }]}>
+            <Ionicons name="layers" size={20} color={colors.primary[600]} />
+            <Text style={[styles.statValue, { color: palette.heading }]}>{config.fases.length}</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Fases</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: palette.surface }]}>
+            <Ionicons name="checkbox" size={20} color={colors.secondary[600]} />
+            <Text style={[styles.statValue, { color: palette.heading }]}>{totalTareas}</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Tareas</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: palette.surface }]}>
+            <Ionicons name="calendar" size={20} color={colors.accent.amber} />
+            <Text style={[styles.statValue, { color: palette.heading }]}>{diasUsados}</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Días usados</Text>
+          </View>
+        </View>
+
+        {/* Distribución de tareas por tipo */}
+        {totalTareas > 0 && (
+          <View style={[styles.distribCard, { backgroundColor: palette.surface }]}>
+            <Text style={[styles.distribTitle, { color: palette.heading }]}>Distribución de tareas</Text>
+            {(['diaria', 'semanal', 'única'] as const).map((tipo) => {
+              const n = (tareasPorTipo as any)[tipo] || 0;
+              const pct = totalTareas > 0 ? Math.round((n / totalTareas) * 100) : 0;
+              const c = getTipoColor(tipo);
+              return (
+                <View key={tipo} style={styles.distribRow}>
+                  <View style={styles.distribLabelWrap}>
+                    <View style={[styles.distribDot, { backgroundColor: c }]} />
+                    <Text style={[styles.distribLabel, { color: palette.text }]}>
+                      {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                    </Text>
+                  </View>
+                  <View style={styles.distribBarWrap}>
+                    <View style={[styles.distribBarBg, { backgroundColor: palette.surfaceAlt }]}>
+                      <View style={[styles.distribBarFill, { width: `${pct}%`, backgroundColor: c }]} />
+                    </View>
+                    <Text style={[styles.distribValue, { color: palette.textMuted }]}>{n}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Línea de fases mini-timeline */}
+        <View style={[styles.miniTimeline, { backgroundColor: palette.surface }]}>
+          <Text style={[styles.distribTitle, { color: palette.heading }]}>Línea de fases</Text>
+          <View style={styles.miniTimelineRow}>
+            <View style={[styles.miniTimelineBarBg, { backgroundColor: palette.surfaceAlt }]}>
+              {config.fases.map((f, i) => {
+                const w = Math.round((f.duracion_dias / config.plazo_dias) * 100);
+                const palettes = [colors.primary[500], colors.secondary[500], colors.accent.amber, colors.accent.cyan];
+                const c = palettes[i % palettes.length];
+                return (
+                  <View key={f.id} style={{ width: `${w}%`, backgroundColor: c, height: 12, justifyContent: 'center' }}>
+                    {w > 10 && (
+                      <Text style={styles.miniTimelineNum}>{i + 1}</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+          {pctDias < 100 && (
+            <Text style={[styles.miniTimelineHint, { color: palette.textMuted }]}>
+              Te quedan {config.plazo_dias - diasUsados} días sin asignar
+            </Text>
+          )}
+        </View>
+
+        {/* Advertencia: fases sin tareas */}
+        {sinTareas.length > 0 && (
+          <View style={styles.warningCard}>
+            <Ionicons name="alert-circle" size={18} color={colors.accent.amber} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.warningTitle}>Algunas fases no tienen tareas</Text>
+              <Text style={styles.warningText}>
+                {sinTareas.map(f => f.titulo).join(', ')}. Vuelve al paso anterior para agregarlas.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Listado compacto de fases */}
+        <View style={[styles.fasesCompactCard, { backgroundColor: palette.surface }]}>
+          <Text style={[styles.distribTitle, { color: palette.heading }]}>Tus fases</Text>
+          {config.fases.map((f, i) => (
+            <View key={f.id} style={styles.faseCompactRow}>
+              <View style={styles.faseCompactNum}>
+                <Text style={styles.faseCompactNumText}>{i + 1}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.faseCompactTitle, { color: palette.text }]} numberOfLines={1}>{f.titulo}</Text>
+                <Text style={[styles.faseCompactMeta, { color: palette.textMuted }]}>
+                  {f.duracion_dias} días · {f.tareas.length} {f.tareas.length === 1 ? 'tarea' : 'tareas'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  };
 
   // ── TAREA MODAL ──
   const renderTareaModal = () => (
@@ -779,7 +1100,6 @@ export default function WizardPlanCustom() {
         </View>
       </KeyboardAvoidingView>
 
-      {renderFaseModal()}
       {renderTareaModal()}
     </SafeAreaView>
   );
@@ -888,4 +1208,344 @@ const styles = StyleSheet.create({
   nextButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: colors.primary[600], paddingVertical: spacing[4], borderRadius: radius.xl },
   createButton: { backgroundColor: colors.secondary[500] },
   nextButtonText: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
+
+  // === A1: Sticky progress strip ===
+  progressStrip: {
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+  },
+  progressStripRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: spacing[2],
+  },
+  progressStripStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressStripText: {
+    fontSize: typography.size.sm,
+  },
+  progressStripBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressStripFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressStripWarn: {
+    marginTop: spacing[2],
+    fontSize: typography.size.xs,
+    color: colors.semantic.error,
+    fontWeight: typography.weight.semibold,
+    textAlign: 'center',
+  },
+
+  // === A2: Fase card V2 (inline edit + expand) ===
+  faseCardV2: {
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+    borderWidth: 1.5,
+    ...shadows.sm,
+  },
+  faseCardV2Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  faseCardV2Title: {
+    flex: 1,
+  },
+  faseCardV2HeaderTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    flex: 1,
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineEditBox: {
+    marginTop: spacing[3],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+  },
+
+  // === A3: tasks inside fase card ===
+  faseTasksContainer: {
+    marginTop: spacing[3],
+  },
+  faseTasksSep: {
+    height: 1,
+    marginBottom: spacing[2],
+  },
+  noTasksText: {
+    fontSize: typography.size.sm,
+    fontStyle: 'italic',
+    paddingVertical: spacing[2],
+    textAlign: 'center',
+  },
+  quickAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: spacing[2],
+  },
+  quickAddInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    fontSize: typography.size.sm,
+  },
+  quickAddBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // === Empty hint card ===
+  emptyHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[2],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing[3],
+  },
+  emptyHintText: {
+    flex: 1,
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+  },
+
+  // === Tip card ===
+  tipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[2],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    marginTop: spacing[3],
+  },
+  tipText: {
+    flex: 1,
+    fontSize: typography.size.xs,
+    color: colors.primary[700],
+    lineHeight: 16,
+  },
+
+  // === A4: Resumen visual paso 3 ===
+  heroSummary: {
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.xl,
+    padding: spacing[5],
+    marginBottom: spacing[4],
+    ...shadows.md,
+  },
+  heroSummaryLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing[1],
+  },
+  heroSummaryMeta: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    marginBottom: spacing[2],
+  },
+  heroSummaryDesc: {
+    fontSize: typography.size.sm,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 20,
+    marginBottom: spacing[3],
+  },
+  heroChips: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  heroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing[3],
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  heroChipText: {
+    color: colors.neutral[0],
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: spacing[3],
+    marginBottom: spacing[4],
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    ...shadows.sm,
+  },
+  statValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    marginTop: spacing[1],
+  },
+  statLabel: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
+  distribCard: {
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    marginBottom: spacing[4],
+    ...shadows.sm,
+  },
+  distribTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.bold,
+    marginBottom: spacing[3],
+  },
+  distribRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+  },
+  distribLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: 90,
+  },
+  distribDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  distribLabel: {
+    fontSize: typography.size.sm,
+  },
+  distribBarWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  distribBarBg: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  distribBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  distribValue: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    width: 24,
+    textAlign: 'right',
+  },
+  miniTimeline: {
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    marginBottom: spacing[4],
+    ...shadows.sm,
+  },
+  miniTimelineRow: {
+    marginTop: spacing[1],
+  },
+  miniTimelineBarBg: {
+    flexDirection: 'row',
+    height: 12,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  miniTimelineNum: {
+    color: colors.neutral[0],
+    fontSize: 9,
+    fontWeight: typography.weight.bold,
+    textAlign: 'center',
+  },
+  miniTimelineHint: {
+    marginTop: spacing[2],
+    fontSize: typography.size.xs,
+    textAlign: 'center',
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[2],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    backgroundColor: colors.accent.amber + '15',
+    borderWidth: 1,
+    borderColor: colors.accent.amber + '40',
+    marginBottom: spacing[4],
+  },
+  warningTitle: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.accent.amber,
+    marginBottom: 2,
+  },
+  warningText: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[700],
+    lineHeight: 16,
+  },
+  fasesCompactCard: {
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    ...shadows.sm,
+  },
+  faseCompactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  faseCompactNum: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  faseCompactNumText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.bold,
+    color: colors.primary[700],
+  },
+  faseCompactTitle: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+  },
+  faseCompactMeta: {
+    fontSize: typography.size.xs,
+    marginTop: 2,
+  },
 });
