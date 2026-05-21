@@ -21,7 +21,7 @@ import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTutorial } from "../../contexts/TutorialContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
+import { getCategoryColor, getCategoryColorByName, traducirCategoria } from "../../constants/categoryColors";
 import ReflectionModal from "../../components/ui/ReflectionModal";
 import DateStrip from "../../components/ui/DateStrip";
 import { useWebSocket, HabitCompletedEvent, HabitUncompletedEvent } from "../../hooks/useWebSocket";
@@ -637,7 +637,7 @@ export default function HomeScreen() {
                           </View>
                         )}
                       </View>
-                      <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
+                      <Text style={[styles.habitCategory, { color: catColor }]}>{traducirCategoria(habito.categoria_nombre)}</Text>
                     </View>
                     <View style={styles.habitPoints}>
                       <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
@@ -1037,7 +1037,7 @@ export default function HomeScreen() {
                           >
                             {h.nombre}
                           </Text>
-                          <Text style={[styles.dayModalHabitCat, { color: palette.textSubtle }]}>{h.categoria_nombre}</Text>
+                          <Text style={[styles.dayModalHabitCat, { color: palette.textSubtle }]}>{traducirCategoria(h.categoria_nombre)}</Text>
                         </View>
                         {h.completado_hoy && (
                           <Text style={styles.dayModalHabitPts}>+{h.puntos_base} pts</Text>

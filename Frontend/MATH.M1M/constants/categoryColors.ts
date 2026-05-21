@@ -16,6 +16,13 @@ export function getCategoryColor(categoriaId?: number): string {
   }
 }
 
+/** Traduce nombres de categoría que vienen en inglés del backend */
+export function traducirCategoria(nombre?: string | null): string {
+  if (!nombre) return '';
+  if (nombre === 'My Custom Habits') return 'Hábito personalizado';
+  return nombre;
+}
+
 /** Map de nombre de categoría → color (fallback cuando no hay categoria_id) */
 export function getCategoryColorByName(nombre?: string): string {
   if (!nombre) return colors.primary[600];

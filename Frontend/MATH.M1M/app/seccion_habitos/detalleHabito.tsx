@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,12 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { getCategoryColor } from "../../constants/categoryColors";
+import { getCategoryColor, traducirCategoria } from "../../constants/categoryColors";
 import { safeIcon } from "../../utils/safeIcon";
 
 // Los iconos de categoría en la BD son emojis; los mapeamos a Ionicons válidos
@@ -151,6 +151,8 @@ export default function DetalleHabitoScreen() {
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editNombre, setEditNombre] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
   const [editColor, setEditColor] = useState<string | null>(null);
   const [editIcono, setEditIcono] = useState<string | null>(null);
   const [editTipo, setEditTipo] = useState<string>('bueno');
@@ -220,17 +222,22 @@ export default function DetalleHabitoScreen() {
     }
   };
 
-  useEffect(() => {
-    const loadAllData = async () => {
-      await Promise.all([
-        fetchHabitoDetalle(),
-        fetchHistorial(),
-        fetchRachas(),
-      ]);
-      setLoading(false);
-    };
-    loadAllData();
-  }, [user?.user_id, habito_usuario_id]);
+  useFocusEffect(
+    useCallback(() => {
+      const loadAllData = async () => {
+        setLoading(true);
+        await Promise.all([
+          fetchHabitoDetalle(),
+          fetchHistorial(),
+          fetchRachas(),
+        ]);
+        setLoading(false);
+      };
+      if (user?.user_id && habito_usuario_id) {
+        loadAllData();
+      }
+    }, [user?.user_id, habito_usuario_id])
+  );
 
   // Inicializar panel de frecuencia con el valor actual del hábito
   useEffect(() => {
@@ -357,6 +364,8 @@ export default function DetalleHabitoScreen() {
   };
 
   const openEditModal = () => {
+    setEditNombre(habito?.nombre || '');
+    setEditDescripcion(habito?.descripcion || '');
     setEditColor(habito?.color || null);
     setEditIcono(habito?.icono || null);
     setEditTipo(habito?.tipo || 'bueno');
@@ -374,6 +383,8 @@ export default function DetalleHabitoScreen() {
     try {
       const isoFecha = displayToIso(editFechaFinDisplay);
       const body: Record<string, unknown> = {
+        nombre: editNombre.trim() || null,
+        descripcion: editDescripcion.trim() || null,
         color: editColor || null,
         icono: editIcono || null,
         tipo: editTipo || null,
@@ -393,6 +404,8 @@ export default function DetalleHabitoScreen() {
       if (data.success) {
         setHabito(prev => prev ? {
           ...prev,
+          nombre: editNombre.trim() || prev.nombre,
+          descripcion: editDescripcion.trim() || null,
           color: editColor,
           icono: editIcono,
           tipo: editTipo,
@@ -486,7 +499,7 @@ export default function DetalleHabitoScreen() {
           <Text style={[styles.habitName, { color: palette.heading }]}>{habito.nombre}</Text>
           <View style={styles.categoryBadge}>
             <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
-              {habito.categoria_nombre}
+              {traducirCategoria(habito.categoria_nombre)}
             </Text>
           </View>
         </View>
@@ -747,8 +760,31 @@ export default function DetalleHabitoScreen() {
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing[5] }}>
+              {/* Nombre */}
+              <Text style={[styles.editSectionLabel, { color: palette.heading }]}>Nombre</Text>
+              <TextInput
+                style={[styles.editTextInput, { backgroundColor: palette.surfaceAlt, color: palette.text, borderColor: palette.border }]}
+                value={editNombre}
+                onChangeText={setEditNombre}
+                placeholder="Nombre del hábito"
+                placeholderTextColor={palette.subtext}
+                maxLength={80}
+              />
+
+              {/* Descripcion */}
+              <Text style={[styles.editSectionLabel, { color: palette.heading, marginTop: spacing[4] }]}>Descripcion</Text>
+              <TextInput
+                style={[styles.editTextInput, { backgroundColor: palette.surfaceAlt, color: palette.text, borderColor: palette.border, minHeight: 72, textAlignVertical: 'top' }]}
+                value={editDescripcion}
+                onChangeText={setEditDescripcion}
+                placeholder="Descripcion del habito (opcional)"
+                placeholderTextColor={palette.subtext}
+                multiline
+                maxLength={200}
+              />
+
               {/* Color */}
-              <Text style={[styles.editSectionLabel, { color: palette.heading }]}>Color</Text>
+              <Text style={[styles.editSectionLabel, { color: palette.heading, marginTop: spacing[4] }]}>Color</Text>
               <View style={styles.colorGrid}>
                 {PRESET_COLORS.map(c => (
                   <TouchableOpacity
@@ -988,6 +1024,13 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     color: colors.neutral[700],
     marginBottom: spacing[3],
+  },
+  editTextInput: {
+    borderWidth: 1,
+    borderRadius: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.base,
   },
   editHint: {
     fontSize: typography.size.xs,

@@ -1211,6 +1211,8 @@ def update_habito_campos_extra(
         verify_user_access(user_id, current_user)
         result = habit_conn.update_habito_campos_extra(
             habito_usuario_id,
+            nombre=data.nombre,
+            descripcion=data.descripcion,
             color=data.color,
             icono=data.icono,
             tipo=data.tipo,

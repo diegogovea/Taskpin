@@ -221,13 +221,38 @@ class habitConnection():
                 conn.commit()
                 return result
 
-    def update_habito_campos_extra(self, habito_usuario_id, color=None, icono=None, tipo=None, fecha_fin=None, meta_valor=None, meta_unidad=None):
-        """Actualiza los campos extra de un hábito del usuario (color, icono, tipo, fecha_fin, meta)"""
+    def update_habito_campos_extra(self, habito_usuario_id, nombre=None, descripcion=None, color=None, icono=None, tipo=None, fecha_fin=None, meta_valor=None, meta_unidad=None):
+        """Actualiza los campos extra de un hábito del usuario (color, icono, tipo, fecha_fin, meta, nombre, descripcion)"""
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
                 if not self._columnas_extra_existen(cur):
                     return None
+
+                # Actualizar nombre y descripcion en habitos_predeterminados si se proveen
+                if nombre is not None or descripcion is not None:
+                    cur.execute("""
+                        SELECT habito_id FROM habitos_usuario
+                        WHERE habito_usuario_id = %s AND activo = true;
+                    """, (habito_usuario_id,))
+                    row = cur.fetchone()
+                    if row:
+                        habito_id = row[0]
+                        if nombre is not None and descripcion is not None:
+                            cur.execute("""
+                                UPDATE habitos_predeterminados
+                                SET nombre = %s, descripcion = %s
+                                WHERE habito_id = %s;
+                            """, (nombre, descripcion, habito_id))
+                        elif nombre is not None:
+                            cur.execute("""
+                                UPDATE habitos_predeterminados SET nombre = %s WHERE habito_id = %s;
+                            """, (nombre, habito_id))
+                        else:
+                            cur.execute("""
+                                UPDATE habitos_predeterminados SET descripcion = %s WHERE habito_id = %s;
+                            """, (descripcion, habito_id))
+
                 cur.execute("""
                     UPDATE habitos_usuario
                     SET color = %s, icono = %s, tipo = %s, fecha_fin = %s, meta_valor = %s, meta_unidad = %s
