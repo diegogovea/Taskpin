@@ -91,7 +91,7 @@ const PRESET_ICONS = [
   'leaf-outline', 'fitness-outline', 'barbell-outline', 'bicycle-outline',
   'heart-outline', 'water-outline', 'moon-outline', 'sunny-outline',
   'book-outline', 'musical-notes-outline', 'brush-outline', 'code-slash-outline',
-  'restaurant-outline', 'walk-outline', 'medkit-outline', 'brain',
+  'restaurant-outline', 'walk-outline', 'medkit-outline', 'sparkles-outline',
 ];
 
 export default function DetalleHabitoScreen() {
@@ -117,6 +117,7 @@ export default function DetalleHabitoScreen() {
   const [editIcono, setEditIcono] = useState<string | null>(null);
   const [editTipo, setEditTipo] = useState<string>('bueno');
   const [editFechaFin, setEditFechaFin] = useState('');
+  const [editFechaFinDisplay, setEditFechaFinDisplay] = useState('');
   const [editMetaValor, setEditMetaValor] = useState('');
   const [editMetaUnidad, setEditMetaUnidad] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -264,11 +265,38 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  // Convierte DD/MM/AAAA a YYYY-MM-DD para el backend
+  const displayToIso = (display: string): string => {
+    const digits = display.replace(/\D/g, '');
+    if (digits.length !== 8) return '';
+    const dd = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const yyyy = digits.slice(4, 8);
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Convierte YYYY-MM-DD a DD/MM/AAAA para mostrarlo
+  const isoToDisplay = (iso: string): string => {
+    if (!iso || iso.length < 10) return '';
+    const [yyyy, mm, dd] = iso.slice(0, 10).split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  // Formatea el input mientras el usuario escribe, insertando / automaticamente
+  const formatDateInput = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
   const openEditModal = () => {
     setEditColor(habito?.color || null);
     setEditIcono(habito?.icono || null);
     setEditTipo(habito?.tipo || 'bueno');
-    setEditFechaFin(habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '');
+    const rawFecha = habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '';
+    setEditFechaFin(rawFecha);
+    setEditFechaFinDisplay(isoToDisplay(rawFecha));
     setEditMetaValor(habito?.meta_valor != null ? String(habito.meta_valor) : '');
     setEditMetaUnidad(habito?.meta_unidad || '');
     setShowEditModal(true);
@@ -278,11 +306,12 @@ export default function DetalleHabitoScreen() {
     if (!user?.user_id || !habito_usuario_id || savingEdit) return;
     setSavingEdit(true);
     try {
+      const isoFecha = displayToIso(editFechaFinDisplay);
       const body: Record<string, unknown> = {
         color: editColor || null,
         icono: editIcono || null,
         tipo: editTipo || null,
-        fecha_fin: editFechaFin || null,
+        fecha_fin: isoFecha || null,
         meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
         meta_unidad: editMetaUnidad || null,
       };
@@ -301,7 +330,7 @@ export default function DetalleHabitoScreen() {
           color: editColor,
           icono: editIcono,
           tipo: editTipo,
-          fecha_fin: editFechaFin || null,
+          fecha_fin: isoFecha || null,
           meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
           meta_unidad: editMetaUnidad || null,
         } : null);
@@ -434,7 +463,33 @@ export default function DetalleHabitoScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Historial</Text>
           <View style={styles.calendarContainer}>
-            <HabitCalendar historial={historial} />
+            <HabitCalendar
+              historial={historial}
+              onDayPress={async (fecha, completado) => {
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+                if (fecha === todayStr) {
+                  try {
+                    const res = await authFetch(
+                      `/api/usuario/${user?.user_id}/habito/${habito_usuario_id}/toggle`,
+                      { method: "POST" }
+                    );
+                    const data = await res.json();
+                    if (data.success) {
+                      await fetchHistorial();
+                      setToast({ visible: true, message: data.completado ? "Hábito completado hoy" : "Marcado como no completado", type: "success" });
+                    }
+                  } catch {
+                    setToast({ visible: true, message: "Error al actualizar", type: "error" });
+                  }
+                } else {
+                  const [y, m, d] = fecha.split("-");
+                  const label = `${parseInt(d)}/${parseInt(m)}/${y}`;
+                  const estado = completado === true ? "Completado" : completado === false ? "No cumplido" : "Sin registro";
+                  setToast({ visible: true, message: `${label}: ${estado}`, type: "success" });
+                }
+              }}
+            />
           </View>
         </View>
 
@@ -697,15 +752,37 @@ export default function DetalleHabitoScreen() {
 
               {/* Fecha fin */}
               <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Fecha de fin (opcional)</Text>
-              <TextInput
-                style={[styles.metaInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={palette.textSubtle}
-                value={editFechaFin}
-                onChangeText={setEditFechaFin}
-                keyboardType="numbers-and-punctuation"
-              />
-              <Text style={[styles.editHint, { color: palette.textSubtle }]}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
+              <View style={[styles.metaInput, {
+                backgroundColor: palette.inputBg,
+                borderColor: palette.border,
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: spacing[3],
+              }]}>
+                <Ionicons name="calendar-outline" size={18} color={palette.icon} style={{ marginRight: spacing[2] }} />
+                <TextInput
+                  style={{ flex: 1, fontSize: typography.size.base, color: palette.text }}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor={palette.textSubtle}
+                  keyboardType="numeric"
+                  value={editFechaFinDisplay}
+                  maxLength={10}
+                  onChangeText={(raw) => {
+                    const formatted = formatDateInput(raw);
+                    setEditFechaFinDisplay(formatted);
+                    setEditFechaFin(displayToIso(formatted));
+                  }}
+                />
+                {editFechaFinDisplay.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => { setEditFechaFinDisplay(''); setEditFechaFin(''); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={palette.iconSubtle} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={[styles.editHint, { color: palette.textSubtle, marginTop: spacing[1] }]}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
 
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -1137,4 +1214,5 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     color: colors.neutral[500],
   },
+
 });

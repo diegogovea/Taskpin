@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { Toast } from "../../components/ui";
 
 // ── Paleta de colores para el hábito ───────────────────────
@@ -48,8 +49,9 @@ const ICONOS_HABITO = [
   "pencil-outline", "people-outline", "person-outline", "phone-portrait-outline",
   "planet-outline", "rose-outline", "school-outline", "sparkles-outline",
   "star-outline", "stopwatch-outline", "sunny-outline", "walk-outline",
-  "water-outline", "wifi-outline", "wine-outline", "yoga-outline",
+  "water-outline", "wifi-outline", "wine-outline", "barcode-outline",
   "alarm-outline", "archive-outline", "bed-outline", "brush-outline",
+  "ribbon-outline", "shield-checkmark-outline", "stats-chart-outline", "timer-outline",
 ];
 
 // ── Frecuencias ─────────────────────────────────────────────
@@ -73,6 +75,7 @@ type ActiveSheet = "color" | "icon" | "frecuencia" | "meta" | "tipo" | null;
 export default function CatHCustomScreen() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   // ── Campos del formulario ───────────────────────────────
   const [nombre, setNombre] = useState("");
@@ -82,7 +85,7 @@ export default function CatHCustomScreen() {
   const [icono, setIcono] = useState("star-outline");
   const [tipo, setTipo] = useState<"bueno" | "por_eliminar">("bueno");
   const [conFechaFin, setConFechaFin] = useState(false);
-  const [fechaFinStr, setFechaFinStr] = useState("");
+  const [fechaFinDisplay, setFechaFinDisplay] = useState('');
   const [conMeta, setConMeta] = useState(false);
   const [metaValor, setMetaValor] = useState("");
   const [metaUnidad, setMetaUnidad] = useState("minutos");
@@ -103,24 +106,24 @@ export default function CatHCustomScreen() {
 
   const isValidForm = () => nombre.trim().length >= 3;
 
+  const formatDateInput = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const displayToIso = (display: string): string => {
+    const digits = display.replace(/\D/g, '');
+    if (digits.length !== 8) return '';
+    return `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+  };
+
   const handleCreate = async () => {
     if (!user?.user_id || !isValidForm() || isLoading) return;
-
-    // Validar fecha fin si está activada
-    if (conFechaFin && fechaFinStr) {
-      const regex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!regex.test(fechaFinStr) || isNaN(Date.parse(fechaFinStr))) {
-        setToast({ visible: true, message: "Formato de fecha inválido (AAAA-MM-DD)", type: "error" });
-        return;
-      }
-      if (new Date(fechaFinStr) < new Date()) {
-        setToast({ visible: true, message: "La fecha fin no puede ser en el pasado", type: "error" });
-        return;
-      }
-    }
-
     setIsLoading(true);
     try {
+      const isoFecha = displayToIso(fechaFinDisplay);
       const body: Record<string, unknown> = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
@@ -129,7 +132,7 @@ export default function CatHCustomScreen() {
         icono,
         tipo,
       };
-      if (conFechaFin && fechaFinStr) body.fecha_fin = fechaFinStr;
+      if (conFechaFin && isoFecha) body.fecha_fin = isoFecha;
       if (conMeta && metaValor) {
         body.meta_valor = parseFloat(metaValor);
         body.meta_unidad = metaUnidad;
@@ -342,13 +345,21 @@ export default function CatHCustomScreen() {
                   </View>
                   <TextInput
                     style={styles.inputInline}
-                    placeholder="AAAA-MM-DD (ej. 2026-12-31)"
+                    placeholder="DD/MM/AAAA"
                     placeholderTextColor={colors.neutral[400]}
-                    value={fechaFinStr}
-                    onChangeText={setFechaFinStr}
                     keyboardType="numeric"
+                    value={fechaFinDisplay}
                     maxLength={10}
+                    onChangeText={(raw) => setFechaFinDisplay(formatDateInput(raw))}
                   />
+                  {fechaFinDisplay.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setFechaFinDisplay('')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.neutral[400]} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}
@@ -787,4 +798,5 @@ const styles = StyleSheet.create({
   unitChipSelected: { backgroundColor: colors.primary[50], borderColor: colors.primary[500] },
   unitChipText: { fontSize: typography.size.sm, color: colors.neutral[600] },
   unitChipTextSelected: { color: colors.primary[700], fontWeight: typography.weight.semibold },
+
 });

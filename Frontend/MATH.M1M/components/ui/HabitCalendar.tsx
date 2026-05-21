@@ -7,7 +7,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing, radius } from "../../constants/theme";
-
 interface HistorialDia {
   fecha: string;
   completado: boolean;
@@ -15,7 +14,7 @@ interface HistorialDia {
 
 interface HabitCalendarProps {
   historial: HistorialDia[];
-  onDayPress?: (fecha: string, completado: boolean) => void;
+  onDayPress?: (fecha: string, completado: boolean | null) => void;
   onMonthChange?: (year: number, month: number) => void;
   completedColor?: string;
   missedColor?: string;
@@ -45,6 +44,7 @@ const HabitCalendar: React.FC<HabitCalendarProps> = ({
   todayBorderColor = colors.primary[500],
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   
   // Convertir historial a Map para lookup rápido
   const historialMap = useMemo(() => {
@@ -138,9 +138,13 @@ const HabitCalendar: React.FC<HabitCalendarProps> = ({
     onMonthChange?.(newDate.getFullYear(), newDate.getMonth());
   };
 
+  const isSelectable = (day: CalendarDay) =>
+    day.isCurrentMonth && !day.isFuture;
+
   // Renderizar celda de día
   const renderDayCell = (day: CalendarDay, index: number) => {
     const completado = historialMap.get(day.date);
+    const isSelected = selectedDate === day.date;
     
     // Determinar estilos
     let backgroundColor = 'transparent';
@@ -150,48 +154,44 @@ const HabitCalendar: React.FC<HabitCalendarProps> = ({
     let showCheck = false;
     
     if (!day.isCurrentMonth) {
-      // Día de otro mes
       backgroundColor = colors.neutral[50];
       textColor = colors.neutral[300];
     } else if (day.isFuture) {
-      // Día futuro
       backgroundColor = colors.neutral[50];
       textColor = colors.neutral[300];
     } else if (completado === true) {
-      // Completado
       backgroundColor = completedColor;
       textColor = colors.neutral[0];
       showCheck = true;
     } else if (completado === false) {
-      // No completado (tiene registro pero no completado)
       backgroundColor = missedColor;
       textColor = colors.neutral[600];
     } else {
-      // Sin registro (días antes de agregar el hábito)
       backgroundColor = colors.neutral[100];
       textColor = colors.neutral[400];
     }
     
-    // Highlight para hoy
     if (day.isToday) {
       borderColor = todayBorderColor;
       borderWidth = 2;
+    }
+
+    if (isSelected) {
+      borderColor = colors.primary[600];
+      borderWidth = 2.5;
     }
     
     return (
       <TouchableOpacity
         key={`${day.date}-${index}`}
-        style={[
-          styles.dayCell,
-          { backgroundColor, borderColor, borderWidth }
-        ]}
+        style={[styles.dayCell, { backgroundColor, borderColor, borderWidth }]}
         onPress={() => {
-          if (day.isCurrentMonth && !day.isFuture && completado !== undefined) {
-            onDayPress?.(day.date, completado);
-          }
+          if (!isSelectable(day)) return;
+          setSelectedDate(day.date === selectedDate ? null : day.date);
+          onDayPress?.(day.date, completado ?? null);
         }}
-        disabled={!day.isCurrentMonth || day.isFuture}
-        activeOpacity={0.7}
+        disabled={!isSelectable(day)}
+        activeOpacity={0.75}
       >
         <Text style={[styles.dayNumber, { color: textColor }]}>
           {day.dayNumber}
@@ -249,6 +249,25 @@ const HabitCalendar: React.FC<HabitCalendarProps> = ({
           <Text style={styles.legendText}>Hoy</Text>
         </View>
       </View>
+
+      {/* Detalle del dia seleccionado */}
+      {selectedDate && (() => {
+        const completado = historialMap.get(selectedDate);
+        const [y, m, d] = selectedDate.split('-');
+        const label = `${parseInt(d)} ${MONTHS[parseInt(m) - 1]} ${y}`;
+        return (
+          <View style={styles.selectedDayRow}>
+            <Ionicons
+              name={completado === true ? "checkmark-circle" : completado === false ? "close-circle" : "remove-circle-outline"}
+              size={18}
+              color={completado === true ? completedColor : completado === false ? colors.neutral[400] : colors.neutral[300]}
+            />
+            <Text style={styles.selectedDayText}>
+              {label} — {completado === true ? "Completado" : completado === false ? "No cumplido" : "Sin registro"}
+            </Text>
+          </View>
+        );
+      })()}
     </View>
   );
 };
@@ -336,6 +355,20 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: typography.size.xs,
     color: colors.neutral[500],
+  },
+  selectedDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: spacing[3],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[100],
+  },
+  selectedDayText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    flex: 1,
   },
 });
 
