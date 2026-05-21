@@ -80,6 +80,50 @@ interface DashboardData {
   habitos_total: number;
 }
 
+interface TimelineFase {
+  objetivo_id: number;
+  titulo: string;
+  descripcion?: string;
+  orden_fase: number;
+  dia_inicio: number;
+  dia_fin: number;
+  duracion_dias: number;
+  estado: "completada" | "en_progreso" | "atrasada" | "pendiente";
+  porcentaje_completado: number;
+  tareas_completadas: number;
+  tareas_total: number;
+}
+
+interface ProximoDia {
+  fecha: string;
+  tareas_total: number;
+  tareas_completadas: number;
+  tareas: TareaDiaria[];
+}
+
+// ── Helpers de fecha ──
+const todayIso = (): string => new Date().toISOString().split("T")[0];
+
+const addDays = (iso: string, n: number): string => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+};
+
+const formatFechaCorta = (iso: string): string => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+};
+
+const formatFechaLarga = (iso: string): string => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+};
+
+const esHoy = (iso: string): boolean => iso === todayIso();
+
 // =====================
 // MAIN COMPONENT
 // =====================
@@ -107,13 +151,31 @@ export default function SeguimientoPlanScreen() {
   const [editFechaObjetivo, setEditFechaObjetivo] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
+  // ── Navegación por fechas (B1) ──
+  const [fechaConsulta, setFechaConsulta] = useState<string>(() => todayIso());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // ── Próximas tareas colapsable (B3) ──
+  const [proximasDias, setProximasDias] = useState<ProximoDia[]>([]);
+  const [showProximas, setShowProximas] = useState(false);
+  const [loadingProximas, setLoadingProximas] = useState(false);
+
+  // ── Timeline integrado (D1) ──
+  const [timeline, setTimeline] = useState<TimelineFase[]>([]);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
+
+  // ── Modal información del plan (C2) ──
+  const [showPlanInfo, setShowPlanInfo] = useState(false);
+
   // =====================
   // FETCH DATA
   // =====================
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (fechaParam?: string) => {
     try {
-      const response = await authFetch(`/api/planes/${planUsuarioId}/hoy`);
+      const fechaToUse = fechaParam ?? fechaConsulta;
+      const response = await authFetch(`/api/planes/${planUsuarioId}/hoy?fecha=${fechaToUse}`);
       const data = await response.json();
       
       if (data && data.plan_usuario_id) {
@@ -128,6 +190,71 @@ export default function SeguimientoPlanScreen() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const cambiarFecha = (delta: number) => {
+    const nueva = addDays(fechaConsulta, delta);
+    setFechaConsulta(nueva);
+    setShowProximas(false); // resetear el collapse al cambiar fecha
+    fetchDashboard(nueva);
+  };
+
+  const irAHoy = () => {
+    const hoy = todayIso();
+    setFechaConsulta(hoy);
+    setShowProximas(false);
+    fetchDashboard(hoy);
+  };
+
+  const loadProximas = async () => {
+    if (loadingProximas) return;
+    setLoadingProximas(true);
+    try {
+      const diasFuturos = [1, 2].map((n) => addDays(fechaConsulta, n));
+      const results = await Promise.all(
+        diasFuturos.map(async (d) => {
+          try {
+            const r = await authFetch(`/api/planes/${planUsuarioId}/hoy?fecha=${d}`);
+            const j = await r.json();
+            return {
+              fecha: d,
+              tareas_total: j.tareas_total ?? 0,
+              tareas_completadas: j.tareas_completadas ?? 0,
+              tareas: j.tareas_hoy ?? [],
+            } as ProximoDia;
+          } catch {
+            return { fecha: d, tareas_total: 0, tareas_completadas: 0, tareas: [] };
+          }
+        })
+      );
+      setProximasDias(results);
+    } finally {
+      setLoadingProximas(false);
+    }
+  };
+
+  const toggleProximas = () => {
+    const next = !showProximas;
+    setShowProximas(next);
+    if (next && proximasDias.length === 0) loadProximas();
+  };
+
+  const loadTimeline = async () => {
+    if (loadingTimeline) return;
+    setLoadingTimeline(true);
+    try {
+      const r = await authFetch(`/api/planes/${planUsuarioId}/timeline`);
+      const j = await r.json();
+      if (j?.success) setTimeline(j.fases ?? []);
+    } finally {
+      setLoadingTimeline(false);
+    }
+  };
+
+  const toggleTimeline = () => {
+    const next = !showTimeline;
+    setShowTimeline(next);
+    if (next && timeline.length === 0) loadTimeline();
   };
 
   // =====================
@@ -277,7 +404,8 @@ export default function SeguimientoPlanScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           plan_usuario_id: Number(planUsuarioId),
-          tarea_id: tareaId 
+          tarea_id: tareaId,
+          fecha: fechaConsulta,
         }),
       });
 
@@ -463,7 +591,33 @@ export default function SeguimientoPlanScreen() {
         )}
 
         {/* ===================== */}
-        {/* PHASE BANNER (2D.3 + 2D.7) */}
+        {/* DATE NAVIGATOR (B1) */}
+        {/* ===================== */}
+        <View style={[styles.dateNav, { backgroundColor: palette.surface }]}>
+          <TouchableOpacity style={[styles.dateNavBtn, { backgroundColor: palette.surfaceAlt }]} onPress={() => cambiarFecha(-1)}>
+            <Ionicons name="chevron-back" size={20} color={palette.text} />
+          </TouchableOpacity>
+          <View style={styles.dateNavCenter}>
+            <Text style={[styles.dateNavLabel, { color: palette.textMuted }]}>
+              {esHoy(fechaConsulta) ? "Hoy" : ""}
+            </Text>
+            <Text style={[styles.dateNavDate, { color: palette.heading }]}>
+              {formatFechaLarga(fechaConsulta).charAt(0).toUpperCase() + formatFechaLarga(fechaConsulta).slice(1)}
+            </Text>
+            {!esHoy(fechaConsulta) && (
+              <TouchableOpacity onPress={irAHoy} style={styles.dateNavTodayBtn}>
+                <Ionicons name="today-outline" size={12} color={colors.primary[600]} />
+                <Text style={styles.dateNavTodayText}>Volver a hoy</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity style={[styles.dateNavBtn, { backgroundColor: palette.surfaceAlt }]} onPress={() => cambiarFecha(1)}>
+            <Ionicons name="chevron-forward" size={20} color={palette.text} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ===================== */}
+        {/* PHASE BANNER (2D.3 + 2D.7 + B2 + B4) */}
         {/* ===================== */}
         <View style={styles.phaseBanner}>
           <LinearGradient
@@ -491,55 +645,161 @@ export default function SeguimientoPlanScreen() {
               </Text>
             )}
 
-            {/* Phase Progress Bar */}
-            <View style={styles.phaseProgressContainer}>
-              <View style={styles.phaseProgressInfo}>
-                <Text style={styles.phaseProgressText}>
+            {/* Phase Info - Days Remaining (B2) */}
+            <View style={styles.phaseFactsRow}>
+              <View style={styles.phaseFact}>
+                <Ionicons name="calendar" size={12} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.phaseFactText}>
                   Día {dashboard.fase_actual.dia_en_fase} de {dashboard.fase_actual.duracion_fase}
                 </Text>
-                <Text style={styles.phaseProgressPercent}>{dashboard.fase_actual.porcentaje_fase}%</Text>
               </View>
-              <View style={styles.phaseProgressBarBg}>
-                <View 
-                  style={[styles.phaseProgressBarFill, { width: `${dashboard.fase_actual.porcentaje_fase}%` }]} 
-                />
+              <View style={styles.phaseFact}>
+                <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.phaseFactText}>
+                  {Math.max(0, dashboard.fase_actual.duracion_fase - dashboard.fase_actual.dia_en_fase)} días restantes en la fase
+                </Text>
+              </View>
+              <View style={styles.phaseFact}>
+                <Ionicons name="flag-outline" size={12} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.phaseFactText}>
+                  {Math.max(0, dashboard.progreso_general.dias_totales - dashboard.progreso_general.dias_transcurridos)} días para terminar
+                </Text>
               </View>
             </View>
+
+            {/* Daily Completion Bar (B4) */}
+            {(() => {
+              const totalItems = dashboard.tareas_total + dashboard.habitos_total;
+              const completedItems = dashboard.tareas_completadas + dashboard.habitos_completados;
+              const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+              return (
+                <View style={styles.phaseProgressContainer}>
+                  <View style={styles.phaseProgressInfo}>
+                    <Text style={styles.phaseProgressText}>
+                      Completado: {completedItems}/{totalItems} {totalItems === 1 ? "actividad" : "actividades"}
+                    </Text>
+                    <Text style={styles.phaseProgressPercent}>{pct}%</Text>
+                  </View>
+                  <View style={styles.phaseProgressBarBg}>
+                    <View style={[styles.phaseProgressBarFill, { width: `${pct}%` }]} />
+                  </View>
+                </View>
+              );
+            })()}
           </LinearGradient>
         </View>
 
         {/* Quick Actions Row */}
         <View style={styles.quickActionsRow}>
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => router.push(`/seccion_planes/timelinePlan?planUsuarioId=${planUsuarioId}` as any)}
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: palette.surface }]}
+            onPress={toggleTimeline}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: colors.primary[100] }]}>
-              <Ionicons name="git-branch-outline" size={18} color={colors.primary[600]} />
+              <Ionicons name={showTimeline ? "git-branch" : "git-branch-outline"} size={18} color={colors.primary[600]} />
             </View>
-            <Text style={styles.quickActionText}>Línea de tiempo</Text>
+            <Text style={[styles.quickActionText, { color: palette.text }]}>Ver fases</Text>
           </TouchableOpacity>
-          
-          <View style={[styles.quickActionBtn, styles.quickActionBtnDisabled]}>
-            <View style={[styles.quickActionIcon, { backgroundColor: colors.neutral[100] }]}>
-              <Ionicons name="stats-chart-outline" size={18} color={colors.neutral[400]} />
+
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: palette.surface }]}
+            onPress={() => setShowPlanInfo(true)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary[100] }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.secondary[600]} />
             </View>
-            <Text style={[styles.quickActionText, { color: colors.neutral[400] }]}>Estadísticas</Text>
-            <View style={styles.proximamenteBadge}>
-              <Text style={styles.proximamenteText}>Pronto</Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
+            <Text style={[styles.quickActionText, { color: palette.text }]}>Detalles</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: palette.surface }]}
             onPress={() => setShowActionMenu(true)}
           >
-            <View style={[styles.quickActionIcon, { backgroundColor: colors.neutral[100] }]}>
-              <Ionicons name="settings-outline" size={18} color={colors.neutral[600]} />
+            <View style={[styles.quickActionIcon, { backgroundColor: palette.surfaceAlt }]}>
+              <Ionicons name="settings-outline" size={18} color={palette.icon} />
             </View>
-            <Text style={styles.quickActionText}>Opciones</Text>
+            <Text style={[styles.quickActionText, { color: palette.text }]}>Opciones</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ===================== */}
+        {/* TIMELINE COLLAPSABLE (D1) */}
+        {/* ===================== */}
+        {showTimeline && (
+          <View style={[styles.timelineCollapse, { backgroundColor: palette.surface }]}>
+            <View style={styles.timelineHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <Ionicons name="layers-outline" size={18} color={colors.primary[600]} />
+                <Text style={[styles.timelineTitle, { color: palette.heading }]}>Todas las fases</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowTimeline(false)}>
+                <Ionicons name="chevron-up" size={20} color={palette.iconSubtle} />
+              </TouchableOpacity>
+            </View>
+            {loadingTimeline ? (
+              <View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
+                <ActivityIndicator size="small" color={colors.primary[600]} />
+              </View>
+            ) : timeline.length === 0 ? (
+              <Text style={[styles.timelineEmpty, { color: palette.textMuted }]}>Sin fases disponibles</Text>
+            ) : (
+              <View style={styles.timelineList}>
+                {timeline.map((f, idx) => {
+                  const colorByEstado: Record<string, string> = {
+                    completada: colors.secondary[500],
+                    en_progreso: colors.primary[500],
+                    atrasada: colors.semantic.error,
+                    pendiente: colors.neutral[400],
+                  };
+                  const iconByEstado: Record<string, any> = {
+                    completada: "checkmark-circle",
+                    en_progreso: "play-circle",
+                    atrasada: "alert-circle",
+                    pendiente: "ellipse-outline",
+                  };
+                  const c = colorByEstado[f.estado] ?? colors.neutral[400];
+                  return (
+                    <View key={f.objetivo_id} style={styles.timelineItem}>
+                      <View style={styles.timelineLeft}>
+                        <View style={[styles.timelineIcon, { backgroundColor: c + "20" }]}>
+                          <Ionicons name={iconByEstado[f.estado] ?? "ellipse-outline"} size={16} color={c} />
+                        </View>
+                        {idx < timeline.length - 1 && <View style={[styles.timelineConnector, { backgroundColor: palette.border }]} />}
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <View style={styles.timelineRow}>
+                          <Text style={[styles.timelineFaseTitle, { color: palette.text }]} numberOfLines={1}>
+                            {f.orden_fase}. {f.titulo}
+                          </Text>
+                          <Text style={[styles.timelineFaseDays, { color: palette.textMuted }]}>
+                            día {f.dia_inicio}-{f.dia_fin}
+                          </Text>
+                        </View>
+                        <View style={styles.timelineRow}>
+                          <Text style={[styles.timelineFaseEstado, { color: c }]}>
+                            {f.estado === "completada"
+                              ? "Completada"
+                              : f.estado === "en_progreso"
+                              ? "En progreso"
+                              : f.estado === "atrasada"
+                              ? "Atrasada"
+                              : "Pendiente"}
+                          </Text>
+                          <Text style={[styles.timelineFaseStats, { color: palette.textMuted }]}>
+                            {f.tareas_completadas}/{f.tareas_total} tareas
+                          </Text>
+                        </View>
+                        <View style={[styles.timelineProgressBg, { backgroundColor: palette.surfaceAlt }]}>
+                          <View style={[styles.timelineProgressFill, { width: `${f.porcentaje_completado}%`, backgroundColor: c }]} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ===================== */}
         {/* TASKS SECTION (2D.4) */}
@@ -649,6 +909,82 @@ export default function SeguimientoPlanScreen() {
           <View style={styles.noHabitsCard}>
             <Ionicons name="leaf-outline" size={24} color={colors.neutral[400]} />
             <Text style={styles.noHabitsText}>Sin hábitos vinculados a este plan</Text>
+          </View>
+        )}
+
+        {/* ===================== */}
+        {/* PRÓXIMAS TAREAS (B3) */}
+        {/* ===================== */}
+        <TouchableOpacity
+          style={[styles.proximasHeader, { backgroundColor: palette.surface }]}
+          onPress={toggleProximas}
+          activeOpacity={0.7}
+        >
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="calendar-outline" size={20} color={colors.primary[600]} />
+            <Text style={[styles.sectionTitle, { color: palette.heading }]}>Próximos días</Text>
+          </View>
+          <Ionicons
+            name={showProximas ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={palette.iconSubtle}
+          />
+        </TouchableOpacity>
+
+        {showProximas && (
+          <View style={[styles.proximasContent, { backgroundColor: palette.surface }]}>
+            {loadingProximas ? (
+              <View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
+                <ActivityIndicator size="small" color={colors.primary[600]} />
+              </View>
+            ) : proximasDias.every((d) => d.tareas_total === 0) ? (
+              <Text style={[styles.proximasEmpty, { color: palette.textMuted }]}>
+                Sin tareas planeadas para los próximos días
+              </Text>
+            ) : (
+              proximasDias.map((d) => (
+                <View key={d.fecha} style={styles.proximaDia}>
+                  <View style={styles.proximaDiaHeader}>
+                    <Text style={[styles.proximaDiaFecha, { color: palette.text }]}>
+                      {formatFechaCorta(d.fecha).charAt(0).toUpperCase() + formatFechaCorta(d.fecha).slice(1)}
+                    </Text>
+                    <View style={[styles.proximaDiaBadge, { backgroundColor: palette.surfaceAlt }]}>
+                      <Text style={[styles.proximaDiaBadgeText, { color: palette.textMuted }]}>
+                        {d.tareas_completadas}/{d.tareas_total} tareas
+                      </Text>
+                    </View>
+                  </View>
+                  {d.tareas.length === 0 ? (
+                    <Text style={[styles.proximaDiaEmpty, { color: palette.textSubtle }]}>Sin tareas</Text>
+                  ) : (
+                    d.tareas.slice(0, 4).map((t) => (
+                      <View key={t.tarea_id} style={styles.proximaTareaItem}>
+                        <Ionicons
+                          name={t.completada ? "checkmark-circle" : "ellipse-outline"}
+                          size={16}
+                          color={t.completada ? colors.secondary[500] : palette.iconSubtle}
+                        />
+                        <Text
+                          style={[
+                            styles.proximaTareaText,
+                            { color: palette.textMuted },
+                            t.completada && { textDecorationLine: "line-through" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {t.titulo}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                  {d.tareas.length > 4 && (
+                    <Text style={[styles.proximaTareaMore, { color: colors.primary[600] }]}>
+                      +{d.tareas.length - 4} tareas más
+                    </Text>
+                  )}
+                </View>
+              ))
+            )}
           </View>
         )}
 
@@ -786,6 +1122,114 @@ export default function SeguimientoPlanScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ===================== */}
+      {/* PLAN INFO MODAL (C2) */}
+      {/* ===================== */}
+      <Modal
+        visible={showPlanInfo}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlanInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.planInfoModal, { backgroundColor: palette.background }]}>
+            <View style={styles.planInfoHandle} />
+            <View style={styles.planInfoHeader}>
+              <Text style={[styles.planInfoTitle, { color: palette.heading }]}>Detalles del Plan</Text>
+              <TouchableOpacity onPress={() => setShowPlanInfo(false)}>
+                <Ionicons name="close" size={24} color={palette.icon} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing[6] }}>
+              <Text style={[styles.planInfoMeta, { color: palette.heading }]}>
+                {dashboard.meta_principal}
+              </Text>
+
+              <View style={styles.planInfoBadges}>
+                <View style={[styles.planInfoBadge, { backgroundColor: palette.surface }]}>
+                  <Ionicons name="speedometer-outline" size={14} color={colors.accent.amber} />
+                  <Text style={[styles.planInfoBadgeText, { color: palette.text }]}>
+                    {dashboard.dificultad}
+                  </Text>
+                </View>
+                <View style={[styles.planInfoBadge, { backgroundColor: palette.surface }]}>
+                  <Ionicons name="hourglass-outline" size={14} color={colors.primary[600]} />
+                  <Text style={[styles.planInfoBadgeText, { color: palette.text }]}>
+                    {dashboard.progreso_general.dias_totales} días
+                  </Text>
+                </View>
+                <View style={[styles.planInfoBadge, { backgroundColor: palette.surface }]}>
+                  <Ionicons name="layers-outline" size={14} color={colors.secondary[600]} />
+                  <Text style={[styles.planInfoBadgeText, { color: palette.text }]}>
+                    {dashboard.fase_actual.total_fases} {dashboard.fase_actual.total_fases === 1 ? "fase" : "fases"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.planInfoSection, { backgroundColor: palette.surface }]}>
+                <Text style={[styles.planInfoSectionTitle, { color: palette.heading }]}>Progreso global</Text>
+                <View style={styles.planInfoStatRow}>
+                  <Text style={[styles.planInfoStatLabel, { color: palette.textMuted }]}>Días transcurridos</Text>
+                  <Text style={[styles.planInfoStatValue, { color: palette.text }]}>
+                    {dashboard.progreso_general.dias_transcurridos} / {dashboard.progreso_general.dias_totales}
+                  </Text>
+                </View>
+                <View style={styles.planInfoStatRow}>
+                  <Text style={[styles.planInfoStatLabel, { color: palette.textMuted }]}>Días restantes</Text>
+                  <Text style={[styles.planInfoStatValue, { color: palette.text }]}>
+                    {Math.max(0, dashboard.progreso_general.dias_totales - dashboard.progreso_general.dias_transcurridos)}
+                  </Text>
+                </View>
+                <View style={styles.planInfoStatRow}>
+                  <Text style={[styles.planInfoStatLabel, { color: palette.textMuted }]}>Estado</Text>
+                  <View style={[styles.planInfoStatusChip, { backgroundColor: estadoPlan === "activo" ? colors.secondary[100] : palette.surfaceAlt }]}>
+                    <Text style={[styles.planInfoStatusText, { color: estadoPlan === "activo" ? colors.secondary[700] : palette.textMuted }]}>
+                      {estadoPlan.charAt(0).toUpperCase() + estadoPlan.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={[styles.planInfoSection, { backgroundColor: palette.surface }]}>
+                <Text style={[styles.planInfoSectionTitle, { color: palette.heading }]}>Fase actual</Text>
+                <Text style={[styles.planInfoFaseTitle, { color: palette.text }]}>
+                  {dashboard.fase_actual.orden_fase}. {dashboard.fase_actual.titulo}
+                </Text>
+                {dashboard.fase_actual.descripcion && (
+                  <Text style={[styles.planInfoFaseDesc, { color: palette.textMuted }]}>
+                    {dashboard.fase_actual.descripcion}
+                  </Text>
+                )}
+                <View style={styles.planInfoStatRow}>
+                  <Text style={[styles.planInfoStatLabel, { color: palette.textMuted }]}>Duración fase</Text>
+                  <Text style={[styles.planInfoStatValue, { color: palette.text }]}>
+                    {dashboard.fase_actual.duracion_fase} días
+                  </Text>
+                </View>
+                <View style={styles.planInfoStatRow}>
+                  <Text style={[styles.planInfoStatLabel, { color: palette.textMuted }]}>Día en la fase</Text>
+                  <Text style={[styles.planInfoStatValue, { color: palette.text }]}>
+                    {dashboard.fase_actual.dia_en_fase} de {dashboard.fase_actual.duracion_fase}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.planInfoFullTimelineBtn}
+                onPress={() => {
+                  setShowPlanInfo(false);
+                  router.push(`/seccion_planes/timelinePlan?planUsuarioId=${planUsuarioId}` as any);
+                }}
+              >
+                <Ionicons name="git-branch-outline" size={18} color={colors.primary[600]} />
+                <Text style={styles.planInfoFullTimelineText}>Ver línea de tiempo completa</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.primary[600]} />
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* Confirm Modal */}
@@ -1359,5 +1803,335 @@ const styles = StyleSheet.create({
     fontSize: typography.size.base,
     fontWeight: typography.weight.semibold,
     color: colors.neutral[0],
+  },
+
+  // === Date Navigator (B1) ===
+  dateNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[3],
+    borderRadius: radius.xl,
+    marginBottom: spacing[4],
+    ...shadows.sm,
+  },
+  dateNavBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateNavCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  dateNavLabel: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  dateNavDate: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+  },
+  dateNavTodayBtn: {
+    marginTop: spacing[1],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary[50],
+  },
+  dateNavTodayText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
+  },
+
+  // === Phase Facts Row (B2) ===
+  phaseFactsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+    marginTop: spacing[3],
+    marginBottom: spacing[3],
+  },
+  phaseFact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 4,
+    borderRadius: radius.full,
+  },
+  phaseFactText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: 'rgba(255,255,255,0.95)',
+  },
+
+  // === Timeline Collapsable (D1) ===
+  timelineCollapse: {
+    marginBottom: spacing[4],
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    ...shadows.sm,
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing[3],
+  },
+  timelineTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+  },
+  timelineEmpty: {
+    fontSize: typography.size.sm,
+    textAlign: 'center',
+    paddingVertical: spacing[4],
+  },
+  timelineList: {
+    gap: spacing[3],
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  timelineLeft: {
+    alignItems: 'center',
+  },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineConnector: {
+    width: 2,
+    flex: 1,
+    marginTop: 4,
+    minHeight: 24,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: spacing[2],
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  timelineFaseTitle: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    flex: 1,
+    marginRight: spacing[2],
+  },
+  timelineFaseDays: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  timelineFaseEstado: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  timelineFaseStats: {
+    fontSize: typography.size.xs,
+  },
+  timelineProgressBg: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  timelineProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // === Próximas Tareas (B3) ===
+  proximasHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    marginBottom: spacing[2],
+    ...shadows.sm,
+  },
+  proximasContent: {
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    marginBottom: spacing[4],
+    ...shadows.sm,
+  },
+  proximasEmpty: {
+    fontSize: typography.size.sm,
+    textAlign: 'center',
+    paddingVertical: spacing[3],
+  },
+  proximaDia: {
+    paddingVertical: spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  proximaDiaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing[2],
+  },
+  proximaDiaFecha: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+  },
+  proximaDiaBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  proximaDiaBadgeText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  proximaDiaEmpty: {
+    fontSize: typography.size.xs,
+    fontStyle: 'italic',
+    paddingVertical: spacing[1],
+  },
+  proximaTareaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: 4,
+  },
+  proximaTareaText: {
+    fontSize: typography.size.sm,
+    flex: 1,
+  },
+  proximaTareaMore: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    marginTop: 4,
+    marginLeft: spacing[6],
+  },
+
+  // === Plan Info Modal (C2) ===
+  planInfoModal: {
+    maxHeight: '88%',
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing[5],
+    marginTop: 'auto',
+  },
+  planInfoHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.neutral[300],
+    alignSelf: 'center',
+    marginBottom: spacing[4],
+  },
+  planInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing[4],
+  },
+  planInfoTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+  },
+  planInfoMeta: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    marginBottom: spacing[3],
+  },
+  planInfoBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+    marginBottom: spacing[4],
+  },
+  planInfoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.full,
+  },
+  planInfoBadgeText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+  },
+  planInfoSection: {
+    padding: spacing[4],
+    borderRadius: radius.xl,
+    marginBottom: spacing[3],
+  },
+  planInfoSectionTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    marginBottom: spacing[3],
+  },
+  planInfoStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing[2],
+  },
+  planInfoStatLabel: {
+    fontSize: typography.size.sm,
+  },
+  planInfoStatValue: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+  },
+  planInfoStatusChip: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: 4,
+    borderRadius: radius.full,
+  },
+  planInfoStatusText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+  },
+  planInfoFaseTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    marginBottom: spacing[1],
+  },
+  planInfoFaseDesc: {
+    fontSize: typography.size.sm,
+    lineHeight: 20,
+    marginBottom: spacing[3],
+  },
+  planInfoFullTimelineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[4],
+    borderRadius: radius.xl,
+    borderWidth: 1.5,
+    borderColor: colors.primary[300],
+    backgroundColor: colors.primary[50],
+    marginTop: spacing[2],
+  },
+  planInfoFullTimelineText: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[700],
   },
 });
