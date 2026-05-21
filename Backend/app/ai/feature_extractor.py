@@ -167,7 +167,7 @@ class FeatureExtractor:
                       AND hp.habito_id NOT IN (
                           SELECT habito_id 
                           FROM habitos_usuario 
-                          WHERE user_id = %s AND activo = true
+                          WHERE user_id = %s
                       )
                     ORDER BY hp.habito_id;
                 """, (user_id,))

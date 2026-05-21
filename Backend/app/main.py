@@ -597,8 +597,10 @@ def add_habito_to_user(user_id: int, habito_data: AddHabitoToUserSchema, current
         )
         
         if result is None:
-            raise HTTPException(status_code=400, detail="El hábito ya está agregado para este usuario")
-        
+            raise HTTPException(status_code=409, detail="El hábito ya está en tu lista")
+
+        redis_client.invalidate_user_cache(user_id)
+
         return {
             "success": True, 
             "message": "Hábito agregado correctamente",
@@ -638,7 +640,10 @@ def add_habito_con_config(user_id: int, data: AddHabitoConConfigSchema, current_
         )
 
         if result is None:
-            raise HTTPException(status_code=400, detail="El hábito ya está agregado para este usuario")
+            redis_client.invalidate_user_cache(user_id)
+            raise HTTPException(status_code=409, detail="El hábito ya está en tu lista")
+
+        redis_client.invalidate_user_cache(user_id)
 
         return {
             "success": True,
@@ -1159,6 +1164,7 @@ def remove_habito_from_user(user_id: int, habito_id: int):
         if not success:
             raise HTTPException(status_code=404, detail="Hábito no encontrado para este usuario")
         
+        redis_client.invalidate_user_cache(user_id)
         return {"success": True, "message": "Hábito removido correctamente"}
     except HTTPException:
         raise

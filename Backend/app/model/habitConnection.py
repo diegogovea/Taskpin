@@ -128,10 +128,42 @@ class habitConnection():
         meta_valor=None, meta_unidad=None,
         puntos_base_override=None,
     ):
-        """Agrega un hábito con configuración completa en un solo INSERT."""
+        """Agrega un hábito con configuración completa. Si existía pero estaba inactivo, lo reactiva."""
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
+                # Verificar si ya existe (activo o no)
+                cur.execute("""
+                    SELECT habito_usuario_id, activo
+                    FROM habitos_usuario
+                    WHERE user_id = %s AND habito_id = %s;
+                """, (user_id, habito_id))
+                existing = cur.fetchone()
+                if existing:
+                    habito_usuario_id, activo = existing
+                    if activo:
+                        return None  # Ya existe y está activo → 409
+
+                    # Estaba inactivo → reactivar con nueva config
+                    cur.execute("""
+                        UPDATE habitos_usuario
+                        SET activo = true,
+                            frecuencia_personal = %s,
+                            color = %s,
+                            icono = %s,
+                            fecha_fin = %s,
+                            meta_valor = %s,
+                            meta_unidad = %s,
+                            fecha_agregado = NOW()
+                        WHERE habito_usuario_id = %s
+                        RETURNING habito_usuario_id;
+                    """, (frecuencia_personal, color, icono, fecha_fin,
+                          meta_valor, meta_unidad, habito_usuario_id))
+                    result = cur.fetchone()
+                    conn.commit()
+                    return result[0] if result else None
+
+                # No existe → INSERT fresco
                 try:
                     # Detectar si existen las columnas de campos_extra (migración 011)
                     cur.execute("""
@@ -182,14 +214,14 @@ class habitConnection():
                 return cur.fetchall()
 
     def get_user_habito_ids(self, user_id):
-        """Obtiene solo los IDs de hábitos predeterminados que el usuario ya tiene (para filtrado)"""
+        """Obtiene los IDs de todos los hábitos del usuario (activos e inactivos) para filtrado en frontend."""
         pool = get_pool()
         with pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT habito_id 
                     FROM habitos_usuario 
-                    WHERE user_id = %s AND activo = true;
+                    WHERE user_id = %s;
                 """, (user_id,))
                 return [row[0] for row in cur.fetchall()]
 
