@@ -90,7 +90,7 @@ export default function LoginScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.primaryButtonGradient}
             >
-              <Text style={styles.primaryButtonText}>Comenzar</Text>
+              <Text style={styles.primaryButtonText}>Crear cuenta</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -100,7 +100,7 @@ export default function LoginScreen() {
             activeOpacity={0.8}
             onPress={() => router.replace("/inicio")}
           >
-            <Text style={styles.secondaryButtonText}>Ya tengo una cuenta</Text>
+            <Text style={styles.secondaryButtonText}>Iniciar sesión</Text>
           </TouchableOpacity>
 
           {/* Terms */}

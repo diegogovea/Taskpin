@@ -39,30 +39,46 @@ const COLORES_HABITO = [
 
 // ── Íconos disponibles (Ionicons) ──────────────────────────
 const ICONOS_HABITO = [
-  "book-outline", "barbell-outline", "bicycle-outline", "body-outline",
-  "cafe-outline", "camera-outline", "chatbubble-outline", "code-outline",
-  "color-palette-outline", "diamond-outline", "earth-outline", "fast-food-outline",
-  "fitness-outline", "flask-outline", "flower-outline", "game-controller-outline",
-  "guitar-outline", "heart-outline", "headset-outline", "home-outline",
-  "journal-outline", "leaf-outline", "medkit-outline", "mic-outline",
-  "moon-outline", "musical-notes-outline", "navigate-outline", "nutrition-outline",
-  "pencil-outline", "people-outline", "person-outline", "phone-portrait-outline",
-  "planet-outline", "rose-outline", "school-outline", "sparkles-outline",
-  "star-outline", "stopwatch-outline", "sunny-outline", "walk-outline",
-  "water-outline", "wifi-outline", "wine-outline", "barcode-outline",
-  "alarm-outline", "archive-outline", "bed-outline", "brush-outline",
-  "ribbon-outline", "shield-checkmark-outline", "stats-chart-outline", "timer-outline",
+  "book-outline",          "barbell-outline",       "bicycle-outline",       "cafe-outline",
+  "camera-outline",        "chatbubble-outline",     "code-outline",          "color-palette-outline",
+  "diamond-outline",       "earth-outline",          "fast-food-outline",     "fitness-outline",
+  "flask-outline",         "game-controller-outline","heart-outline",         "headset-outline",
+  "home-outline",          "journal-outline",        "leaf-outline",          "medkit-outline",
+  "mic-outline",           "moon-outline",           "musical-notes-outline", "navigate-outline",
+  "nutrition-outline",     "pencil-outline",         "people-outline",        "person-outline",
+  "phone-portrait-outline","planet-outline",         "school-outline",        "sparkles-outline",
+  "star-outline",          "stopwatch-outline",      "sunny-outline",         "walk-outline",
+  "water-outline",         "wifi-outline",           "alarm-outline",         "archive-outline",
+  "brush-outline",         "shield-checkmark-outline","stats-chart-outline",  "timer-outline",
+  "trophy-outline",        "radio-outline",          "pricetag-outline",      "flag-outline",
 ];
 
 // ── Frecuencias ─────────────────────────────────────────────
 const FRECUENCIAS = [
-  { value: "diario", label: "Cada día", icon: "sunny-outline" },
-  { value: "cada_2_dias", label: "Cada 2 días", icon: "partly-sunny-outline" },
-  { value: "semanal", label: "Cada semana", icon: "calendar-outline" },
+  { value: "diario",         label: "Cada día",       icon: "sunny-outline" },
+  { value: "cada_2_dias",    label: "Cada 2 días",    icon: "partly-sunny-outline" },
+  { value: "semanal",        label: "Cada semana",    icon: "calendar-outline" },
   { value: "cada_2_semanas", label: "Cada 2 semanas", icon: "calendar-clear-outline" },
-  { value: "mensual", label: "Cada mes", icon: "calendar-number-outline" },
-  { value: "cada_2_meses", label: "Cada 2 meses", icon: "time-outline" },
+  { value: "mensual",        label: "Cada mes",       icon: "calendar-number-outline" },
+  { value: "cada_2_meses",   label: "Cada 2 meses",  icon: "time-outline" },
 ];
+
+const FREQ_UNITS = [
+  { value: "dias",    label: "días" },
+  { value: "semanas", label: "semanas" },
+  { value: "meses",   label: "meses" },
+];
+
+function getFrecuenciaLabel(value: string): string {
+  const preset = FRECUENCIAS.find((f) => f.value === value);
+  if (preset) return preset.label;
+  const match = value.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+  if (match) {
+    const unitMap: Record<string, string> = { dias: "días", semanas: "semanas", meses: "meses" };
+    return `Cada ${match[1]} ${unitMap[match[2]] ?? match[2]}`;
+  }
+  return value;
+}
 
 // ── Unidades de meta ────────────────────────────────────────
 const UNIDADES_META = [
@@ -70,7 +86,7 @@ const UNIDADES_META = [
   "vasos", "repeticiones", "series", "veces",
 ];
 
-type ActiveSheet = "color" | "icon" | "frecuencia" | "meta" | "tipo" | null;
+type ActiveSheet = "color" | "icon" | "frecuencia" | "meta" | "tipo" | "customFreq" | null;
 
 export default function CatHCustomScreen() {
   const router = useRouter();
@@ -93,6 +109,8 @@ export default function CatHCustomScreen() {
   // ── Estado UI ───────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const [customFreqNum, setCustomFreqNum] = useState('');
+  const [customFreqUnit, setCustomFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
   const [toast, setToast] = useState({
     visible: false,
     message: "",
@@ -158,7 +176,7 @@ export default function CatHCustomScreen() {
   };
 
   // ── Label helpers ───────────────────────────────────────
-  const frecLabel = FRECUENCIAS.find((f) => f.value === frecuencia)?.label ?? frecuencia;
+  const frecLabel = getFrecuenciaLabel(frecuencia);
   const tipoLabel = tipo === "bueno" ? "Hábito positivo" : "Hábito a eliminar";
 
   // ── Fila de opción estilo iOS ───────────────────────────
@@ -499,11 +517,71 @@ export default function CatHCustomScreen() {
                 )}
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setActiveSheet(null)}>
+            {/* Opcion personalizada */}
+            <TouchableOpacity
+              style={styles.optionRow}
+              onPress={() => { setActiveSheet("customFreq"); setCustomFreqNum(''); setCustomFreqUnit('dias'); }}
+            >
+              <Ionicons name="options-outline" size={20} color={colors.neutral[500]} />
+              <Text style={styles.optionLabel}>Personalizar...</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sheetCloseBtn, styles.optionRowLast]} onPress={() => setActiveSheet(null)}>
               <Text style={styles.sheetCloseBtnText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ── Sheet: Frecuencia personalizada ── */}
+      <Modal visible={activeSheet === "customFreq"} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+          <View style={styles.sheetOverlay}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Personalizar frecuencia</Text>
+              <Text style={styles.sheetSubtitle}>¿Cada cuánto quieres repetir el hábito?</Text>
+              <TextInput
+                style={styles.metaInput}
+                placeholder="Ej: 3"
+                placeholderTextColor={colors.neutral[400]}
+                keyboardType="number-pad"
+                value={customFreqNum}
+                onChangeText={(t) => setCustomFreqNum(t.replace(/\D/g, ''))}
+                maxLength={3}
+                autoFocus
+              />
+              <Text style={styles.sheetSectionLabel}>Unidad</Text>
+              <View style={{ flexDirection: "row", gap: spacing[2], marginBottom: spacing[4] }}>
+                {FREQ_UNITS.map((u) => (
+                  <TouchableOpacity
+                    key={u.value}
+                    style={[styles.unitChip, customFreqUnit === u.value && styles.unitChipSelected, { flex: 1, alignItems: "center" }]}
+                    onPress={() => setCustomFreqUnit(u.value as 'dias' | 'semanas' | 'meses')}
+                  >
+                    <Text style={[styles.unitChipText, customFreqUnit === u.value && styles.unitChipTextSelected]}>
+                      {u.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.sheetConfirmBtn, { opacity: customFreqNum ? 1 : 0.4 }]}
+                disabled={!customFreqNum}
+                onPress={() => {
+                  setFrecuencia(`cada_${customFreqNum}_${customFreqUnit}`);
+                  setActiveSheet(null);
+                }}
+              >
+                <Text style={styles.sheetConfirmText}>
+                  {customFreqNum ? `Cada ${customFreqNum} ${FREQ_UNITS.find(u => u.value === customFreqUnit)?.label}` : 'Ingresa un número'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setActiveSheet("frecuencia")}>
+                <Text style={styles.sheetCloseBtnText}>Volver</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Sheet: Tipo ── */}

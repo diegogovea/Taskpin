@@ -20,6 +20,21 @@ import { colors, typography, spacing, radius, shadows } from "../../constants/th
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { getCategoryColor } from "../../constants/categoryColors";
+import { safeIcon } from "../../utils/safeIcon";
+
+// Los iconos de categoría en la BD son emojis; los mapeamos a Ionicons válidos
+const CATEGORIA_ICON_MAP: Record<string, string> = {
+  "Bienestar Diario":            "leaf-outline",
+  "Energía y Movimiento":        "flash-outline",
+  "Mente y Enfoque":             "bulb-outline",
+  "Orden y Hogar":               "home-outline",
+  "Finanzas y Control Personal": "cash-outline",
+};
+
+function getCategoriaIcon(nombre: string, rawIcono: string | null | undefined): string {
+  if (CATEGORIA_ICON_MAP[nombre]) return CATEGORIA_ICON_MAP[nombre];
+  return safeIcon(rawIcono, "leaf-outline");
+}
 import { ConfirmModal } from "../../components/modals";
 import { Toast, HabitCalendar } from "../../components/ui";
 
@@ -81,6 +96,23 @@ const FRECUENCIAS = [
   { value: 'cada_2_meses',   label: 'Cada 2 meses',  icon: 'time-outline' },
 ];
 
+const FREQ_UNITS = [
+  { value: 'dias',    label: 'días' },
+  { value: 'semanas', label: 'semanas' },
+  { value: 'meses',   label: 'meses' },
+];
+
+function getFrecuenciaLabel(value: string): string {
+  const preset = FRECUENCIAS.find((f) => f.value === value);
+  if (preset) return preset.label;
+  const match = value.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+  if (match) {
+    const unitMap: Record<string, string> = { dias: 'días', semanas: 'semanas', meses: 'meses' };
+    return `Cada ${match[1]} ${unitMap[match[2]] ?? match[2]}`;
+  }
+  return value;
+}
+
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
   '#F97316', '#F59E0B', '#10B981', '#14B8A6',
@@ -88,10 +120,12 @@ const PRESET_COLORS = [
 ];
 
 const PRESET_ICONS = [
-  'leaf-outline', 'fitness-outline', 'barbell-outline', 'bicycle-outline',
-  'heart-outline', 'water-outline', 'moon-outline', 'sunny-outline',
-  'book-outline', 'musical-notes-outline', 'brush-outline', 'code-slash-outline',
-  'restaurant-outline', 'walk-outline', 'medkit-outline', 'sparkles-outline',
+  'leaf-outline',          'fitness-outline',       'barbell-outline',       'bicycle-outline',
+  'heart-outline',         'water-outline',         'moon-outline',          'sunny-outline',
+  'book-outline',          'musical-notes-outline', 'brush-outline',         'code-outline',
+  'fast-food-outline',     'walk-outline',          'medkit-outline',        'sparkles-outline',
+  'trophy-outline',        'star-outline',          'people-outline',        'school-outline',
+  'stopwatch-outline',     'headset-outline',       'pencil-outline',        'flag-outline',
 ];
 
 export default function DetalleHabitoScreen() {
@@ -110,6 +144,10 @@ export default function DetalleHabitoScreen() {
   const [historialResumen, setHistorialResumen] = useState<HistorialResumen | null>(null);
   const [rachas, setRachas] = useState<RachasData | null>(null);
   
+  // Frecuencia personalizada
+  const [customFreqNum, setCustomFreqNum] = useState('');
+  const [customFreqUnit, setCustomFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
+
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -193,6 +231,34 @@ export default function DetalleHabitoScreen() {
     };
     loadAllData();
   }, [user?.user_id, habito_usuario_id]);
+
+  // Inicializar panel de frecuencia con el valor actual del hábito
+  useEffect(() => {
+    if (!habito) return;
+    const match = habito.frecuencia_personal.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+    if (match) {
+      setCustomFreqNum(match[1]);
+      setCustomFreqUnit(match[2] as 'dias' | 'semanas' | 'meses');
+    } else if (habito.frecuencia_personal === 'diario') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('dias');
+    } else if (habito.frecuencia_personal === 'semanal') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('semanas');
+    } else if (habito.frecuencia_personal === 'mensual') {
+      setCustomFreqNum('1');
+      setCustomFreqUnit('meses');
+    } else if (habito.frecuencia_personal === 'cada_2_dias') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('dias');
+    } else if (habito.frecuencia_personal === 'cada_2_semanas') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('semanas');
+    } else if (habito.frecuencia_personal === 'cada_2_meses') {
+      setCustomFreqNum('2');
+      setCustomFreqUnit('meses');
+    }
+  }, [habito?.frecuencia_personal]);
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -408,10 +474,13 @@ export default function DetalleHabitoScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={[styles.iconContainer, { backgroundColor: categoryColor + '15' }]}>
-            <Ionicons 
-              name={(habito.categoria_icono || 'leaf') as any} 
-              size={40} 
-              color={categoryColor} 
+            <Ionicons
+              name={(habito.icono
+                ? safeIcon(habito.icono, 'leaf-outline')
+                : getCategoriaIcon(habito.categoria_nombre, habito.categoria_icono)
+              ) as any}
+              size={40}
+              color={categoryColor}
             />
           </View>
           <Text style={[styles.habitName, { color: palette.heading }]}>{habito.nombre}</Text>
@@ -583,44 +652,51 @@ export default function DetalleHabitoScreen() {
         {/* Frequency Selector */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Frecuencia</Text>
-          <View style={styles.frequencyContainer}>
-            {FRECUENCIAS.map((freq) => {
-              const isSelected = habito.frecuencia_personal === freq.value;
-              return (
-                <TouchableOpacity
-                  key={freq.value}
-                  style={[
-                    styles.frequencyOption,
-                    isSelected && styles.frequencyOptionSelected,
-                  ]}
-                  onPress={() => updateFrecuencia(freq.value)}
-                  disabled={updating}
-                >
-                  {updating && isSelected ? (
-                    <ActivityIndicator size="small" color={colors.primary[600]} />
-                  ) : (
-                    <>
-                      <Ionicons 
-                        name={freq.icon as any} 
-                        size={20} 
-                        color={isSelected ? colors.primary[600] : colors.neutral[400]} 
-                      />
-                      <Text style={[
-                        styles.frequencyLabel,
-                        isSelected && styles.frequencyLabelSelected,
-                      ]}>
-                        {freq.label}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.selectedIndicator}>
-                          <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
-                        </View>
-                      )}
-                    </>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+          <View style={[styles.customFreqPanel, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+            <Text style={[styles.customFreqLabel, { color: palette.textMuted }]}>
+              Actual: <Text style={{ color: palette.text, fontWeight: '600' }}>{getFrecuenciaLabel(habito.frecuencia_personal)}</Text>
+            </Text>
+            <View style={styles.customFreqRow}>
+              <TextInput
+                style={[styles.customFreqInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="3"
+                placeholderTextColor={palette.textSubtle}
+                keyboardType="number-pad"
+                value={customFreqNum}
+                onChangeText={(t) => setCustomFreqNum(t.replace(/\D/g, ''))}
+                maxLength={3}
+              />
+              <View style={styles.customFreqUnits}>
+                {FREQ_UNITS.map((u) => (
+                  <TouchableOpacity
+                    key={u.value}
+                    style={[
+                      styles.customFreqUnitChip,
+                      { backgroundColor: palette.surface, borderColor: palette.border },
+                      customFreqUnit === u.value && styles.customFreqUnitChipSelected,
+                    ]}
+                    onPress={() => setCustomFreqUnit(u.value as 'dias' | 'semanas' | 'meses')}
+                  >
+                    <Text style={[
+                      styles.customFreqUnitText,
+                      { color: palette.textMuted },
+                      customFreqUnit === u.value && { color: colors.primary[600], fontWeight: '600' },
+                    ]}>
+                      {u.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.customFreqConfirmBtn, { opacity: customFreqNum ? 1 : 0.4 }]}
+              disabled={!customFreqNum || updating}
+              onPress={() => updateFrecuencia(`cada_${customFreqNum}_${customFreqUnit}`)}
+            >
+              <Text style={styles.customFreqConfirmText}>
+                {updating ? 'Guardando...' : customFreqNum ? `Guardar: cada ${customFreqNum} ${FREQ_UNITS.find(u => u.value === customFreqUnit)?.label}` : 'Ingresa un número'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -1111,6 +1187,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Custom frequency panel
+  customFreqPanel: {
+    marginTop: spacing[3],
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing[4],
+    gap: spacing[3],
+  },
+  customFreqLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: '600',
+    marginBottom: spacing[1],
+  },
+  customFreqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  customFreqInput: {
+    width: 64,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    fontSize: typography.size.xl,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  customFreqUnits: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  customFreqUnitChip: {
+    flex: 1,
+    paddingVertical: spacing[2],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  customFreqUnitChipSelected: {
+    borderColor: colors.primary[500],
+    backgroundColor: colors.primary[50],
+  },
+  customFreqUnitText: {
+    fontSize: typography.size.xs,
+    fontWeight: '500',
+  },
+  customFreqConfirmBtn: {
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.lg,
+    paddingVertical: spacing[3],
+    alignItems: 'center',
+  },
+  customFreqConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: typography.size.sm,
+  },
+
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
