@@ -508,7 +508,7 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: palette.bg }]}>
           <View>
             <Text style={[styles.greeting, { color: palette.textMuted }]}>{getGreeting()}</Text>
             <Text style={[styles.userName, { color: palette.text }]}>{(user?.nombre || "Usuario").split(" ")[0]}</Text>
@@ -934,7 +934,7 @@ export default function HomeScreen() {
           activeOpacity={1}
           onPress={() => setDayDetailDate(null)}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.dayModalSheet}>
+          <TouchableOpacity activeOpacity={1} style={[styles.dayModalSheet, { backgroundColor: palette.surface }]}>
             {/* Handle */}
             <View style={styles.dayModalHandle} />
 
@@ -948,8 +948,8 @@ export default function HomeScreen() {
               return (
                 <View style={styles.dayModalHeader}>
                   <View>
-                    <Text style={styles.dayModalTitle}>{dayName} {dayNum} {monthName}</Text>
-                    <Text style={styles.dayModalSubtitle}>Resumen del día</Text>
+                    <Text style={[styles.dayModalTitle, { color: palette.heading }]}>{dayName} {dayNum} {monthName}</Text>
+                    <Text style={[styles.dayModalSubtitle, { color: palette.textMuted }]}>Resumen del día</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.dayModalCloseBtn}
@@ -964,7 +964,7 @@ export default function HomeScreen() {
             {dayDetailLoading ? (
               <View style={styles.dayModalLoading}>
                 <ActivityIndicator color={colors.primary[600]} size="large" />
-                <Text style={styles.dayModalLoadingText}>Cargando resumen...</Text>
+                <Text style={[styles.dayModalLoadingText, { color: palette.textMuted }]}>Cargando resumen...</Text>
               </View>
             ) : (
               <ScrollView
@@ -1011,32 +1011,33 @@ export default function HomeScreen() {
                 {/* Lista de hábitos */}
                 {dayDetailHabitos.length > 0 ? (
                   <View style={styles.dayModalList}>
-                    <Text style={styles.dayModalListTitle}>Detalle por hábito</Text>
+                    <Text style={[styles.dayModalListTitle, { color: palette.heading }]}>Detalle por hábito</Text>
                     {dayDetailHabitos.map((h) => (
-                      <View key={h.habito_usuario_id} style={styles.dayModalHabitRow}>
+                      <View key={h.habito_usuario_id} style={[styles.dayModalHabitRow, { borderBottomColor: palette.divider }]}>
                         <View
                           style={[
                             styles.dayModalHabitStatus,
-                            { backgroundColor: h.completado_hoy ? colors.secondary[500] : colors.neutral[200] },
+                            { backgroundColor: h.completado_hoy ? colors.secondary[500] : palette.surfaceAlt },
                           ]}
                         >
                           <Ionicons
                             name={h.completado_hoy ? "checkmark" : "close"}
                             size={14}
-                            color={h.completado_hoy ? colors.neutral[0] : colors.neutral[400]}
+                            color={h.completado_hoy ? colors.neutral[0] : palette.textSubtle}
                           />
                         </View>
                         <View style={styles.dayModalHabitInfo}>
                           <Text
                             style={[
                               styles.dayModalHabitName,
-                              !h.completado_hoy && styles.dayModalHabitNameMuted,
+                              { color: palette.text },
+                              !h.completado_hoy && { color: palette.textMuted },
                             ]}
                             numberOfLines={1}
                           >
                             {h.nombre}
                           </Text>
-                          <Text style={styles.dayModalHabitCat}>{h.categoria_nombre}</Text>
+                          <Text style={[styles.dayModalHabitCat, { color: palette.textSubtle }]}>{h.categoria_nombre}</Text>
                         </View>
                         {h.completado_hoy && (
                           <Text style={styles.dayModalHabitPts}>+{h.puntos_base} pts</Text>
@@ -1046,8 +1047,8 @@ export default function HomeScreen() {
                   </View>
                 ) : (
                   <View style={styles.dayModalEmpty}>
-                    <Ionicons name="calendar-outline" size={40} color={colors.neutral[300]} />
-                    <Text style={styles.dayModalEmptyText}>Sin hábitos ese día</Text>
+                    <Ionicons name="calendar-outline" size={40} color={palette.iconSubtle} />
+                    <Text style={[styles.dayModalEmptyText, { color: palette.textMuted }]}>Sin hábitos ese día</Text>
                   </View>
                 )}
               </ScrollView>

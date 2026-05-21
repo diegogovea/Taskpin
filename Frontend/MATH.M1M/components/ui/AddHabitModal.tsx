@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, radius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // ── Constants ──────────────────────────────────────────────
 const FREQ_UNITS = ['días', 'semanas', 'meses', 'año'] as const;
@@ -82,6 +83,7 @@ interface Props {
 
 // ── Component ────────────────────────────────────────────────
 export default function AddHabitModal({ visible, habito, categoryColor, onConfirm, onCancel }: Props) {
+  const { palette } = useTheme();
   const [freqN, setFreqN] = useState('1');
   const [freqUnit, setFreqUnit] = useState<FreqUnit>('días');
   const [color, setColor] = useState<string | null>(categoryColor || null);
@@ -136,12 +138,12 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <SafeHeader accentColor={accentColor} nombre={habito.nombre} onCancel={onCancel} onConfirm={handleConfirm} />
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.scroll, { backgroundColor: palette.bg }]} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {/* Descripción */}
           {habito.descripcion ? (
-            <View style={styles.descCard}>
-              <Ionicons name="information-circle-outline" size={15} color={colors.neutral[400]} />
-              <Text style={styles.descText}>{habito.descripcion}</Text>
+            <View style={[styles.descCard, { backgroundColor: palette.surfaceAlt }]}>
+              <Ionicons name="information-circle-outline" size={15} color={palette.icon} />
+              <Text style={[styles.descText, { color: palette.textMuted }]}>{habito.descripcion}</Text>
             </View>
           ) : null}
 
@@ -150,7 +152,7 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
             <View style={styles.freqRow}>
               <Text style={styles.freqPrefix}>Cada</Text>
               <TextInput
-                style={styles.freqInput}
+                style={[styles.freqInput, { borderColor: palette.border, backgroundColor: palette.inputBg, color: palette.text }]}
                 keyboardType="number-pad"
                 value={freqN}
                 onChangeText={(t) => setFreqN(t.replace(/[^0-9]/g, '') || '1')}
@@ -177,9 +179,9 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
           <Section label="Fechas">
             {/* Inicio */}
             <Text style={styles.subLabel}>Fecha de inicio</Text>
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowInicioPicker(true)}>
+            <TouchableOpacity style={[styles.dateBtn, { backgroundColor: palette.surface, borderColor: palette.border }]} onPress={() => setShowInicioPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={accentColor} />
-              <Text style={styles.dateBtnText}>{formatDateDisplay(fechaInicio)}</Text>
+              <Text style={[styles.dateBtnText, { color: palette.text }]}>{formatDateDisplay(fechaInicio)}</Text>
             </TouchableOpacity>
             {showInicioPicker && (
               <DateTimePicker
@@ -195,9 +197,9 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
 
             {/* Fin */}
             <Text style={[styles.subLabel, { marginTop: spacing[4] }]}>Fecha de fin (opcional)</Text>
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowFinPicker(true)}>
-              <Ionicons name="calendar-clear-outline" size={18} color={fechaFin ? accentColor : colors.neutral[400]} />
-              <Text style={[styles.dateBtnText, !fechaFin && { color: colors.neutral[400] }]}>
+            <TouchableOpacity style={[styles.dateBtn, { backgroundColor: palette.surface, borderColor: palette.border }]} onPress={() => setShowFinPicker(true)}>
+              <Ionicons name="calendar-clear-outline" size={18} color={fechaFin ? accentColor : palette.textSubtle} />
+              <Text style={[styles.dateBtnText, { color: fechaFin ? palette.text : palette.textSubtle }]}>
                 {fechaFin ? formatDateDisplay(fechaFin) : 'Sin fecha límite'}
               </Text>
             </TouchableOpacity>
@@ -225,17 +227,17 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
           <Section label="Meta diaria (opcional)">
             <View style={styles.metaRow}>
               <TextInput
-                style={[styles.metaInput, { flex: 1 }]}
+                style={[styles.metaInput, { flex: 1, backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                 placeholder="Ej: 30"
-                placeholderTextColor={colors.neutral[400]}
+                placeholderTextColor={palette.textSubtle}
                 keyboardType="decimal-pad"
                 value={metaValor}
                 onChangeText={setMetaValor}
               />
               <TextInput
-                style={[styles.metaInput, { flex: 2 }]}
+                style={[styles.metaInput, { flex: 2, backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                 placeholder="Ej: minutos, vasos, km..."
-                placeholderTextColor={colors.neutral[400]}
+                placeholderTextColor={palette.textSubtle}
                 value={metaUnidad}
                 onChangeText={setMetaUnidad}
               />
@@ -310,14 +312,15 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
 function SafeHeader({ accentColor, nombre, onCancel, onConfirm }: {
   accentColor: string; nombre: string; onCancel: () => void; onConfirm: () => void;
 }) {
+  const { palette } = useTheme();
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
       <TouchableOpacity onPress={onCancel} style={styles.headerBtn}>
         <Text style={styles.headerCancel}>Cancelar</Text>
       </TouchableOpacity>
       <View style={styles.headerCenter}>
-        <Text style={styles.headerTitle} numberOfLines={1}>{nombre}</Text>
-        <Text style={styles.headerSub}>Configura el hábito</Text>
+        <Text style={[styles.headerTitle, { color: palette.heading }]} numberOfLines={1}>{nombre}</Text>
+        <Text style={[styles.headerSub, { color: palette.textSubtle }]}>Configura el hábito</Text>
       </View>
       <TouchableOpacity onPress={onConfirm} style={[styles.headerBtn, styles.headerConfirmBtn, { backgroundColor: accentColor }]}>
         <Text style={styles.headerConfirm}>Agregar</Text>
@@ -327,9 +330,10 @@ function SafeHeader({ accentColor, nombre, onCancel, onConfirm }: {
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  const { palette } = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{label}</Text>
+      <Text style={[styles.sectionLabel, { color: palette.heading }]}>{label}</Text>
       {children}
     </View>
   );

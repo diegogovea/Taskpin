@@ -79,7 +79,7 @@ export default function TabsLayout() {
   // Mientras verifica sesión, mostrar loading
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]}>
         <ActivityIndicator size="large" color={colors.primary[600]} />
       </View>
     );

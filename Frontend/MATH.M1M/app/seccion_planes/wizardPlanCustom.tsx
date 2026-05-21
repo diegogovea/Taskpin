@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // =====================
 // INTERFACES
@@ -96,6 +97,7 @@ const formatDate = (d: Date) =>
 export default function WizardPlanCustom() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -355,15 +357,15 @@ export default function WizardPlanCustom() {
   // ── STEP 1 ──
   const renderStep1 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <Text style={styles.stepTitle}>¿Cuál es tu meta?</Text>
-      <Text style={styles.stepSubtitle}>Dale a tu plan un objetivo claro</Text>
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>¿Cuál es tu meta?</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>Dale a tu plan un objetivo claro</Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Meta Principal *</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Meta Principal *</Text>
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
           placeholder="Ej: Aprender a tocar guitarra"
-          placeholderTextColor={colors.neutral[400]}
+          placeholderTextColor={palette.textSubtle}
           value={config.meta_principal}
           onChangeText={(t) => { setConfig({ ...config, meta_principal: t }); setStepError(''); }}
           maxLength={100}
@@ -371,11 +373,11 @@ export default function WizardPlanCustom() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Descripción (opcional)</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Descripción (opcional)</Text>
         <TextInput
           style={[styles.textInput, styles.textArea]}
           placeholder="Describe lo que quieres lograr..."
-          placeholderTextColor={colors.neutral[400]}
+          placeholderTextColor={palette.textSubtle}
           value={config.descripcion}
           onChangeText={(t) => setConfig({ ...config, descripcion: t })}
           multiline
@@ -383,7 +385,7 @@ export default function WizardPlanCustom() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Duración total</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Duración total</Text>
         {/* Chips de sugerencia */}
         <View style={styles.chipRow}>
           {DURACIONES_SUGERIDAS.map((d) => (
@@ -417,7 +419,7 @@ export default function WizardPlanCustom() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Dificultad</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Dificultad</Text>
         <View style={styles.chipRow}>
           {DIFICULTADES.map((d) => (
             <TouchableOpacity
@@ -438,8 +440,8 @@ export default function WizardPlanCustom() {
   // ── STEP 2 ──
   const renderStep2 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Divídelo en fases</Text>
-      <Text style={styles.stepSubtitle}>
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>Divídelo en fases</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>
         Plan de {config.plazo_dias} días — divide el tiempo en etapas
       </Text>
 
@@ -485,8 +487,8 @@ export default function WizardPlanCustom() {
   // ── STEP 3 ──
   const renderStep3 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Agrega tareas a cada fase</Text>
-      <Text style={styles.stepSubtitle}>Define lo que harás en cada etapa</Text>
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>Agrega tareas a cada fase</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>Define lo que harás en cada etapa</Text>
 
       {config.fases.map((fase, faseIndex) => (
         <View key={fase.id} style={styles.faseTasksCard}>
@@ -555,11 +557,11 @@ export default function WizardPlanCustom() {
             {editingFaseId === 'new' ? 'Nueva Fase' : 'Editar Fase'}
           </Text>
 
-          <Text style={styles.inputLabel}>Título *</Text>
+          <Text style={[styles.inputLabel, { color: palette.text }]}>Título *</Text>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
             placeholder="Ej: Fundamentos"
-            placeholderTextColor={colors.neutral[400]}
+            placeholderTextColor={palette.textSubtle}
             value={tempFase.titulo}
             onChangeText={(t) => { setTempFase({ ...tempFase, titulo: t }); setFaseError(''); }}
           />
@@ -568,14 +570,14 @@ export default function WizardPlanCustom() {
           <TextInput
             style={[styles.textInput, styles.textArea, { marginBottom: spacing[3] }]}
             placeholder="¿Qué harás en esta fase?"
-            placeholderTextColor={colors.neutral[400]}
+            placeholderTextColor={palette.textSubtle}
             value={tempFase.descripcion}
             onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
             multiline
           />
 
           <View style={styles.durationRow}>
-            <Text style={styles.inputLabel}>Duración:</Text>
+            <Text style={[styles.inputLabel, { color: palette.text }]}>Duración:</Text>
             <TextInput
               style={styles.smallInput}
               keyboardType="number-pad"
@@ -583,7 +585,7 @@ export default function WizardPlanCustom() {
               onChangeText={(t) => { setTempFase({ ...tempFase, duracion_dias: t.replace(/[^0-9]/g, '') }); setFaseError(''); }}
               selectTextOnFocus
             />
-            <Text style={styles.inputLabel}>días</Text>
+            <Text style={[styles.inputLabel, { color: palette.text }]}>días</Text>
           </View>
           <Text style={styles.durationHint}>
             Días disponibles: {diasRestantes + (editingFaseId !== 'new' ? (config.fases.find(f => f.id === editingFaseId)?.duracion_dias || 0) : 0)}
@@ -619,11 +621,11 @@ export default function WizardPlanCustom() {
           </Text>
 
           {/* Título */}
-          <Text style={styles.inputLabel}>Título *</Text>
+          <Text style={[styles.inputLabel, { color: palette.text }]}>Título *</Text>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
             placeholder="¿Qué vas a hacer?"
-            placeholderTextColor={colors.neutral[400]}
+            placeholderTextColor={palette.textSubtle}
             value={tempTarea.titulo || ''}
             onChangeText={(t) => { setTempTarea({ ...tempTarea, titulo: t }); setTareaError(''); }}
           />
@@ -633,7 +635,7 @@ export default function WizardPlanCustom() {
           <TextInput
             style={[styles.textInput, styles.textArea, { marginBottom: 0 }]}
             placeholder="Más detalles de la tarea..."
-            placeholderTextColor={colors.neutral[400]}
+            placeholderTextColor={palette.textSubtle}
             value={tempTarea.descripcion || ''}
             onChangeText={(t) => setTempTarea({ ...tempTarea, descripcion: t })}
             multiline
@@ -706,7 +708,7 @@ export default function WizardPlanCustom() {
           <TextInput
             style={[styles.textInput, styles.textArea]}
             placeholder="Recordatorios, recursos, links..."
-            placeholderTextColor={colors.neutral[400]}
+            placeholderTextColor={palette.textSubtle}
             value={tempTarea.notas || ''}
             onChangeText={(t) => setTempTarea({ ...tempTarea, notas: t })}
             multiline
@@ -731,14 +733,14 @@ export default function WizardPlanCustom() {
   // RENDER
   // =====================
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+        <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crear Plan Personalizado</Text>
+          <Text style={[styles.headerTitle, { color: palette.heading }]}>Crear Plan Personalizado</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -757,7 +759,7 @@ export default function WizardPlanCustom() {
         )}
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
           {step < 3 ? (
             <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
               <Text style={styles.nextButtonText}>Continuar</Text>

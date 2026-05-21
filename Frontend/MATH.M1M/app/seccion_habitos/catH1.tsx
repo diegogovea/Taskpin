@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { Toast } from "../../components/ui";
 import AddHabitModal, { HabitConfig } from "../../components/ui/AddHabitModal";
 
@@ -40,6 +41,7 @@ const CATEGORY_DESCRIPTION = "Autocuidado y rutinas saludables para la vida diar
 export default function CatH1Screen() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   const [habitos, setHabitos] = useState<Habito[]>([]);
   const [recomendados, setRecomendados] = useState<Recomendacion[]>([]);
@@ -132,7 +134,7 @@ export default function CatH1Screen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={CATEGORY_COLOR} />
           <Text style={styles.loadingText}>Cargando hábitos...</Text>
@@ -142,10 +144,10 @@ export default function CatH1Screen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <View style={[styles.header, { backgroundColor: palette.surface }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
       </View>
 
@@ -155,8 +157,8 @@ export default function CatH1Screen() {
           <View style={[styles.categoryIconContainer, { backgroundColor: CATEGORY_COLOR + "15" }]}>
             <Ionicons name={CATEGORY_ICON as any} size={32} color={CATEGORY_COLOR} />
           </View>
-          <Text style={styles.categoryTitle}>{CATEGORY_NAME}</Text>
-          <Text style={styles.categoryDescription}>{CATEGORY_DESCRIPTION}</Text>
+          <Text style={[styles.categoryTitle, { color: palette.heading }]}>{CATEGORY_NAME}</Text>
+          <Text style={[styles.categoryDescription, { color: palette.textMuted }]}>{CATEGORY_DESCRIPTION}</Text>
         </View>
 
         {/* IA Recomendados */}
@@ -164,7 +166,7 @@ export default function CatH1Screen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="sparkles" size={16} color={CATEGORY_COLOR} />
-              <Text style={styles.sectionTitle}>Recomendados para ti</Text>
+              <Text style={[styles.sectionTitle, { color: palette.heading }]}>Recomendados para ti</Text>
             </View>
             {recomendados.map((rec) => {
               const isAdded = alreadyAddedIds.includes(rec.habito_id);
@@ -209,7 +211,7 @@ export default function CatH1Screen() {
         {/* All habits */}
         <View style={styles.section}>
           {recomendados.length > 0 && (
-            <Text style={styles.sectionTitle}>Todos los hábitos</Text>
+            <Text style={[styles.sectionTitle, { color: palette.heading }]}>Todos los hábitos</Text>
           )}
           <View style={styles.habitsContainer}>
             {habitos.map((habito) => {

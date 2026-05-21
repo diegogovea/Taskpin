@@ -261,7 +261,7 @@ export default function AIScreen() {
             activeOpacity={1}
             onPress={() => setActiveTooltip(null)}
           >
-            <View style={styles.tooltipCard}>
+            <View style={[styles.tooltipCard, { backgroundColor: palette.surface }]}>
               {activeTooltip && (
                 <>
                   <View style={[styles.tooltipIconWrap, { backgroundColor: TOOLTIP_INFO[activeTooltip].color + "15" }]}>
@@ -271,8 +271,8 @@ export default function AIScreen() {
                       color={TOOLTIP_INFO[activeTooltip].color}
                     />
                   </View>
-                  <Text style={styles.tooltipTitle}>{TOOLTIP_INFO[activeTooltip].title}</Text>
-                  <Text style={styles.tooltipBody}>{TOOLTIP_INFO[activeTooltip].body}</Text>
+                  <Text style={[styles.tooltipTitle, { color: palette.heading }]}>{TOOLTIP_INFO[activeTooltip].title}</Text>
+                  <Text style={[styles.tooltipBody, { color: palette.textMuted }]}>{TOOLTIP_INFO[activeTooltip].body}</Text>
                 </>
               )}
               <TouchableOpacity
@@ -293,15 +293,15 @@ export default function AIScreen() {
           onRequestClose={() => setShowSugeridosInfo(false)}
         >
           <TouchableOpacity style={styles.tooltipOverlay} activeOpacity={1} onPress={() => setShowSugeridosInfo(false)}>
-            <View style={styles.tooltipCard}>
-              <Text style={styles.tooltipTitle}>¿Qué son los Hábitos Sugeridos?</Text>
-              <Text style={styles.tooltipText}>
+            <View style={[styles.tooltipCard, { backgroundColor: palette.surface }]}>
+              <Text style={[styles.tooltipTitle, { color: palette.heading }]}>¿Qué son los Hábitos Sugeridos?</Text>
+              <Text style={[styles.tooltipText, { color: palette.textMuted }]}>
                 Estos hábitos son recomendados por nuestra IA basándose en hábitos que otras personas con un perfil similar al tuyo han adoptado con éxito.{"\n\n"}
                 El porcentaje de <Text style={{ fontWeight: "700" }}>coincidencia</Text> indica qué tan compatible es cada hábito con tu perfil, historial y objetivos actuales. A mayor porcentaje, mejor se adapta a ti.{"\n\n"}
                 Pulsa el ➕ para agregar un hábito sugerido a tu lista, o toca la fila para ver sus detalles y modificarlo antes de añadirlo.
               </Text>
-              <TouchableOpacity style={styles.tooltipClose} onPress={() => setShowSugeridosInfo(false)}>
-                <Text style={styles.tooltipCloseText}>Entendido</Text>
+              <TouchableOpacity style={[styles.tooltipClose, { backgroundColor: palette.surfaceAlt }]} onPress={() => setShowSugeridosInfo(false)}>
+                <Text style={[styles.tooltipCloseText, { color: palette.textMuted }]}>Entendido</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -310,9 +310,9 @@ export default function AIScreen() {
         {/* Recommendations Section */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Hábitos Sugeridos</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Hábitos Sugeridos</Text>
             <TouchableOpacity onPress={() => setShowSugeridosInfo(true)} style={styles.infoBtn}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.neutral[400]} />
+              <Ionicons name="information-circle-outline" size={20} color={palette.icon} />
             </TouchableOpacity>
           </View>
 
@@ -328,7 +328,7 @@ export default function AIScreen() {
             recomendaciones.map((rec, index) => (
               <View
                 key={rec.habito_id}
-                style={[styles.habitCard, index === 0 && styles.habitCardHighlight]}
+                style={[styles.habitCard, { backgroundColor: palette.surface }, index === 0 && styles.habitCardHighlight]}
               >
                 <View style={styles.habitContent}>
                   {/* Botón agregar */}
@@ -353,7 +353,7 @@ export default function AIScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <View style={styles.habitNameRow}>
-                        <Text style={styles.habitName}>{rec.nombre}</Text>
+                        <Text style={[styles.habitName, { color: palette.text }]}>{rec.nombre}</Text>
                         {index === 0 && (
                           <View style={styles.topBadge}>
                             <Ionicons name="star" size={10} color={colors.neutral[0]} />
@@ -362,14 +362,14 @@ export default function AIScreen() {
                         )}
                       </View>
                       <View style={styles.habitMeta}>
-                        <Text style={styles.habitCategory}>{rec.categoria || "Sin categoría"}</Text>
+                        <Text style={[styles.habitCategory, { color: palette.textMuted }]}>{rec.categoria || "Sin categoría"}</Text>
                         <View style={styles.habitPoints}>
                           <Ionicons name="people" size={12} color={colors.primary[500]} />
                           <Text style={styles.habitPointsText}>{Math.round(rec.score * 100)}% coincidencia</Text>
                         </View>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.neutral[300]} />
+                    <Ionicons name="chevron-forward" size={20} color={palette.iconSubtle} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -384,11 +384,11 @@ export default function AIScreen() {
 
           {predicciones.length === 0 ? (
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="fitness-outline" size={48} color={colors.neutral[300]} />
+              <View style={[styles.emptyIconContainer, { backgroundColor: palette.surfaceAlt }]}>
+                <Ionicons name="fitness-outline" size={48} color={palette.iconSubtle} />
               </View>
-              <Text style={styles.emptyTitle}>Sin predicciones aún</Text>
-              <Text style={styles.emptySubtitle}>Agrega hábitos para ver predicciones de éxito</Text>
+              <Text style={[styles.emptyTitle, { color: palette.text }]}>Sin predicciones aún</Text>
+              <Text style={[styles.emptySubtitle, { color: palette.textMuted }]}>Agrega hábitos para ver predicciones de éxito</Text>
             </View>
           ) : (
             predicciones.map((pred) => (
@@ -417,7 +417,7 @@ export default function AIScreen() {
                     {Math.round(pred.probabilidad * 100)}%
                   </Text>
                 </View>
-                <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarBg, { backgroundColor: palette.surfaceAlt }]}>
                   <LinearGradient
                     colors={
                       pred.probabilidad >= 0.6

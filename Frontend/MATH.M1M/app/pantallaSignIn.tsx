@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 import { useTutorial } from "../contexts/TutorialContext";
 
 interface FieldErrors {
@@ -28,6 +29,7 @@ export default function SignInScreen() {
   const router = useRouter();
   const { register, user, isLoading: authLoading } = useAuth();
   const { scheduleTutorial } = useTutorial();
+  const { isDark, palette } = useTheme();
 
   useEffect(() => {
     if (!authLoading && user) router.replace("/(tabs)/home");
@@ -145,7 +147,7 @@ export default function SignInScreen() {
   const hasError = (field: keyof FieldErrors) => errors[field] !== "";
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <KeyboardAvoidingView style={[styles.container, { backgroundColor: isDark ? '#121212' : colors.neutral[50] }]} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/login")}>
@@ -160,8 +162,8 @@ export default function SignInScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Crear cuenta</Text>
-            <Text style={styles.subtitle}>Comienza tu camino hacia mejores hábitos hoy</Text>
+            <Text style={[styles.title, { color: palette.heading }]}>Crear cuenta</Text>
+            <Text style={[styles.subtitle, { color: palette.textMuted }]}>Comienza tu camino hacia mejores hábitos hoy</Text>
           </View>
 
           {/* ── Server Error Banner ── */}
@@ -185,9 +187,9 @@ export default function SignInScreen() {
               <View style={[styles.inputContainer, nameFocused && styles.inputContainerFocused, hasError("nombre") && styles.inputContainerError]}>
                 <Ionicons name="person-outline" size={20} color={hasError("nombre") ? "#EF4444" : nameFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                   placeholder="Tu nombre"
-                  placeholderTextColor={colors.neutral[400]}
+                  placeholderTextColor={palette.textSubtle}
                   value={nombre}
                   onChangeText={t => { setNombre(t); if (errors.nombre) setErrors(p => ({ ...p, nombre: "" })); }}
                   autoCapitalize="words"
@@ -204,9 +206,9 @@ export default function SignInScreen() {
               <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused, hasError("correo") && styles.inputContainerError]}>
                 <Ionicons name="mail-outline" size={20} color={hasError("correo") ? "#EF4444" : emailFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                   placeholder="tucorreo@email.com"
-                  placeholderTextColor={colors.neutral[400]}
+                  placeholderTextColor={palette.textSubtle}
                   keyboardType="email-address"
                   value={correo}
                   onChangeText={t => { setCorreo(t); if (errors.correo) setErrors(p => ({ ...p, correo: "" })); }}
@@ -225,9 +227,9 @@ export default function SignInScreen() {
               <View style={[styles.inputContainer, passwordFocused && styles.inputContainerFocused, hasError("contraseña") && styles.inputContainerError]}>
                 <Ionicons name="lock-closed-outline" size={20} color={hasError("contraseña") ? "#EF4444" : passwordFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                   placeholder="Mínimo 8 caracteres"
-                  placeholderTextColor={colors.neutral[400]}
+                  placeholderTextColor={palette.textSubtle}
                   secureTextEntry={!showPassword}
                   value={contraseña}
                   onChangeText={t => { setContraseña(t); if (errors.contraseña) setErrors(p => ({ ...p, contraseña: "" })); }}
@@ -258,9 +260,9 @@ export default function SignInScreen() {
               <View style={[styles.inputContainer, confirmFocused && styles.inputContainerFocused, hasError("confirmar") && styles.inputContainerError]}>
                 <Ionicons name="lock-closed-outline" size={20} color={hasError("confirmar") ? "#EF4444" : confirmFocused ? colors.primary[600] : colors.neutral[400]} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
                   placeholder="Repite tu contraseña"
-                  placeholderTextColor={colors.neutral[400]}
+                  placeholderTextColor={palette.textSubtle}
                   secureTextEntry={!showConfirmPassword}
                   value={confirmarContraseña}
                   onChangeText={t => { setConfirmarContraseña(t); if (errors.confirmar) setErrors(p => ({ ...p, confirmar: "" })); }}

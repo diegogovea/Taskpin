@@ -38,10 +38,12 @@ interface Achievement {
 
 // ── Componente reutilizable para cada logro ──
 function AchievementCard({ achievement, large }: { achievement: Achievement; large?: boolean }) {
+  const { palette } = useTheme();
   return (
     <View
       style={[
         styles.achievementItem,
+        { backgroundColor: palette.surface },
         large && styles.achievementItemLarge,
         !achievement.unlocked && styles.achievementLocked,
       ]}
@@ -50,25 +52,26 @@ function AchievementCard({ achievement, large }: { achievement: Achievement; lar
         style={[
           styles.achievementIcon,
           large && styles.achievementIconLarge,
-          { backgroundColor: achievement.unlocked ? achievement.color + "20" : colors.neutral[100] },
+          { backgroundColor: achievement.unlocked ? achievement.color + "20" : palette.surfaceAlt },
         ]}
       >
         <Ionicons
           name={achievement.icon as any}
           size={large ? 28 : 24}
-          color={achievement.unlocked ? achievement.color : colors.neutral[300]}
+          color={achievement.unlocked ? achievement.color : palette.iconSubtle}
         />
       </View>
       <Text
         style={[
           styles.achievementName,
+          { color: achievement.unlocked ? palette.text : palette.textSubtle },
           !achievement.unlocked && styles.achievementNameLocked,
         ]}
         numberOfLines={2}
       >
         {achievement.name}
       </Text>
-      <Text style={styles.achievementDesc} numberOfLines={2}>
+      <Text style={[styles.achievementDesc, { color: palette.textMuted }]} numberOfLines={2}>
         {achievement.description}
       </Text>
       {achievement.unlocked && (
@@ -471,14 +474,14 @@ export default function PerfilScreen() {
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: palette.bg }]}>
           {/* Handle + header */}
-          <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
-            <Text style={styles.modalTitle}>Todos los logros</Text>
-            <Text style={styles.modalSubtitle}>{unlockedCount} de {achievements.length} desbloqueados</Text>
+          <View style={[styles.modalHeader, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
+            <Text style={[styles.modalTitle, { color: palette.heading }]}>Todos los logros</Text>
+            <Text style={[styles.modalSubtitle, { color: palette.textMuted }]}>{unlockedCount} de {achievements.length} desbloqueados</Text>
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setShowAllAchievements(false)}
             >
-              <Ionicons name="close" size={22} color={colors.neutral[600]} />
+              <Ionicons name="close" size={22} color={palette.icon} />
             </TouchableOpacity>
           </View>
 
@@ -488,7 +491,7 @@ export default function PerfilScreen() {
           >
             {Object.entries(achievementsByCategory).map(([category, items]) => (
               <View key={category} style={styles.modalCategory}>
-                <Text style={styles.modalCategoryTitle}>{category}</Text>
+                <Text style={[styles.modalCategoryTitle, { color: palette.textMuted }]}>{category}</Text>
                 <View style={styles.achievementsGrid}>
                   {items.map((achievement) => (
                     <AchievementCard key={achievement.id} achievement={achievement} large />

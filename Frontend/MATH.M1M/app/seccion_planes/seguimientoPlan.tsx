@@ -21,6 +21,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmModal from "../../components/modals/ConfirmModal";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // =====================
 // INTERFACES
@@ -87,6 +88,7 @@ export default function SeguimientoPlanScreen() {
   const router = useRouter();
   const { planUsuarioId, titulo } = useLocalSearchParams();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
   
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -376,7 +378,7 @@ export default function SeguimientoPlanScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
           <Text style={styles.loadingText}>Cargando tu progreso...</Text>
@@ -406,20 +408,20 @@ export default function SeguimientoPlanScreen() {
   // =====================
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+      <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
+          <Text style={[styles.headerTitle, { color: palette.heading }]} numberOfLines={1}>
             {titulo ? decodeURIComponent(titulo as string) : dashboard.meta_principal}
           </Text>
         </View>
         {estadoPlan !== "completado" && estadoPlan !== "cancelado" ? (
-          <TouchableOpacity style={styles.menuButton} onPress={() => setShowActionMenu(true)}>
-            <Ionicons name="ellipsis-vertical" size={22} color={colors.neutral[700]} />
+          <TouchableOpacity style={[styles.menuButton, { backgroundColor: palette.surfaceAlt }]} onPress={() => setShowActionMenu(true)}>
+            <Ionicons name="ellipsis-vertical" size={22} color={palette.text} />
           </TouchableOpacity>
         ) : (
           <View style={{ width: 44 }} />
@@ -546,7 +548,7 @@ export default function SeguimientoPlanScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="checkbox-outline" size={20} color={colors.primary[600]} />
-              <Text style={styles.sectionTitle}>Tareas de Hoy</Text>
+              <Text style={[styles.sectionTitle, { color: palette.heading }]}>Tareas de Hoy</Text>
             </View>
             <View style={styles.sectionBadge}>
               <Text style={styles.sectionBadgeText}>
@@ -558,14 +560,14 @@ export default function SeguimientoPlanScreen() {
           {dashboard.tareas_hoy.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="checkmark-done-circle" size={40} color={colors.secondary[400]} />
-              <Text style={styles.emptyTitle}>Sin tareas para hoy</Text>
+              <Text style={[styles.emptyTitle, { color: palette.textMuted }]}>Sin tareas para hoy</Text>
             </View>
           ) : (
             <View style={styles.itemsList}>
               {dashboard.tareas_hoy.map((tarea) => (
                 <TouchableOpacity
                   key={tarea.tarea_id}
-                  style={[styles.itemCard, tarea.completada && styles.itemCardCompleted]}
+                  style={[styles.itemCard, { backgroundColor: palette.surface }, tarea.completada && styles.itemCardCompleted]}
                   activeOpacity={0.8}
                   onPress={() => toggleTarea(tarea.tarea_id)}
                   disabled={togglingTask === tarea.tarea_id}
@@ -578,14 +580,14 @@ export default function SeguimientoPlanScreen() {
                     ) : null}
                   </View>
                   <View style={styles.itemContent}>
-                    <Text style={[styles.itemText, tarea.completada && styles.itemTextCompleted]}>
+                    <Text style={[styles.itemText, { color: palette.text }, tarea.completada && styles.itemTextCompleted]}>
                       {tarea.titulo}
                     </Text>
                     {tarea.descripcion && (
-                      <Text style={styles.itemDescription} numberOfLines={2}>{tarea.descripcion}</Text>
+                      <Text style={[styles.itemDescription, { color: palette.textMuted }]} numberOfLines={2}>{tarea.descripcion}</Text>
                     )}
                     {tarea.completada && tarea.hora_completada && (
-                      <Text style={styles.itemTime}>✓ {tarea.hora_completada}</Text>
+                      <Text style={[styles.itemTime, { color: palette.textSubtle }]}>✓ {tarea.hora_completada}</Text>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -602,7 +604,7 @@ export default function SeguimientoPlanScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <Ionicons name="refresh" size={20} color={colors.secondary[600]} />
-                <Text style={styles.sectionTitle}>Hábitos del Plan</Text>
+                <Text style={[styles.sectionTitle, { color: palette.heading }]}>Hábitos del Plan</Text>
               </View>
               <View style={[styles.sectionBadge, { backgroundColor: colors.secondary[100] }]}>
                 <Text style={[styles.sectionBadgeText, { color: colors.secondary[600] }]}>
@@ -672,62 +674,61 @@ export default function SeguimientoPlanScreen() {
       {/* Action Menu Modal */}
       <Modal visible={showActionMenu} transparent animationType="fade" onRequestClose={() => setShowActionMenu(false)}>
         <Pressable style={styles.actionMenuOverlay} onPress={() => setShowActionMenu(false)}>
-          <View style={styles.actionMenuContainer}>
-            <View style={styles.actionMenuHeader}>
-              <Text style={styles.actionMenuTitle}>Opciones del Plan</Text>
+          <View style={[styles.actionMenuContainer, { backgroundColor: palette.surface }]}>
+            <View style={[styles.actionMenuHeader, { borderBottomColor: palette.border }]}>
+              <Text style={[styles.actionMenuTitle, { color: palette.heading }]}>Opciones del Plan</Text>
             </View>
 
-            {/* Editar Plan — siempre disponible si está activo o pausado */}
             {(estadoPlan === "activo" || estadoPlan === "pausado") && (
-              <TouchableOpacity style={styles.actionMenuItem} onPress={abrirEditarPlan}>
-                <View style={[styles.actionMenuIcon, { backgroundColor: colors.primary[100] }]}>
+              <TouchableOpacity style={[styles.actionMenuItem, { borderBottomColor: palette.divider }]} onPress={abrirEditarPlan}>
+                <View style={[styles.actionMenuIcon, { backgroundColor: colors.primary[50] }]}>
                   <Ionicons name="create-outline" size={22} color={colors.primary[600]} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={styles.actionMenuItemText}>Editar Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Ajusta la fecha objetivo</Text>
+                  <Text style={[styles.actionMenuItemText, { color: palette.text }]}>Editar Plan</Text>
+                  <Text style={[styles.actionMenuItemSubtext, { color: palette.textMuted }]}>Ajusta la fecha objetivo</Text>
                 </View>
               </TouchableOpacity>
             )}
             
             {estadoPlan === "activo" && (
-              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("pausar")}>
+              <TouchableOpacity style={[styles.actionMenuItem, { borderBottomColor: palette.divider }]} onPress={() => handleAccion("pausar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.accent.amber + '15' }]}>
                   <Ionicons name="pause-circle" size={22} color={colors.accent.amber} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={styles.actionMenuItemText}>Pausar Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Toma un descanso, reanuda cuando quieras</Text>
+                  <Text style={[styles.actionMenuItemText, { color: palette.text }]}>Pausar Plan</Text>
+                  <Text style={[styles.actionMenuItemSubtext, { color: palette.textMuted }]}>Toma un descanso, reanuda cuando quieras</Text>
                 </View>
               </TouchableOpacity>
             )}
             
             {estadoPlan === "pausado" && (
-              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("reanudar")}>
+              <TouchableOpacity style={[styles.actionMenuItem, { borderBottomColor: palette.divider }]} onPress={() => handleAccion("reanudar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.secondary[500] + '15' }]}>
                   <Ionicons name="play-circle" size={22} color={colors.secondary[500]} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
-                  <Text style={styles.actionMenuItemText}>Reanudar Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Continúa tu camino</Text>
+                  <Text style={[styles.actionMenuItemText, { color: palette.text }]}>Reanudar Plan</Text>
+                  <Text style={[styles.actionMenuItemSubtext, { color: palette.textMuted }]}>Continúa tu camino</Text>
                 </View>
               </TouchableOpacity>
             )}
             
             {(estadoPlan === "activo" || estadoPlan === "pausado") && (
-              <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleAccion("cancelar")}>
+              <TouchableOpacity style={[styles.actionMenuItem, { borderBottomColor: palette.divider }]} onPress={() => handleAccion("cancelar")}>
                 <View style={[styles.actionMenuIcon, { backgroundColor: colors.semantic.error + '15' }]}>
                   <Ionicons name="close-circle" size={22} color={colors.semantic.error} />
                 </View>
                 <View style={styles.actionMenuTextContainer}>
                   <Text style={[styles.actionMenuItemText, { color: colors.semantic.error }]}>Cancelar Plan</Text>
-                  <Text style={styles.actionMenuItemSubtext}>Esto no se puede deshacer</Text>
+                  <Text style={[styles.actionMenuItemSubtext, { color: palette.textMuted }]}>Esto no se puede deshacer</Text>
                 </View>
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={styles.actionMenuCloseButton} onPress={() => setShowActionMenu(false)}>
-              <Text style={styles.actionMenuCloseText}>Cerrar</Text>
+            <TouchableOpacity style={[styles.actionMenuCloseButton, { backgroundColor: palette.surfaceAlt }]} onPress={() => setShowActionMenu(false)}>
+              <Text style={[styles.actionMenuCloseText, { color: palette.textMuted }]}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -744,32 +745,32 @@ export default function SeguimientoPlanScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.editModalOverlay}
         >
-          <View style={styles.editModalSheet}>
-            <View style={styles.editModalHandle} />
-            <Text style={styles.editModalTitle}>Editar Plan</Text>
-            <Text style={styles.editModalSubtitle}>
+          <View style={[styles.editModalSheet, { backgroundColor: palette.surface }]}>
+            <View style={[styles.editModalHandle, { backgroundColor: palette.border }]} />
+            <Text style={[styles.editModalTitle, { color: palette.heading }]}>Editar Plan</Text>
+            <Text style={[styles.editModalSubtitle, { color: palette.textMuted }]}>
               Ajusta la fecha en la que quieres alcanzar tu objetivo
             </Text>
 
-            <Text style={styles.editModalLabel}>Fecha objetivo</Text>
+            <Text style={[styles.editModalLabel, { color: palette.text }]}>Fecha objetivo</Text>
             <TextInput
-              style={styles.editModalInput}
+              style={[styles.editModalInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
               value={editFechaObjetivo}
               onChangeText={setEditFechaObjetivo}
               placeholder="AAAA-MM-DD  (ej. 2026-12-31)"
-              placeholderTextColor={colors.neutral[400]}
+              placeholderTextColor={palette.textSubtle}
               keyboardType="numeric"
               maxLength={10}
               autoFocus
             />
-            <Text style={styles.editModalHint}>Formato: Año-Mes-Día</Text>
+            <Text style={[styles.editModalHint, { color: palette.textSubtle }]}>Formato: Año-Mes-Día</Text>
 
             <View style={styles.editModalButtons}>
               <TouchableOpacity
-                style={styles.editModalCancelBtn}
+                style={[styles.editModalCancelBtn, { backgroundColor: palette.surfaceAlt }]}
                 onPress={() => setShowEditModal(false)}
               >
-                <Text style={styles.editModalCancelText}>Cancelar</Text>
+                <Text style={[styles.editModalCancelText, { color: palette.textMuted }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.editModalSaveBtn, guardandoEdicion && { opacity: 0.6 }]}
