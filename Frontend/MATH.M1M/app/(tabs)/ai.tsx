@@ -10,6 +10,9 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -17,6 +20,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const PRESET_COLORS = [
+  '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
+  '#F97316', '#F59E0B', '#10B981', '#14B8A6',
+  '#3B82F6', '#06B6D4', '#84CC16', '#64748B',
+];
+
+const PRESET_ICONS = [
+  'leaf-outline',       'fitness-outline',    'barbell-outline',    'bicycle-outline',
+  'heart-outline',      'water-outline',      'moon-outline',       'sunny-outline',
+  'book-outline',       'musical-notes-outline','brush-outline',    'code-outline',
+  'fast-food-outline',  'walk-outline',       'medkit-outline',     'sparkles-outline',
+  'trophy-outline',     'star-outline',       'people-outline',     'school-outline',
+  'stopwatch-outline',  'headset-outline',    'pencil-outline',     'flag-outline',
+];
 
 interface Recomendacion {
   habito_id: number;
@@ -50,6 +68,19 @@ export default function AIScreen() {
   const [showSugeridosInfo, setShowSugeridosInfo] = useState(false);
   const router = useRouter();
 
+  // Customize modal state
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [selectedRec, setSelectedRec] = useState<Recomendacion | null>(null);
+  const [custColor, setCustColor] = useState<string | null>(null);
+  const [custIcono, setCustIcono] = useState<string | null>(null);
+  const [custTipo, setCustTipo] = useState<'bueno' | 'por_eliminar'>('bueno');
+  const [custFreqNum, setCustFreqNum] = useState('1');
+  const [custFreqUnit, setCustFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
+  const [custMetaValor, setCustMetaValor] = useState('');
+  const [custMetaUnidad, setCustMetaUnidad] = useState('');
+  const [custFechaDisplay, setCustFechaDisplay] = useState('');
+  const [savingCustom, setSavingCustom] = useState(false);
+
   const loadRecomendaciones = async (userId: number) => {
     try {
       const response = await authFetch(`/api/ai/usuario/${userId}/recomendaciones?limit=5`);
@@ -73,6 +104,77 @@ export default function AIScreen() {
     } catch (error) {
       console.error("Error loading predicciones:", error);
       setPredicciones([]);
+    }
+  };
+
+  const formatDateInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const displayToIso = (display: string) => {
+    const digits = display.replace(/\D/g, '');
+    if (digits.length !== 8) return '';
+    const dd = digits.slice(0, 2), mm = digits.slice(2, 4), yyyy = digits.slice(4, 8);
+    if (+mm < 1 || +mm > 12 || +dd < 1 || +dd > 31) return '';
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const openCustomize = (rec: Recomendacion) => {
+    setSelectedRec(rec);
+    setCustColor(null);
+    setCustIcono(null);
+    setCustTipo('bueno');
+    setCustFreqNum('1');
+    setCustFreqUnit('dias');
+    setCustMetaValor('');
+    setCustMetaUnidad('');
+    setCustFechaDisplay('');
+    setShowCustomize(true);
+  };
+
+  const handleAgregarConConfig = async () => {
+    if (!user?.user_id || !selectedRec || savingCustom) return;
+    setSavingCustom(true);
+    try {
+      const isoFecha = displayToIso(custFechaDisplay);
+      const frecuencia = `cada_${custFreqNum || '1'}_${custFreqUnit}`;
+      const body: Record<string, unknown> = {
+        habito_id: selectedRec.habito_id,
+        frecuencia_personal: frecuencia,
+        color: custColor || null,
+        icono: custIcono || null,
+        fecha_fin: isoFecha || null,
+        meta_valor: custMetaValor ? parseFloat(custMetaValor) : null,
+        meta_unidad: custMetaUnidad || null,
+      };
+      const res = await authFetch(`/api/usuario/${user.user_id}/habitos/con-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowCustomize(false);
+        // Actualizar tipo si es por_eliminar (llamada a campos-extra)
+        if (custTipo === 'por_eliminar' && data.data?.habito_usuario_id) {
+          await authFetch(`/api/usuario/${user.user_id}/habito/${data.data.habito_usuario_id}/campos-extra`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: 'por_eliminar' }),
+          });
+        }
+        loadRecomendaciones(user.user_id);
+        loadPredicciones(user.user_id);
+      } else {
+        Alert.alert('Error', data.detail || 'No se pudo agregar el hábito');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo agregar el hábito');
+    } finally {
+      setSavingCustom(false);
     }
   };
 
@@ -331,25 +433,20 @@ export default function AIScreen() {
                 style={[styles.habitCard, { backgroundColor: palette.surface }, index === 0 && styles.habitCardHighlight]}
               >
                 <View style={styles.habitContent}>
-                  {/* Botón agregar */}
+                  {/* Botón agregar — abre modal de personalización */}
                   <TouchableOpacity
                     style={[styles.checkbox, index === 0 && styles.checkboxHighlight]}
-                    onPress={() => handleAgregarHabito(rec.habito_id)}
-                    disabled={addingHabit === rec.habito_id}
+                    onPress={() => openCustomize(rec)}
                     activeOpacity={0.7}
                   >
-                    {addingHabit === rec.habito_id ? (
-                      <ActivityIndicator size="small" color={colors.primary[600]} />
-                    ) : (
-                      <Ionicons name="add" size={18} color={colors.primary[600]} />
-                    )}
+                    <Ionicons name="add" size={18} color={colors.primary[600]} />
                   </TouchableOpacity>
 
-                  {/* Habit Info — tappable para ver detalle */}
+                  {/* Habit Info — abre modal de personalización */}
                   <TouchableOpacity
                     style={[styles.habitInfo, { flexDirection: "row", alignItems: "center" }]}
                     activeOpacity={0.7}
-                    onPress={() => router.push(`/seccion_habitos/detalleHabito?habito_id=${rec.habito_id}`)}
+                    onPress={() => openCustomize(rec)}
                   >
                     <View style={{ flex: 1 }}>
                       <View style={styles.habitNameRow}>
@@ -447,6 +544,191 @@ export default function AIScreen() {
         {/* Bottom Padding for Tab Bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* ── Modal: Personalizar y agregar hábito de IA ── */}
+      <Modal visible={showCustomize} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCustomize(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[custStyles.modalContainer, { backgroundColor: palette.bg }]}>
+            {/* Header */}
+            <View style={[custStyles.modalHeader, { borderBottomColor: palette.border }]}>
+              <TouchableOpacity onPress={() => setShowCustomize(false)}>
+                <Text style={[custStyles.cancelBtn, { color: palette.textMuted }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={[custStyles.modalTitle, { color: palette.heading }]}>Personalizar hábito</Text>
+              <TouchableOpacity
+                onPress={handleAgregarConConfig}
+                disabled={savingCustom}
+                style={[custStyles.saveBtn, { opacity: savingCustom ? 0.6 : 1 }]}
+              >
+                {savingCustom
+                  ? <ActivityIndicator size="small" color={colors.neutral[0]} />
+                  : <Text style={custStyles.saveBtnText}>Agregar</Text>}
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: spacing[5] }} keyboardShouldPersistTaps="handled">
+              {/* Preview del hábito */}
+              {selectedRec && (
+                <View style={[custStyles.previewCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                  <Text style={[custStyles.previewName, { color: palette.heading }]}>{selectedRec.nombre}</Text>
+                  {selectedRec.descripcion ? (
+                    <Text style={[custStyles.previewDesc, { color: palette.textMuted }]}>{selectedRec.descripcion}</Text>
+                  ) : null}
+                  <View style={custStyles.previewMeta}>
+                    {selectedRec.categoria ? (
+                      <View style={[custStyles.categoryBadge, { backgroundColor: palette.surfaceAlt }]}>
+                        <Text style={[custStyles.categoryBadgeText, { color: palette.textMuted }]}>{selectedRec.categoria}</Text>
+                      </View>
+                    ) : null}
+                    <View style={[custStyles.categoryBadge, { backgroundColor: colors.primary[50] }]}>
+                      <Ionicons name="people" size={11} color={colors.primary[600]} />
+                      <Text style={[custStyles.categoryBadgeText, { color: colors.primary[600] }]}>
+                        {Math.round(selectedRec.score * 100)}% coincidencia
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Frecuencia */}
+              <Text style={[custStyles.label, { color: palette.heading }]}>Frecuencia</Text>
+              <View style={custStyles.freqRow}>
+                <View style={[custStyles.freqNumWrap, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                  <Text style={[custStyles.freqEvery, { color: palette.textMuted }]}>Cada</Text>
+                  <TextInput
+                    style={[custStyles.freqNumInput, { color: palette.text }]}
+                    value={custFreqNum}
+                    onChangeText={v => setCustFreqNum(v.replace(/\D/g, ''))}
+                    keyboardType="numeric"
+                    maxLength={3}
+                    placeholder="1"
+                    placeholderTextColor={palette.textMuted}
+                  />
+                </View>
+                <View style={custStyles.unitRow}>
+                  {(['dias', 'semanas', 'meses'] as const).map(u => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[custStyles.unitBtn, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, custFreqUnit === u && custStyles.unitBtnActive]}
+                      onPress={() => setCustFreqUnit(u)}
+                    >
+                      <Text style={[custStyles.unitBtnText, { color: palette.textMuted }, custFreqUnit === u && custStyles.unitBtnTextActive]}>
+                        {u.charAt(0).toUpperCase() + u.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Color */}
+              <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Color</Text>
+              <View style={custStyles.colorGrid}>
+                {PRESET_COLORS.map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[custStyles.colorSwatch, { backgroundColor: c }, custColor === c && custStyles.swatchSelected]}
+                    onPress={() => setCustColor(c)}
+                  >
+                    {custColor === c && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[custStyles.colorSwatch, { backgroundColor: palette.surfaceAlt }, !custColor && custStyles.swatchSelected]}
+                  onPress={() => setCustColor(null)}
+                >
+                  <Ionicons name="close" size={14} color={palette.icon} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Icono */}
+              <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Icono</Text>
+              <View style={custStyles.iconGrid}>
+                {PRESET_ICONS.map(ic => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[custStyles.iconSwatch, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, custIcono === ic && custStyles.swatchSelected]}
+                    onPress={() => setCustIcono(ic)}
+                  >
+                    <Ionicons name={ic as any} size={20} color={custIcono === ic ? colors.primary[600] : palette.icon} />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[custStyles.iconSwatch, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, !custIcono && custStyles.swatchSelected]}
+                  onPress={() => setCustIcono(null)}
+                >
+                  <Ionicons name="close" size={20} color={palette.icon} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Tipo */}
+              <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Tipo</Text>
+              <View style={custStyles.tipoRow}>
+                <TouchableOpacity
+                  style={[custStyles.tipoBtn, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, custTipo === 'bueno' && custStyles.tipoBtnActive]}
+                  onPress={() => setCustTipo('bueno')}
+                >
+                  <Ionicons name="trending-up" size={14} color={custTipo === 'bueno' ? colors.secondary[600] : palette.icon} />
+                  <Text style={[custStyles.tipoBtnText, { color: palette.textMuted }, custTipo === 'bueno' && { color: colors.secondary[600] }]}>
+                    Habito positivo
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[custStyles.tipoBtn, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, custTipo === 'por_eliminar' && custStyles.tipoBtnElim]}
+                  onPress={() => setCustTipo('por_eliminar')}
+                >
+                  <Ionicons name="trending-down" size={14} color={custTipo === 'por_eliminar' ? colors.semantic.error : palette.icon} />
+                  <Text style={[custStyles.tipoBtnText, { color: palette.textMuted }, custTipo === 'por_eliminar' && { color: colors.semantic.error }]}>
+                    Habito a eliminar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Meta diaria */}
+              <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Meta diaria (opcional)</Text>
+              <View style={custStyles.metaRow}>
+                <TextInput
+                  style={[custStyles.metaInput, { flex: 1, backgroundColor: palette.surfaceAlt, borderColor: palette.border, color: palette.text }]}
+                  value={custMetaValor}
+                  onChangeText={setCustMetaValor}
+                  keyboardType="numeric"
+                  placeholder="Ej: 30"
+                  placeholderTextColor={palette.textMuted}
+                />
+                <TextInput
+                  style={[custStyles.metaInput, { flex: 1.4, backgroundColor: palette.surfaceAlt, borderColor: palette.border, color: palette.text }]}
+                  value={custMetaUnidad}
+                  onChangeText={setCustMetaUnidad}
+                  placeholder="Ej: minutos, vasos, km..."
+                  placeholderTextColor={palette.textMuted}
+                />
+              </View>
+
+              {/* Fecha de fin */}
+              <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Fecha de fin (opcional)</Text>
+              <View style={[custStyles.metaInput, { flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
+                <Ionicons name="calendar-outline" size={16} color={palette.icon} style={{ marginRight: spacing[2] }} />
+                <TextInput
+                  style={{ flex: 1, color: palette.text, fontSize: typography.size.base }}
+                  value={custFechaDisplay}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor={palette.textMuted}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  onChangeText={raw => setCustFechaDisplay(formatDateInput(raw))}
+                />
+                {custFechaDisplay.length > 0 && (
+                  <TouchableOpacity onPress={() => setCustFechaDisplay('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={palette.icon} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={[custStyles.hint, { color: palette.textMuted }]}>Dejalo en blanco si el habito no tiene fecha limite</Text>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -773,7 +1055,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressBarFill: {
-    height: "100%",
+    height: "100%" as any,
     borderRadius: 4,
   },
   infoCard: {
@@ -789,5 +1071,86 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.primary[700],
     lineHeight: 20,
+  },
+});
+
+const custStyles = StyleSheet.create({
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[4],
+    borderBottomWidth: 1,
+  },
+  cancelBtn: { fontSize: typography.size.base, fontWeight: typography.weight.medium },
+  modalTitle: { fontSize: typography.size.base, fontWeight: typography.weight.bold },
+  saveBtn: {
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  saveBtnText: { color: colors.neutral[0], fontWeight: typography.weight.bold, fontSize: typography.size.sm },
+  previewCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing[4],
+    marginBottom: spacing[5],
+  },
+  previewName: { fontSize: typography.size.lg, fontWeight: typography.weight.bold, marginBottom: spacing[1] },
+  previewDesc: { fontSize: typography.size.sm, lineHeight: 20, marginBottom: spacing[3] },
+  previewMeta: { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' },
+  categoryBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[1],
+    borderRadius: radius.full,
+  },
+  categoryBadgeText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium },
+  label: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, marginBottom: spacing[3] },
+  hint: { fontSize: typography.size.xs, marginTop: spacing[1] },
+  freqRow: { flexDirection: 'column', gap: spacing[3] },
+  freqNumWrap: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1,
+    borderRadius: radius.lg, paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    gap: spacing[2],
+  },
+  freqEvery: { fontSize: typography.size.base },
+  freqNumInput: { fontSize: typography.size.xl, fontWeight: typography.weight.bold, minWidth: 40, textAlign: 'center' },
+  unitRow: { flexDirection: 'row', gap: spacing[2] },
+  unitBtn: {
+    flex: 1, paddingVertical: spacing[2], borderRadius: radius.lg, borderWidth: 1,
+    alignItems: 'center',
+  },
+  unitBtnActive: { backgroundColor: colors.primary[600], borderColor: colors.primary[600] },
+  unitBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium },
+  unitBtnTextActive: { color: colors.neutral[0] },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
+  colorSwatch: {
+    width: 36, height: 36, borderRadius: 18,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  iconSwatch: {
+    width: 44, height: 44, borderRadius: radius.lg, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  swatchSelected: { borderWidth: 2, borderColor: colors.primary[500] },
+  tipoRow: { flexDirection: 'row', gap: spacing[3] },
+  tipoBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing[2], paddingVertical: spacing[3], borderRadius: radius.lg, borderWidth: 1,
+  },
+  tipoBtnActive: { backgroundColor: colors.secondary[50], borderColor: colors.secondary[400] },
+  tipoBtnElim: { backgroundColor: '#FEE2E2', borderColor: colors.semantic.error },
+  tipoBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium },
+  metaRow: { flexDirection: 'row', gap: spacing[3] },
+  metaInput: {
+    borderWidth: 1, borderRadius: radius.lg,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    fontSize: typography.size.base,
   },
 });
