@@ -80,6 +80,21 @@ function getFrecuenciaLabel(value: string): string {
   return value;
 }
 
+/**
+ * Construye el string canónico de frecuencia que acepta la BD.
+ * n=1 → 'diario' | 'semanal' | 'mensual' (formas cortas)
+ * n>=2 → 'cada_N_(dias|semanas|meses)' (forma extendida)
+ */
+function buildFrecuencia(n: number, unit: 'dias' | 'semanas' | 'meses'): string {
+  const N = Math.max(1, Math.floor(n));
+  if (N === 1) {
+    if (unit === 'dias') return 'diario';
+    if (unit === 'semanas') return 'semanal';
+    return 'mensual';
+  }
+  return `cada_${N}_${unit}`;
+}
+
 // ── Unidades de meta ────────────────────────────────────────
 const UNIDADES_META = [
   "minutos", "horas", "páginas", "km", "metros",
@@ -568,12 +583,15 @@ export default function CatHCustomScreen() {
                 style={[styles.sheetConfirmBtn, { opacity: customFreqNum ? 1 : 0.4 }]}
                 disabled={!customFreqNum}
                 onPress={() => {
-                  setFrecuencia(`cada_${customFreqNum}_${customFreqUnit}`);
+                  const n = parseInt(customFreqNum) || 1;
+                  setFrecuencia(buildFrecuencia(n, customFreqUnit));
                   setActiveSheet(null);
                 }}
               >
                 <Text style={styles.sheetConfirmText}>
-                  {customFreqNum ? `Cada ${customFreqNum} ${FREQ_UNITS.find(u => u.value === customFreqUnit)?.label}` : 'Ingresa un número'}
+                  {customFreqNum
+                    ? `Guardar: ${getFrecuenciaLabel(buildFrecuencia(parseInt(customFreqNum) || 1, customFreqUnit))}`
+                    : 'Ingresa un número'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setActiveSheet("frecuencia")}>

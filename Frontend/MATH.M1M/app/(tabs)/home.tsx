@@ -119,6 +119,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [habitosHoy, setHabitosHoy] = useState<HabitoHoy[]>([]);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   // Modal de resumen de día pasado
   const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
   const [dayDetailHabitos, setDayDetailHabitos] = useState<HabitoHoy[]>([]);
@@ -224,6 +225,42 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Error loading habitos:", error);
       setHabitosHoy([]);
+    }
+  };
+
+  // Marcar / desmarcar un hábito desde la vista previa
+  const toggleHabito = async (habitoUsuarioId: number) => {
+    if (!user?.user_id || togglingId !== null) return;
+    setTogglingId(habitoUsuarioId);
+    try {
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habitoUsuarioId}/toggle`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        // Optimistic update local
+        setHabitosHoy((prev) =>
+          prev.map((h) =>
+            h.habito_usuario_id === habitoUsuarioId
+              ? { ...h, completado_hoy: !h.completado_hoy }
+              : h
+          )
+        );
+        // Recargar estadísticas y resumen (puntos, racha, nivel)
+        if (user?.user_id) {
+          loadHabitosHoy(user.user_id);
+          loadResumenUsuario(user.user_id);
+        }
+      } else {
+        Alert.alert("Error", data.message || "No se pudo actualizar el hábito");
+      }
+    } catch (error) {
+      console.error("Error toggling habito:", error);
+      Alert.alert("Error", "No se pudo actualizar el hábito");
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -602,60 +639,99 @@ export default function HomeScreen() {
               <Text style={[styles.emptyCardTitle, { color: palette.text }]}>Sin hábitos aún</Text>
               <Text style={[styles.emptyCardSubtitle, { color: palette.textMuted }]}>Toca para agregar tu primer hábito</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.habitsList}>
-              {habitosHoy.slice(0, 3).map((habito) => {
-                // Color personal del hábito tiene prioridad sobre el de categoría
-                const catColor = habito.color
-                  || (habito.categoria_id
-                    ? getCategoryColor(habito.categoria_id)
-                    : getCategoryColorByName(habito.categoria_nombre));
-                return (
-                  <View key={habito.habito_usuario_id} style={[styles.habitItem, { backgroundColor: palette.surface }]}>
-                    <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
-                    <View
-                      style={[
-                        styles.habitCheckbox,
-                        habito.completado_hoy && styles.habitCheckboxCompleted,
-                        habito.completado_hoy && { backgroundColor: catColor },
-                      ]}
+          ) : (() => {
+            // Solo mostramos pendientes en la vista previa
+            const pendientes = habitosHoy.filter((h) => !h.completado_hoy);
+            const visibles = pendientes.slice(0, 3);
+            const restantes = pendientes.length - visibles.length;
+
+            if (pendientes.length === 0) {
+              return (
+                <TouchableOpacity
+                  style={[styles.allDoneCard, { backgroundColor: palette.surface }]}
+                  onPress={() => router.push("/(tabs)/habitos")}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.allDoneIcon}>
+                    <Ionicons name="trophy" size={28} color={colors.secondary[500]} />
+                  </View>
+                  <Text style={[styles.allDoneTitle, { color: palette.text }]}>
+                    ¡Completaste todo!
+                  </Text>
+                  <Text style={[styles.allDoneSubtitle, { color: palette.textMuted }]}>
+                    {habitosHoy.length} {habitosHoy.length === 1 ? "hábito completado" : "hábitos completados"} hoy. Toca para ver el detalle.
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+
+            return (
+              <View style={styles.habitsList}>
+                {visibles.map((habito) => {
+                  const catColor = habito.color
+                    || (habito.categoria_id
+                      ? getCategoryColor(habito.categoria_id)
+                      : getCategoryColorByName(habito.categoria_nombre));
+                  const isToggling = togglingId === habito.habito_usuario_id;
+                  return (
+                    <TouchableOpacity
+                      key={habito.habito_usuario_id}
+                      style={[styles.habitItem, { backgroundColor: palette.surface }, isToggling && { opacity: 0.6 }]}
+                      onPress={() => toggleHabito(habito.habito_usuario_id)}
+                      disabled={isToggling}
+                      activeOpacity={0.7}
                     >
-                      {habito.completado_hoy && (
-                        <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
-                      )}
-                    </View>
-                    <View style={styles.habitInfo}>
-                      <View style={styles.habitNameRow}>
-                        <Text
-                          style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
-                        >
-                          {habito.nombre}
-                        </Text>
-                        {habito.categoria_nombre === "My Custom Habits" && (
-                          <View style={styles.customBadge}>
-                            <Ionicons name="sparkles" size={8} color={colors.primary[600]} />
-                          </View>
+                      <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
+                      <View
+                        style={[
+                          styles.habitCheckbox,
+                          { borderColor: catColor },
+                        ]}
+                      >
+                        {isToggling && (
+                          <ActivityIndicator size="small" color={catColor} />
                         )}
                       </View>
-                      <Text style={[styles.habitCategory, { color: catColor }]}>{traducirCategoria(habito.categoria_nombre)}</Text>
-                    </View>
-                    <View style={styles.habitPoints}>
-                      <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
-                      <Text style={styles.habitPointsText}>+{habito.puntos_base}</Text>
-                    </View>
+                      <View style={styles.habitInfo}>
+                        <View style={styles.habitNameRow}>
+                          <Text style={styles.habitName} numberOfLines={1}>
+                            {habito.nombre}
+                          </Text>
+                          {habito.categoria_nombre === "My Custom Habits" && (
+                            <View style={styles.customBadge}>
+                              <Ionicons name="sparkles" size={8} color={colors.primary[600]} />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.habitCategory, { color: catColor }]}>{traducirCategoria(habito.categoria_nombre)}</Text>
+                      </View>
+                      <View style={styles.habitPoints}>
+                        <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
+                        <Text style={styles.habitPointsText}>+{habito.puntos_base}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {restantes > 0 && (
+                  <TouchableOpacity
+                    style={styles.moreHabitsButton}
+                    onPress={() => router.push("/(tabs)/habitos")}
+                  >
+                    <Text style={styles.moreHabitsText}>+{restantes} pendientes más</Text>
+                  </TouchableOpacity>
+                )}
+                {/* Hint sutil de cuántos llevas completados */}
+                {estadisticasHabitos.completados > 0 && (
+                  <View style={styles.completedHint}>
+                    <Ionicons name="checkmark-circle" size={12} color={colors.secondary[500]} />
+                    <Text style={styles.completedHintText}>
+                      {estadisticasHabitos.completados} de {estadisticasHabitos.total} completados hoy
+                    </Text>
                   </View>
-                );
-              })}
-              {habitosHoy.length > 3 && (
-                <TouchableOpacity
-                  style={styles.moreHabitsButton}
-                  onPress={() => router.push("/(tabs)/habitos")}
-                >
-                  <Text style={styles.moreHabitsText}>+{habitosHoy.length - 3} hábitos más</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                )}
+              </View>
+            );
+          })()}
         </View>
 
         {/* Plans Section */}
@@ -1536,6 +1612,52 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     fontWeight: typography.weight.medium,
     color: colors.primary[600],
+  },
+  completedHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingTop: spacing[2],
+    paddingBottom: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[100],
+  },
+  completedHintText: {
+    fontSize: typography.size.xs,
+    color: colors.secondary[600],
+    fontWeight: typography.weight.medium,
+  },
+  // All-done card (todos los hábitos completados)
+  allDoneCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[6],
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.secondary[200],
+    ...shadows.sm,
+  },
+  allDoneIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.secondary[50],
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  allDoneTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[800],
+    marginBottom: spacing[1],
+  },
+  allDoneSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[500],
+    textAlign: "center",
+    lineHeight: 18,
   },
   plansList: {
     gap: spacing[3],
