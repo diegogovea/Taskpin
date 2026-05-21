@@ -102,6 +102,21 @@ const FREQ_UNITS = [
   { value: 'meses',   label: 'meses' },
 ];
 
+/**
+ * Construye el string canónico de frecuencia que acepta la BD.
+ * n=1 → 'diario' | 'semanal' | 'mensual'  (formas cortas)
+ * n>=2 → 'cada_N_(dias|semanas|meses)'   (forma extendida)
+ */
+function buildFrecuencia(n: number, unit: 'dias' | 'semanas' | 'meses'): string {
+  const N = Math.max(1, Math.floor(n));
+  if (N === 1) {
+    if (unit === 'dias')    return 'diario';
+    if (unit === 'semanas') return 'semanal';
+    return 'mensual';
+  }
+  return `cada_${N}_${unit}`;
+}
+
 function getFrecuenciaLabel(value: string): string {
   const preset = FRECUENCIAS.find((f) => f.value === value);
   if (preset) return preset.label;
@@ -144,8 +159,8 @@ export default function DetalleHabitoScreen() {
   const [historialResumen, setHistorialResumen] = useState<HistorialResumen | null>(null);
   const [rachas, setRachas] = useState<RachasData | null>(null);
   
-  // Frecuencia personalizada
-  const [customFreqNum, setCustomFreqNum] = useState('');
+  // Frecuencia personalizada (input numérico + selector de unidad)
+  const [customFreqNum, setCustomFreqNum] = useState('1');
   const [customFreqUnit, setCustomFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
 
   // Modal & Toast states
@@ -239,30 +254,22 @@ export default function DetalleHabitoScreen() {
     }, [user?.user_id, habito_usuario_id])
   );
 
-  // Inicializar panel de frecuencia con el valor actual del hábito
+  // Pre-llenar el panel de frecuencia con el valor actual del hábito
   useEffect(() => {
     if (!habito) return;
-    const match = habito.frecuencia_personal.match(/^cada_(\d+)_(dias|semanas|meses)$/);
+    const f = habito.frecuencia_personal;
+    const match = f.match(/^cada_(\d+)_(dias|semanas|meses)$/);
     if (match) {
       setCustomFreqNum(match[1]);
       setCustomFreqUnit(match[2] as 'dias' | 'semanas' | 'meses');
-    } else if (habito.frecuencia_personal === 'diario') {
+    } else if (f === 'diario') {
       setCustomFreqNum('1');
       setCustomFreqUnit('dias');
-    } else if (habito.frecuencia_personal === 'semanal') {
+    } else if (f === 'semanal') {
       setCustomFreqNum('1');
       setCustomFreqUnit('semanas');
-    } else if (habito.frecuencia_personal === 'mensual') {
+    } else if (f === 'mensual') {
       setCustomFreqNum('1');
-      setCustomFreqUnit('meses');
-    } else if (habito.frecuencia_personal === 'cada_2_dias') {
-      setCustomFreqNum('2');
-      setCustomFreqUnit('dias');
-    } else if (habito.frecuencia_personal === 'cada_2_semanas') {
-      setCustomFreqNum('2');
-      setCustomFreqUnit('semanas');
-    } else if (habito.frecuencia_personal === 'cada_2_meses') {
-      setCustomFreqNum('2');
       setCustomFreqUnit('meses');
     }
   }, [habito?.frecuencia_personal]);
@@ -670,14 +677,16 @@ export default function DetalleHabitoScreen() {
               Actual: <Text style={{ color: palette.text, fontWeight: '600' }}>{getFrecuenciaLabel(habito.frecuencia_personal)}</Text>
             </Text>
             <View style={styles.customFreqRow}>
+              <Text style={[styles.customFreqEvery, { color: palette.text }]}>Cada</Text>
               <TextInput
                 style={[styles.customFreqInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
-                placeholder="3"
+                placeholder="1"
                 placeholderTextColor={palette.textSubtle}
                 keyboardType="number-pad"
                 value={customFreqNum}
                 onChangeText={(t) => setCustomFreqNum(t.replace(/\D/g, ''))}
                 maxLength={3}
+                selectTextOnFocus
               />
               <View style={styles.customFreqUnits}>
                 {FREQ_UNITS.map((u) => (
@@ -701,15 +710,29 @@ export default function DetalleHabitoScreen() {
                 ))}
               </View>
             </View>
-            <TouchableOpacity
-              style={[styles.customFreqConfirmBtn, { opacity: customFreqNum ? 1 : 0.4 }]}
-              disabled={!customFreqNum || updating}
-              onPress={() => updateFrecuencia(`cada_${customFreqNum}_${customFreqUnit}`)}
-            >
-              <Text style={styles.customFreqConfirmText}>
-                {updating ? 'Guardando...' : customFreqNum ? `Guardar: cada ${customFreqNum} ${FREQ_UNITS.find(u => u.value === customFreqUnit)?.label}` : 'Ingresa un número'}
-              </Text>
-            </TouchableOpacity>
+            {(() => {
+              const n = parseInt(customFreqNum) || 0;
+              const nextFrec = n > 0 ? buildFrecuencia(n, customFreqUnit) : null;
+              const sameAsCurrent = nextFrec === habito.frecuencia_personal;
+              const disabled = !nextFrec || updating || sameAsCurrent;
+              return (
+                <TouchableOpacity
+                  style={[styles.customFreqConfirmBtn, { opacity: disabled ? 0.4 : 1 }]}
+                  disabled={disabled}
+                  onPress={() => nextFrec && updateFrecuencia(nextFrec)}
+                >
+                  <Text style={styles.customFreqConfirmText}>
+                    {updating
+                      ? 'Guardando...'
+                      : !nextFrec
+                        ? 'Ingresa un número'
+                        : sameAsCurrent
+                          ? 'Sin cambios'
+                          : `Guardar: ${getFrecuenciaLabel(nextFrec)}`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
           </View>
         </View>
 
@@ -1246,26 +1269,33 @@ const styles = StyleSheet.create({
   customFreqRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[3],
+    gap: spacing[2],
+    flexWrap: 'wrap',
+  },
+  customFreqEvery: {
+    fontSize: typography.size.base,
+    fontWeight: '500',
   },
   customFreqInput: {
-    width: 64,
+    width: 60,
     borderWidth: 1.5,
     borderRadius: radius.lg,
-    paddingHorizontal: spacing[3],
+    paddingHorizontal: spacing[2],
     paddingVertical: spacing[2],
-    fontSize: typography.size.xl,
+    fontSize: typography.size.lg,
     fontWeight: '700',
     textAlign: 'center',
   },
   customFreqUnits: {
     flex: 1,
     flexDirection: 'row',
-    gap: spacing[2],
+    gap: spacing[1],
+    minWidth: 180,
   },
   customFreqUnitChip: {
     flex: 1,
     paddingVertical: spacing[2],
+    paddingHorizontal: spacing[1],
     borderRadius: radius.lg,
     borderWidth: 1.5,
     alignItems: 'center',

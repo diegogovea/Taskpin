@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -30,7 +29,6 @@ interface Tarea {
   tipo: 'diaria' | 'semanal' | 'única';
   prioridad: 'alta' | 'media' | 'baja';
   notas: string;
-  fecha_limite: string | null;
 }
 
 interface Fase {
@@ -87,9 +85,6 @@ const getPrioridadColor = (p: string) => {
   return colors.secondary[500];
 };
 
-const formatDate = (d: Date) =>
-  d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-
 // =====================
 // MAIN COMPONENT
 // =====================
@@ -125,10 +120,9 @@ export default function WizardPlanCustom() {
   const [editingTareaId, setEditingTareaId] = useState<string | null>(null);
   const [editingFaseId2, setEditingFaseId2] = useState<string | null>(null);
   const [tempTarea, setTempTarea] = useState<Partial<Tarea>>({
-    titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '', fecha_limite: null,
+    titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '',
   });
   const [tareaError, setTareaError] = useState('');
-  const [showTareaDatePicker, setShowTareaDatePicker] = useState(false);
 
   // ── A2: fase inline expandida (id de la fase cuyas tareas están visibles) ──
   const [expandedFaseId, setExpandedFaseId] = useState<string | null>(null);
@@ -246,7 +240,7 @@ export default function WizardPlanCustom() {
   // ── TAREAS ──
   const openNewTarea = (faseId: string) => {
     setTareaError('');
-    setTempTarea({ titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '', fecha_limite: null });
+    setTempTarea({ titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '' });
     setEditingTareaId('new');
     setEditingFaseId2(faseId);
   };
@@ -262,7 +256,6 @@ export default function WizardPlanCustom() {
       tipo: 'diaria',
       prioridad: 'media',
       notas: '',
-      fecha_limite: null,
     };
     setConfig(prev => ({
       ...prev,
@@ -291,7 +284,6 @@ export default function WizardPlanCustom() {
       tipo: tempTarea.tipo || 'diaria',
       prioridad: tempTarea.prioridad || 'media',
       notas: tempTarea.notas || '',
-      fecha_limite: tempTarea.fecha_limite || null,
     };
     setConfig(prev => ({
       ...prev,
@@ -346,7 +338,7 @@ export default function WizardPlanCustom() {
             orden: j + 1,
             prioridad: t.prioridad,
             notas: t.notas || null,
-            fecha_limite: t.fecha_limite || null,
+            fecha_limite: null,
           })),
         })),
       };
@@ -629,11 +621,6 @@ export default function WizardPlanCustom() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tareaTitulo, { color: palette.text }]} numberOfLines={1}>{tarea.titulo}</Text>
-                      {tarea.fecha_limite && (
-                        <Text style={[styles.tareaFecha, { color: palette.textSubtle }]}>
-                          <Ionicons name="calendar-outline" size={11} /> {tarea.fecha_limite}
-                        </Text>
-                      )}
                     </View>
                     <View style={[styles.prioridadDot, { backgroundColor: getPrioridadColor(tarea.prioridad) }]} />
                   </TouchableOpacity>
@@ -992,38 +979,6 @@ export default function WizardPlanCustom() {
             ))}
           </View>
 
-          {/* Fecha límite */}
-          <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Fecha límite (opcional)</Text>
-          <TouchableOpacity
-            style={[styles.textInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-            onPress={() => setShowTareaDatePicker(true)}
-          >
-            <Text style={{ color: tempTarea.fecha_limite ? colors.neutral[800] : colors.neutral[400], fontSize: typography.size.base }}>
-              {tempTarea.fecha_limite || 'Seleccionar fecha'}
-            </Text>
-            <Ionicons name="calendar-outline" size={18} color={colors.neutral[400]} />
-          </TouchableOpacity>
-          {tempTarea.fecha_limite && (
-            <TouchableOpacity onPress={() => setTempTarea({ ...tempTarea, fecha_limite: null })} style={styles.clearDateBtn}>
-              <Ionicons name="close-circle" size={14} color={colors.neutral[400]} />
-              <Text style={styles.clearDateText}>Quitar fecha</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* DatePicker */}
-          {showTareaDatePicker && (
-            <DateTimePicker
-              value={tempTarea.fecha_limite ? new Date(tempTarea.fecha_limite) : new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              minimumDate={new Date()}
-              onChange={(_: DateTimePickerEvent, date?: Date) => {
-                setShowTareaDatePicker(Platform.OS === 'ios');
-                if (date) setTempTarea({ ...tempTarea, fecha_limite: formatDate(date) });
-              }}
-            />
-          )}
-
           {/* Notas */}
           <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Notas (opcional)</Text>
           <TextInput
@@ -1180,7 +1135,6 @@ const styles = StyleSheet.create({
   tareaTipoBadge: { paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radius.sm },
   tareaTipoText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium },
   tareaTitulo: { fontSize: typography.size.sm, color: colors.neutral[700], fontWeight: typography.weight.medium },
-  tareaFecha: { fontSize: 10, color: colors.neutral[400], marginTop: 2 },
   prioridadDot: { width: 8, height: 8, borderRadius: 4 },
   addTaskBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1], paddingVertical: spacing[3], marginTop: spacing[2] },
   addTaskBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.primary[600] },
@@ -1198,8 +1152,6 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: typography.size.base, fontWeight: typography.weight.medium, color: colors.neutral[600] },
   saveBtn: { flex: 1, padding: spacing[4], borderRadius: radius.lg, backgroundColor: colors.primary[600], alignItems: 'center' },
   saveBtnText: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
-  clearDateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },
-  clearDateText: { fontSize: typography.size.xs, color: colors.neutral[400] },
   stepErrorBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[5], marginBottom: spacing[2], backgroundColor: '#FEF2F2', borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: '#FECACA' },
   stepErrorText: { flex: 1, fontSize: typography.size.sm, color: '#B91C1C' },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },

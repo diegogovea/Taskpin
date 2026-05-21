@@ -8,7 +8,6 @@ import {
   TouchableOpacity, TextInput, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, radius } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -53,11 +52,6 @@ export function toFrecuenciaPersonal(n: number, unit: FreqUnit): string {
 const formatDate = (d: Date) =>
   d.toISOString().split('T')[0]; // YYYY-MM-DD
 
-const formatDateDisplay = (iso: string) => {
-  const d = new Date(iso + 'T12:00:00');
-  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-};
-
 // ── Types ────────────────────────────────────────────────────
 export interface HabitConfig {
   habito_id: number;
@@ -88,15 +82,9 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
   const [freqUnit, setFreqUnit] = useState<FreqUnit>('días');
   const [color, setColor] = useState<string | null>(categoryColor || null);
   const [icono, setIcono] = useState<string | null>(null);
-  const [fechaInicio, setFechaInicio] = useState<string>(formatDate(new Date()));
-  const [fechaFin, setFechaFin] = useState<string | null>(null);
   const [metaValor, setMetaValor] = useState('');
   const [metaUnidad, setMetaUnidad] = useState('');
   const [puntos, setPuntos] = useState('10');
-
-  // Date picker states
-  const [showInicioPicker, setShowInicioPicker] = useState(false);
-  const [showFinPicker, setShowFinPicker] = useState(false);
 
   useEffect(() => {
     if (visible && habito) {
@@ -104,8 +92,6 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
       setFreqUnit('días');
       setColor(categoryColor || null);
       setIcono(null);
-      setFechaInicio(formatDate(new Date()));
-      setFechaFin(null);
       setMetaValor('');
       setMetaUnidad('');
       setPuntos(String(habito.puntos_base ?? 10));
@@ -123,8 +109,8 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
       frecuencia_personal: toFrecuenciaPersonal(n, freqUnit),
       color: color || null,
       icono: icono || null,
-      fecha_inicio: fechaInicio,
-      fecha_fin: fechaFin,
+      fecha_inicio: formatDate(new Date()),
+      fecha_fin: null,
       meta_valor: metaValor ? parseFloat(metaValor) : null,
       meta_unidad: metaUnidad,
       puntos_base: parseInt(puntos) || 10,
@@ -173,54 +159,6 @@ export default function AddHabitModal({ visible, habito, categoryColor, onConfir
             <Text style={styles.freqPreview}>
               Frecuencia: <Text style={{ fontWeight: '700', color: accentColor }}>{toFrecuenciaPersonal(parseInt(freqN) || 1, freqUnit).replace(/_/g, ' ')}</Text>
             </Text>
-          </Section>
-
-          {/* ── Fechas ── */}
-          <Section label="Fechas">
-            {/* Inicio */}
-            <Text style={styles.subLabel}>Fecha de inicio</Text>
-            <TouchableOpacity style={[styles.dateBtn, { backgroundColor: palette.surface, borderColor: palette.border }]} onPress={() => setShowInicioPicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color={accentColor} />
-              <Text style={[styles.dateBtnText, { color: palette.text }]}>{formatDateDisplay(fechaInicio)}</Text>
-            </TouchableOpacity>
-            {showInicioPicker && (
-              <DateTimePicker
-                value={new Date(fechaInicio + 'T12:00:00')}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(_: DateTimePickerEvent, d?: Date) => {
-                  setShowInicioPicker(Platform.OS === 'ios');
-                  if (d) setFechaInicio(formatDate(d));
-                }}
-              />
-            )}
-
-            {/* Fin */}
-            <Text style={[styles.subLabel, { marginTop: spacing[4] }]}>Fecha de fin (opcional)</Text>
-            <TouchableOpacity style={[styles.dateBtn, { backgroundColor: palette.surface, borderColor: palette.border }]} onPress={() => setShowFinPicker(true)}>
-              <Ionicons name="calendar-clear-outline" size={18} color={fechaFin ? accentColor : palette.textSubtle} />
-              <Text style={[styles.dateBtnText, { color: fechaFin ? palette.text : palette.textSubtle }]}>
-                {fechaFin ? formatDateDisplay(fechaFin) : 'Sin fecha límite'}
-              </Text>
-            </TouchableOpacity>
-            {fechaFin && (
-              <TouchableOpacity onPress={() => setFechaFin(null)} style={styles.clearDateBtn}>
-                <Ionicons name="close-circle" size={14} color={colors.neutral[400]} />
-                <Text style={styles.clearDateText}>Quitar fecha fin</Text>
-              </TouchableOpacity>
-            )}
-            {showFinPicker && (
-              <DateTimePicker
-                value={fechaFin ? new Date(fechaFin + 'T12:00:00') : new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date(fechaInicio + 'T12:00:00')}
-                onChange={(_: DateTimePickerEvent, d?: Date) => {
-                  setShowFinPicker(Platform.OS === 'ios');
-                  if (d) setFechaFin(formatDate(d));
-                }}
-              />
-            )}
           </Section>
 
           {/* ── Meta diaria ── */}
@@ -360,7 +298,6 @@ const styles = StyleSheet.create({
   descText: { flex: 1, fontSize: typography.size.sm, color: colors.neutral[600], lineHeight: 18 },
   section: { marginBottom: spacing[6] },
   sectionLabel: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.neutral[800], marginBottom: spacing[3] },
-  subLabel: { fontSize: typography.size.xs, color: colors.neutral[500], marginBottom: spacing[2] },
   // Frecuencia
   freqRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   freqPrefix: { fontSize: typography.size.base, color: colors.neutral[700] },
@@ -369,11 +306,6 @@ const styles = StyleSheet.create({
   unitBtn: { paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderRadius: radius.md, borderWidth: 1, borderColor: colors.neutral[200], backgroundColor: colors.neutral[0] },
   unitBtnText: { fontSize: typography.size.xs, color: colors.neutral[600] },
   freqPreview: { fontSize: typography.size.xs, color: colors.neutral[400], marginTop: spacing[2] },
-  // Fechas
-  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: colors.neutral[0], borderRadius: radius.lg, padding: spacing[4], borderWidth: 1, borderColor: colors.neutral[200] },
-  dateBtnText: { fontSize: typography.size.base, color: colors.neutral[800] },
-  clearDateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },
-  clearDateText: { fontSize: typography.size.xs, color: colors.neutral[400] },
   // Meta
   metaRow: { flexDirection: 'row', gap: spacing[3] },
   metaInput: { backgroundColor: colors.neutral[0], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: radius.lg, paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: typography.size.base, color: colors.neutral[900] },
