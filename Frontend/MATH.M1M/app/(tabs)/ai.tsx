@@ -74,7 +74,8 @@ export default function AIScreen() {
   const [custColor, setCustColor] = useState<string | null>(null);
   const [custIcono, setCustIcono] = useState<string | null>(null);
   const [custTipo, setCustTipo] = useState<'bueno' | 'por_eliminar'>('bueno');
-  const [custFrecuencia, setCustFrecuencia] = useState<string>('diario');
+  const [custFreqNum, setCustFreqNum] = useState<string>('1');
+  const [custFreqUnit, setCustFreqUnit] = useState<'dias' | 'semanas' | 'meses'>('dias');
   const [custMetaValor, setCustMetaValor] = useState('');
   const [custMetaUnidad, setCustMetaUnidad] = useState('');
   const [custFechaDisplay, setCustFechaDisplay] = useState('');
@@ -121,12 +122,24 @@ export default function AIScreen() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  // n=1 → 'diario'|'semanal'|'mensual'; n>=2 → 'cada_N_(dias|semanas|meses)'
+  const buildFrecuencia = (n: number, unit: 'dias' | 'semanas' | 'meses'): string => {
+    const N = Math.max(1, Math.floor(n));
+    if (N === 1) {
+      if (unit === 'dias') return 'diario';
+      if (unit === 'semanas') return 'semanal';
+      return 'mensual';
+    }
+    return `cada_${N}_${unit}`;
+  };
+
   const openCustomize = (rec: Recomendacion) => {
     setSelectedRec(rec);
     setCustColor(null);
     setCustIcono(null);
     setCustTipo('bueno');
-    setCustFrecuencia('diario');
+    setCustFreqNum('1');
+    setCustFreqUnit('dias');
     setCustMetaValor('');
     setCustMetaUnidad('');
     setCustFechaDisplay('');
@@ -140,7 +153,7 @@ export default function AIScreen() {
       const isoFecha = displayToIso(custFechaDisplay);
       const body: Record<string, unknown> = {
         habito_id: selectedRec.habito_id,
-        frecuencia_personal: custFrecuencia,
+        frecuencia_personal: buildFrecuencia(parseInt(custFreqNum) || 1, custFreqUnit),
         color: custColor || null,
         icono: custIcono || null,
         fecha_fin: isoFecha || null,
@@ -603,26 +616,49 @@ export default function AIScreen() {
 
               {/* Frecuencia */}
               <Text style={[custStyles.label, { color: palette.heading }]}>Frecuencia</Text>
-              <View style={custStyles.freqChipsWrap}>
-                {([
-                  { value: 'diario', label: 'Diario' },
-                  { value: 'cada_2_dias', label: 'Cada 2 días' },
-                  { value: 'semanal', label: 'Semanal' },
-                  { value: 'cada_2_semanas', label: 'Cada 2 sem.' },
-                  { value: 'mensual', label: 'Mensual' },
-                  { value: 'cada_2_meses', label: 'Cada 2 mes.' },
-                ] as const).map(opt => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[custStyles.freqChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }, custFrecuencia === opt.value && custStyles.freqChipActive]}
-                    onPress={() => setCustFrecuencia(opt.value)}
-                  >
-                    <Text style={[custStyles.freqChipText, { color: palette.textMuted }, custFrecuencia === opt.value && custStyles.freqChipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={custStyles.freqRow}>
+                <Text style={[custStyles.freqEvery, { color: palette.text }]}>Cada</Text>
+                <TextInput
+                  style={[custStyles.freqNumInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                  placeholder="1"
+                  placeholderTextColor={palette.textSubtle}
+                  keyboardType="number-pad"
+                  value={custFreqNum}
+                  onChangeText={(t) => setCustFreqNum(t.replace(/\D/g, ''))}
+                  maxLength={3}
+                  selectTextOnFocus
+                />
+                <View style={custStyles.unitRow}>
+                  {([
+                    { value: 'dias',    label: 'días' },
+                    { value: 'semanas', label: 'semanas' },
+                    { value: 'meses',   label: 'meses' },
+                  ] as const).map((u) => (
+                    <TouchableOpacity
+                      key={u.value}
+                      style={[
+                        custStyles.unitBtn,
+                        { backgroundColor: palette.surfaceAlt, borderColor: palette.border },
+                        custFreqUnit === u.value && custStyles.unitBtnActive,
+                      ]}
+                      onPress={() => setCustFreqUnit(u.value as 'dias' | 'semanas' | 'meses')}
+                    >
+                      <Text style={[
+                        custStyles.unitBtnText,
+                        { color: palette.textMuted },
+                        custFreqUnit === u.value && custStyles.unitBtnTextActive,
+                      ]}>
+                        {u.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
+              <Text style={[custStyles.freqPreview, { color: palette.textSubtle }]}>
+                Resultado: <Text style={{ fontWeight: '700', color: colors.primary[600] }}>
+                  {buildFrecuencia(parseInt(custFreqNum) || 1, custFreqUnit).replace(/_/g, ' ')}
+                </Text>
+              </Text>
 
               {/* Color */}
               <Text style={[custStyles.label, { color: palette.heading, marginTop: spacing[5] }]}>Color</Text>
@@ -1116,14 +1152,31 @@ const custStyles = StyleSheet.create({
   categoryBadgeText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium },
   label: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, marginBottom: spacing[3] },
   hint: { fontSize: typography.size.xs, marginTop: spacing[1] },
-  freqChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  freqChip: {
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1,
+  freqRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
+  freqEvery: { fontSize: typography.size.base, fontWeight: typography.weight.medium },
+  freqNumInput: {
+    width: 56,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[2],
+    fontSize: typography.size.lg,
+    fontWeight: '700',
+    textAlign: 'center',
   },
-  freqChipActive: { backgroundColor: colors.primary[600], borderColor: colors.primary[600] },
-  freqChipText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium },
-  freqChipTextActive: { color: colors.neutral[0] },
+  unitRow: { flex: 1, flexDirection: 'row', gap: spacing[1], minWidth: 160 },
+  unitBtn: {
+    flex: 1,
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[1],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  unitBtnActive: { borderColor: colors.primary[500], backgroundColor: colors.primary[50] },
+  unitBtnText: { fontSize: typography.size.xs, fontWeight: '500' },
+  unitBtnTextActive: { color: colors.primary[600], fontWeight: '700' },
+  freqPreview: { fontSize: typography.size.xs, marginTop: spacing[2] },
   colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
   colorSwatch: {
     width: 36, height: 36, borderRadius: 18,
