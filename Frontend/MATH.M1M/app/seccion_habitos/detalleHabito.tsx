@@ -7,12 +7,18 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getCategoryColor } from "../../constants/categoryColors";
 import { ConfirmModal } from "../../components/modals";
 import { Toast, HabitCalendar } from "../../components/ui";
@@ -75,12 +81,24 @@ const FRECUENCIAS = [
   { value: 'cada_2_meses',   label: 'Cada 2 meses',  icon: 'time-outline' },
 ];
 
-// Map category names to colors
+const PRESET_COLORS = [
+  '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
+  '#F97316', '#F59E0B', '#10B981', '#14B8A6',
+  '#3B82F6', '#06B6D4', '#84CC16', '#64748B',
+];
+
+const PRESET_ICONS = [
+  'leaf-outline', 'fitness-outline', 'barbell-outline', 'bicycle-outline',
+  'heart-outline', 'water-outline', 'moon-outline', 'sunny-outline',
+  'book-outline', 'musical-notes-outline', 'brush-outline', 'code-slash-outline',
+  'restaurant-outline', 'walk-outline', 'medkit-outline', 'brain',
+];
 
 export default function DetalleHabitoScreen() {
   const router = useRouter();
   const { habito_usuario_id } = useLocalSearchParams<{ habito_usuario_id: string }>();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   const [habito, setHabito] = useState<HabitoDetalle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,6 +112,14 @@ export default function DetalleHabitoScreen() {
   
   // Modal & Toast states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editColor, setEditColor] = useState<string | null>(null);
+  const [editIcono, setEditIcono] = useState<string | null>(null);
+  const [editTipo, setEditTipo] = useState<string>('bueno');
+  const [editFechaFin, setEditFechaFin] = useState('');
+  const [editMetaValor, setEditMetaValor] = useState('');
+  const [editMetaUnidad, setEditMetaUnidad] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
     message: '',
@@ -238,6 +264,59 @@ export default function DetalleHabitoScreen() {
     }
   };
 
+  const openEditModal = () => {
+    setEditColor(habito?.color || null);
+    setEditIcono(habito?.icono || null);
+    setEditTipo(habito?.tipo || 'bueno');
+    setEditFechaFin(habito?.fecha_fin ? habito.fecha_fin.slice(0, 10) : '');
+    setEditMetaValor(habito?.meta_valor != null ? String(habito.meta_valor) : '');
+    setEditMetaUnidad(habito?.meta_unidad || '');
+    setShowEditModal(true);
+  };
+
+  const saveEditExtras = async () => {
+    if (!user?.user_id || !habito_usuario_id || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const body: Record<string, unknown> = {
+        color: editColor || null,
+        icono: editIcono || null,
+        tipo: editTipo || null,
+        fecha_fin: editFechaFin || null,
+        meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
+        meta_unidad: editMetaUnidad || null,
+      };
+      const response = await authFetch(
+        `/api/usuario/${user.user_id}/habito/${habito_usuario_id}/campos-extra`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setHabito(prev => prev ? {
+          ...prev,
+          color: editColor,
+          icono: editIcono,
+          tipo: editTipo,
+          fecha_fin: editFechaFin || null,
+          meta_valor: editMetaValor ? parseFloat(editMetaValor) : null,
+          meta_unidad: editMetaUnidad || null,
+        } : null);
+        setShowEditModal(false);
+        setToast({ visible: true, message: 'Hábito actualizado', type: 'success' });
+      } else {
+        setToast({ visible: true, message: data.detail || 'Error al guardar', type: 'error' });
+      }
+    } catch {
+      setToast({ visible: true, message: 'Error de conexión', type: 'error' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 
@@ -280,14 +359,16 @@ export default function DetalleHabitoScreen() {
   const categoryColor = getCategoryColor(habito.categoria_id);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+      <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalle del hábito</Text>
-        <View style={{ width: 44 }} />
+        <Text style={[styles.headerTitle, { color: palette.heading }]}>Detalle del hábito</Text>
+        <TouchableOpacity style={styles.editHeaderBtn} onPress={openEditModal}>
+          <Ionicons name="create-outline" size={22} color={colors.primary[600]} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -304,7 +385,7 @@ export default function DetalleHabitoScreen() {
               color={categoryColor} 
             />
           </View>
-          <Text style={styles.habitName}>{habito.nombre}</Text>
+          <Text style={[styles.habitName, { color: palette.heading }]}>{habito.nombre}</Text>
           <View style={styles.categoryBadge}>
             <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
               {habito.categoria_nombre}
@@ -316,8 +397,8 @@ export default function DetalleHabitoScreen() {
         {habito.descripcion && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Descripción</Text>
-            <View style={styles.descriptionCard}>
-              <Text style={styles.descriptionText}>{habito.descripcion}</Text>
+            <View style={[styles.descriptionCard, { backgroundColor: palette.surfaceAlt }]}>
+              <Text style={[styles.descriptionText, { color: palette.textMuted }]}>{habito.descripcion}</Text>
             </View>
           </View>
         )}
@@ -329,23 +410,23 @@ export default function DetalleHabitoScreen() {
             <Text style={[styles.statValue, { color: colors.accent.amber }]}>
               {habito.estadisticas.racha_actual}
             </Text>
-            <Text style={styles.statLabel}>Racha</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Racha</Text>
           </View>
           
-          <View style={[styles.statCard, { backgroundColor: colors.primary[50] }]}>
+          <View style={[styles.statCard, { backgroundColor: palette.surface }]}>
             <Ionicons name="diamond" size={24} color={colors.primary[600]} />
             <Text style={[styles.statValue, { color: colors.primary[600] }]}>
               {habito.puntos_base}
             </Text>
-            <Text style={styles.statLabel}>Puntos</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Puntos</Text>
           </View>
           
-          <View style={[styles.statCard, { backgroundColor: colors.secondary[50] }]}>
+          <View style={[styles.statCard, { backgroundColor: palette.surface }]}>
             <Ionicons name="checkmark-done" size={24} color={colors.secondary[600]} />
             <Text style={[styles.statValue, { color: colors.secondary[600] }]}>
               {habito.estadisticas.dias_completados}
             </Text>
-            <Text style={styles.statLabel}>Días Hechos</Text>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Días Hechos</Text>
           </View>
         </View>
 
@@ -359,33 +440,33 @@ export default function DetalleHabitoScreen() {
 
         {/* Month Stats */}
         {historialResumen && (
-          <View style={styles.monthStatsCard}>
+          <View style={[styles.monthStatsCard, { backgroundColor: palette.surface }]}>
             <View style={styles.monthStatItem}>
-              <Text style={styles.monthStatValue}>
+              <Text style={[styles.monthStatValue, { color: palette.heading }]}>
                 {historialResumen.dias_completados}/{historialResumen.total_dias}
               </Text>
-              <Text style={styles.monthStatLabel}>Días este mes</Text>
+              <Text style={[styles.monthStatLabel, { color: palette.textMuted }]}>Días este mes</Text>
             </View>
-            <View style={styles.monthStatDivider} />
+            <View style={[styles.monthStatDivider, { backgroundColor: palette.divider }]} />
             <View style={styles.monthStatItem}>
-              <Text style={styles.monthStatValue}>
+              <Text style={[styles.monthStatValue, { color: palette.heading }]}>
                 {historialResumen.porcentaje_completado}%
               </Text>
-              <Text style={styles.monthStatLabel}>Tasa de éxito</Text>
+              <Text style={[styles.monthStatLabel, { color: palette.textMuted }]}>Tasa de éxito</Text>
             </View>
           </View>
         )}
 
         {/* Extra info: meta, fecha fin, tipo */}
         {(habito.meta_valor || habito.fecha_fin || habito.tipo === 'por_eliminar') && (
-          <View style={styles.extraInfoCard}>
+          <View style={[styles.extraInfoCard, { backgroundColor: palette.surface }]}>
             {habito.tipo === 'por_eliminar' && (
               <View style={styles.extraInfoRow}>
                 <View style={[styles.extraInfoIcon, { backgroundColor: '#FEE2E2' }]}>
                   <Ionicons name="warning" size={16} color="#EF4444" />
                 </View>
                 <View>
-                  <Text style={styles.extraInfoLabel}>Tipo</Text>
+                  <Text style={[styles.extraInfoLabel, { color: palette.textMuted }]}>Tipo</Text>
                   <Text style={[styles.extraInfoValue, { color: '#EF4444' }]}>Hábito a eliminar</Text>
                 </View>
               </View>
@@ -396,8 +477,8 @@ export default function DetalleHabitoScreen() {
                   <Ionicons name="flag" size={16} color="#8B5CF6" />
                 </View>
                 <View>
-                  <Text style={styles.extraInfoLabel}>Meta diaria</Text>
-                  <Text style={styles.extraInfoValue}>{habito.meta_valor} {habito.meta_unidad}</Text>
+                  <Text style={[styles.extraInfoLabel, { color: palette.textMuted }]}>Meta diaria</Text>
+                  <Text style={[styles.extraInfoValue, { color: palette.text }]}>{habito.meta_valor} {habito.meta_unidad}</Text>
                 </View>
               </View>
             )}
@@ -407,8 +488,8 @@ export default function DetalleHabitoScreen() {
                   <Ionicons name="calendar-clear" size={16} color="#F97316" />
                 </View>
                 <View>
-                  <Text style={styles.extraInfoLabel}>Finaliza el</Text>
-                  <Text style={styles.extraInfoValue}>
+                  <Text style={[styles.extraInfoLabel, { color: palette.textMuted }]}>Finaliza el</Text>
+                  <Text style={[styles.extraInfoValue, { color: palette.text }]}>
                     {new Date(habito.fecha_fin).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </Text>
                 </View>
@@ -419,26 +500,26 @@ export default function DetalleHabitoScreen() {
 
         {/* Streaks Stats */}
         {rachas && (
-          <View style={styles.streaksCard}>
+          <View style={[styles.streaksCard, { backgroundColor: palette.surface }]}>
             <View style={styles.streakItem}>
               <Ionicons name="trophy" size={20} color={colors.accent.amber} />
               <View>
-                <Text style={styles.streakValue}>{rachas.racha_maxima} días</Text>
-                <Text style={styles.streakLabel}>Mejor Racha</Text>
+                <Text style={[styles.streakValue, { color: palette.heading }]}>{rachas.racha_maxima} días</Text>
+                <Text style={[styles.streakLabel, { color: palette.textMuted }]}>Mejor Racha</Text>
               </View>
             </View>
             <View style={styles.streakItem}>
               <Ionicons name="analytics" size={20} color={colors.primary[600]} />
               <View>
-                <Text style={styles.streakValue}>{rachas.estadisticas.promedio_racha} días</Text>
-                <Text style={styles.streakLabel}>Promedio</Text>
+                <Text style={[styles.streakValue, { color: palette.heading }]}>{rachas.estadisticas.promedio_racha} días</Text>
+                <Text style={[styles.streakLabel, { color: palette.textMuted }]}>Promedio</Text>
               </View>
             </View>
             <View style={styles.streakItem}>
               <Ionicons name="layers" size={20} color={colors.secondary[600]} />
               <View>
-                <Text style={styles.streakValue}>{rachas.estadisticas.total_rachas}</Text>
-                <Text style={styles.streakLabel}>Total Rachas</Text>
+                <Text style={[styles.streakValue, { color: palette.heading }]}>{rachas.estadisticas.total_rachas}</Text>
+                <Text style={[styles.streakLabel, { color: palette.textMuted }]}>Total Rachas</Text>
               </View>
             </View>
           </View>
@@ -508,6 +589,129 @@ export default function DetalleHabitoScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: palette.bg }}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            {/* Modal Header */}
+            <View style={[styles.editModalHeader, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={[styles.editModalCancel, { color: palette.textMuted }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={[styles.editModalTitle, { color: palette.heading }]}>Personalizar hábito</Text>
+              <TouchableOpacity onPress={saveEditExtras} disabled={savingEdit}>
+                <Text style={[styles.editModalSave, savingEdit && { opacity: 0.5 }]}>
+                  {savingEdit ? 'Guardando...' : 'Guardar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing[5] }}>
+              {/* Color */}
+              <Text style={[styles.editSectionLabel, { color: palette.heading }]}>Color</Text>
+              <View style={styles.colorGrid}>
+                {PRESET_COLORS.map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorSwatch, { backgroundColor: c }, editColor === c && styles.colorSwatchSelected]}
+                    onPress={() => setEditColor(c)}
+                  >
+                    {editColor === c && <Ionicons name="checkmark" size={16} color="#fff" />}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.colorSwatch, { backgroundColor: palette.surfaceAlt }, !editColor && styles.colorSwatchSelected]}
+                  onPress={() => setEditColor(null)}
+                >
+                  <Ionicons name="close" size={16} color={palette.icon} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Icono */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Icono</Text>
+              <View style={styles.iconGrid}>
+                {PRESET_ICONS.map(ic => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[styles.iconSwatch, { backgroundColor: palette.surfaceAlt }, editIcono === ic && styles.iconSwatchSelected]}
+                    onPress={() => setEditIcono(ic)}
+                  >
+                    <Ionicons name={ic as any} size={22} color={editIcono === ic ? colors.primary[600] : palette.icon} />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.iconSwatch, { backgroundColor: palette.surfaceAlt }, !editIcono && styles.iconSwatchSelected]}
+                  onPress={() => setEditIcono(null)}
+                >
+                  <Ionicons name="close-circle-outline" size={22} color={palette.icon} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Tipo */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Tipo</Text>
+              <View style={styles.tipoRow}>
+                <TouchableOpacity
+                  style={[styles.tipoBtn, { backgroundColor: palette.surfaceAlt }, editTipo === 'bueno' && styles.tipoBtnSelected]}
+                  onPress={() => setEditTipo('bueno')}
+                >
+                  <Ionicons name="trending-up" size={16} color={editTipo === 'bueno' ? colors.secondary[600] : palette.icon} />
+                  <Text style={[styles.tipoBtnText, { color: palette.textMuted }, editTipo === 'bueno' && { color: colors.secondary[600] }]}>Hábito positivo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tipoBtn, { backgroundColor: palette.surfaceAlt }, editTipo === 'por_eliminar' && styles.tipoBtnDanger]}
+                  onPress={() => setEditTipo('por_eliminar')}
+                >
+                  <Ionicons name="trending-down" size={16} color={editTipo === 'por_eliminar' ? '#EF4444' : palette.icon} />
+                  <Text style={[styles.tipoBtnText, { color: palette.textMuted }, editTipo === 'por_eliminar' && { color: '#EF4444' }]}>Hábito a eliminar</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Meta diaria */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Meta diaria (opcional)</Text>
+              <View style={styles.metaRow}>
+                <TextInput
+                  style={[styles.metaInput, { flex: 1, backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                  placeholder="Ej: 30"
+                  placeholderTextColor={palette.textSubtle}
+                  keyboardType="decimal-pad"
+                  value={editMetaValor}
+                  onChangeText={setEditMetaValor}
+                />
+                <TextInput
+                  style={[styles.metaInput, { flex: 2, backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                  placeholder="Ej: minutos, vasos, km..."
+                  placeholderTextColor={palette.textSubtle}
+                  value={editMetaUnidad}
+                  onChangeText={setEditMetaUnidad}
+                />
+              </View>
+
+              {/* Fecha fin */}
+              <Text style={[styles.editSectionLabel, { marginTop: spacing[5], color: palette.heading }]}>Fecha de fin (opcional)</Text>
+              <TextInput
+                style={[styles.metaInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={palette.textSubtle}
+                value={editFechaFin}
+                onChangeText={setEditFechaFin}
+                keyboardType="numbers-and-punctuation"
+              />
+              <Text style={[styles.editHint, { color: palette.textSubtle }]}>Déjalo en blanco si el hábito no tiene fecha límite</Text>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
@@ -592,6 +796,125 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: typography.size.lg,
     fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  editHeaderBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+    backgroundColor: colors.neutral[0],
+  },
+  editModalTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[900],
+  },
+  editModalCancel: {
+    fontSize: typography.size.base,
+    color: colors.neutral[500],
+  },
+  editModalSave: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
+  },
+  editSectionLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[3],
+  },
+  editHint: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+    marginTop: spacing[2],
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[3],
+  },
+  colorSwatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorSwatchSelected: {
+    borderWidth: 3,
+    borderColor: colors.neutral[900],
+  },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+  },
+  iconSwatch: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconSwatchSelected: {
+    backgroundColor: colors.primary[50],
+    borderWidth: 2,
+    borderColor: colors.primary[400],
+  },
+  tipoRow: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  tipoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100],
+  },
+  tipoBtnSelected: {
+    backgroundColor: colors.secondary[50],
+    borderWidth: 1.5,
+    borderColor: colors.secondary[400],
+  },
+  tipoBtnDanger: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  tipoBtnText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    fontWeight: typography.weight.medium,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  metaInput: {
+    backgroundColor: colors.neutral[0],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.size.base,
     color: colors.neutral[900],
   },
   content: {

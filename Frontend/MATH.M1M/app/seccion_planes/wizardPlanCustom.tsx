@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -15,9 +14,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // =====================
 // INTERFACES
@@ -28,6 +28,9 @@ interface Tarea {
   titulo: string;
   descripcion: string;
   tipo: 'diaria' | 'semanal' | 'única';
+  prioridad: 'alta' | 'media' | 'baja';
+  notas: string;
+  fecha_limite: string | null;
 }
 
 interface Fase {
@@ -58,13 +61,34 @@ const DIFICULTADES = [
   { key: 'difícil', label: 'Difícil', color: colors.semantic.error },
 ];
 
-const DURACIONES_SUGERIDAS = [30, 60, 90, 120];
+const DURACIONES_SUGERIDAS = [14, 30, 60, 90, 120];
 
 const TIPOS_TAREA = [
   { key: 'diaria', label: 'Diaria', icon: 'today' },
   { key: 'semanal', label: 'Semanal', icon: 'calendar' },
   { key: 'única', label: 'Única', icon: 'checkmark-done' },
 ];
+
+const PRIORIDADES = [
+  { key: 'alta', label: 'Alta', color: colors.semantic.error },
+  { key: 'media', label: 'Media', color: colors.accent.amber },
+  { key: 'baja', label: 'Baja', color: colors.secondary[500] },
+];
+
+const getTipoColor = (tipo: string) => {
+  if (tipo === 'diaria') return colors.primary[500];
+  if (tipo === 'semanal') return colors.accent.amber;
+  return colors.secondary[500];
+};
+
+const getPrioridadColor = (p: string) => {
+  if (p === 'alta') return colors.semantic.error;
+  if (p === 'media') return colors.accent.amber;
+  return colors.secondary[500];
+};
+
+const formatDate = (d: Date) =>
+  d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // =====================
 // MAIN COMPONENT
@@ -73,24 +97,39 @@ const TIPOS_TAREA = [
 export default function WizardPlanCustom() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [stepError, setStepError] = useState('');
+
   const [config, setConfig] = useState<PlanConfig>({
     meta_principal: '',
     descripcion: '',
-    plazo_dias: 60,
+    plazo_dias: 30,
     dificultad: 'intermedio',
     fases: [],
   });
 
-  // Para edición de fase/tarea
-  const [editingFaseId, setEditingFaseId] = useState<string | null>(null);
-  const [editingTareaId, setEditingTareaId] = useState<string | null>(null);
-  const [tempFase, setTempFase] = useState<Partial<Fase>>({});
-  const [tempTarea, setTempTarea] = useState<Partial<Tarea>>({});
+  // Estado separado para el input de duración del plan (permite vacío mientras escribe)
+  const [plazoDiasInput, setPlazoDiasInput] = useState('30');
 
-  // Calcular días usados
+  // Fase editing
+  const [editingFaseId, setEditingFaseId] = useState<string | null>(null);
+  const [tempFase, setTempFase] = useState<{ titulo: string; descripcion: string; duracion_dias: string }>({
+    titulo: '', descripcion: '', duracion_dias: '',
+  });
+  const [faseError, setFaseError] = useState('');
+
+  // Tarea editing
+  const [editingTareaId, setEditingTareaId] = useState<string | null>(null);
+  const [editingFaseId2, setEditingFaseId2] = useState<string | null>(null);
+  const [tempTarea, setTempTarea] = useState<Partial<Tarea>>({
+    titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '', fecha_limite: null,
+  });
+  const [tareaError, setTareaError] = useState('');
+  const [showTareaDatePicker, setShowTareaDatePicker] = useState(false);
+
   const diasUsados = config.fases.reduce((acc, f) => acc + f.duracion_dias, 0);
   const diasRestantes = config.plazo_dias - diasUsados;
 
@@ -99,15 +138,20 @@ export default function WizardPlanCustom() {
   // =====================
 
   const handleNext = () => {
+    setStepError('');
     if (step === 1) {
       if (!config.meta_principal.trim() || config.meta_principal.length < 5) {
-        Alert.alert('Requerido', 'Por favor ingresa una meta con al menos 5 caracteres');
+        setStepError('Ingresa una meta con al menos 5 caracteres');
+        return;
+      }
+      if (config.plazo_dias < 1) {
+        setStepError('La duración del plan debe ser de al menos 1 día');
         return;
       }
     }
     if (step === 2) {
       if (config.fases.length === 0) {
-        Alert.alert('Requerido', 'Agrega al menos una fase a tu plan');
+        setStepError('Agrega al menos una fase a tu plan');
         return;
       }
     }
@@ -115,128 +159,134 @@ export default function WizardPlanCustom() {
   };
 
   const handleBack = () => {
-    if (step === 1) {
-      router.back();
+    setStepError('');
+    if (step === 1) router.back();
+    else setStep(step - 1);
+  };
+
+  // Duración del plan
+  const commitPlazo = (text: string) => {
+    const num = parseInt(text.replace(/[^0-9]/g, ''));
+    if (!isNaN(num) && num > 0) {
+      setConfig({ ...config, plazo_dias: num });
+      setPlazoDiasInput(String(num));
     } else {
-      setStep(step - 1);
+      setPlazoDiasInput(String(config.plazo_dias));
     }
   };
 
-  // Fase handlers
-  const addFase = () => {
-    if (diasRestantes <= 0) {
-      Alert.alert('Sin días disponibles', 'Todos los días están asignados. Aumenta la duración del plan o reduce la duración de las fases.');
-      return;
-    }
-    setTempFase({
-      titulo: '',
-      descripcion: '',
-      duracion_dias: Math.min(14, diasRestantes),
-    });
+  // ── FASES ──
+  const openNewFase = () => {
+    setFaseError('');
+    setTempFase({ titulo: '', descripcion: '', duracion_dias: String(Math.min(14, Math.max(1, diasRestantes))) });
     setEditingFaseId('new');
   };
 
-  const saveFase = () => {
-    if (!tempFase.titulo || tempFase.titulo.trim().length < 3) {
-      Alert.alert('Requerido', 'El título de la fase debe tener al menos 3 caracteres');
-      return;
-    }
-    if (!tempFase.duracion_dias || tempFase.duracion_dias < 1) {
-      Alert.alert('Requerido', 'La duración debe ser de al menos 1 día');
-      return;
-    }
+  const openEditFase = (fase: Fase) => {
+    setFaseError('');
+    setTempFase({ titulo: fase.titulo, descripcion: fase.descripcion, duracion_dias: String(fase.duracion_dias) });
+    setEditingFaseId(fase.id);
+  };
 
+  const saveFase = () => {
+    setFaseError('');
+    if (!tempFase.titulo.trim() || tempFase.titulo.trim().length < 3) {
+      setFaseError('El título debe tener al menos 3 caracteres');
+      return;
+    }
+    const dias = parseInt(tempFase.duracion_dias);
+    if (isNaN(dias) || dias < 1) {
+      setFaseError('La duración debe ser de al menos 1 día');
+      return;
+    }
     if (editingFaseId === 'new') {
-      const newFase: Fase = {
-        id: generateId(),
-        titulo: tempFase.titulo!.trim(),
-        descripcion: tempFase.descripcion || '',
-        duracion_dias: tempFase.duracion_dias!,
-        tareas: [],
-      };
-      setConfig({ ...config, fases: [...config.fases, newFase] });
+      setConfig(prev => ({
+        ...prev,
+        fases: [...prev.fases, {
+          id: generateId(),
+          titulo: tempFase.titulo.trim(),
+          descripcion: tempFase.descripcion,
+          duracion_dias: dias,
+          tareas: [],
+        }],
+      }));
     } else {
-      setConfig({
-        ...config,
-        fases: config.fases.map((f) =>
+      setConfig(prev => ({
+        ...prev,
+        fases: prev.fases.map(f =>
           f.id === editingFaseId
-            ? { ...f, titulo: tempFase.titulo!.trim(), descripcion: tempFase.descripcion || '', duracion_dias: tempFase.duracion_dias! }
+            ? { ...f, titulo: tempFase.titulo.trim(), descripcion: tempFase.descripcion, duracion_dias: dias }
             : f
         ),
-      });
+      }));
     }
     setEditingFaseId(null);
-    setTempFase({});
   };
 
   const deleteFase = (faseId: string) => {
-    Alert.alert('Eliminar Fase', '¿Estás seguro? Todas las tareas de esta fase serán eliminadas.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: () => setConfig({ ...config, fases: config.fases.filter((f) => f.id !== faseId) }),
-      },
-    ]);
+    setConfig(prev => ({ ...prev, fases: prev.fases.filter(f => f.id !== faseId) }));
   };
 
-  // Tarea handlers
-  const addTarea = (faseId: string) => {
-    setTempTarea({ titulo: '', descripcion: '', tipo: 'diaria' });
+  // ── TAREAS ──
+  const openNewTarea = (faseId: string) => {
+    setTareaError('');
+    setTempTarea({ titulo: '', descripcion: '', tipo: 'diaria', prioridad: 'media', notas: '', fecha_limite: null });
     setEditingTareaId('new');
-    setEditingFaseId(faseId);
+    setEditingFaseId2(faseId);
+  };
+
+  const openEditTarea = (faseId: string, tarea: Tarea) => {
+    setTareaError('');
+    setTempTarea({ ...tarea });
+    setEditingTareaId(tarea.id);
+    setEditingFaseId2(faseId);
   };
 
   const saveTarea = () => {
+    setTareaError('');
     if (!tempTarea.titulo || tempTarea.titulo.trim().length < 3) {
-      Alert.alert('Requerido', 'El título de la tarea debe tener al menos 3 caracteres');
+      setTareaError('El título debe tener al menos 3 caracteres');
       return;
     }
-
     const newTarea: Tarea = {
       id: editingTareaId === 'new' ? generateId() : editingTareaId!,
       titulo: tempTarea.titulo!.trim(),
       descripcion: tempTarea.descripcion || '',
       tipo: tempTarea.tipo || 'diaria',
+      prioridad: tempTarea.prioridad || 'media',
+      notas: tempTarea.notas || '',
+      fecha_limite: tempTarea.fecha_limite || null,
     };
-
-    setConfig({
-      ...config,
-      fases: config.fases.map((f) => {
-        if (f.id !== editingFaseId) return f;
-        if (editingTareaId === 'new') {
-          return { ...f, tareas: [...f.tareas, newTarea] };
-        } else {
-          return { ...f, tareas: f.tareas.map((t) => (t.id === editingTareaId ? newTarea : t)) };
-        }
+    setConfig(prev => ({
+      ...prev,
+      fases: prev.fases.map(f => {
+        if (f.id !== editingFaseId2) return f;
+        if (editingTareaId === 'new') return { ...f, tareas: [...f.tareas, newTarea] };
+        return { ...f, tareas: f.tareas.map(t => (t.id === editingTareaId ? newTarea : t)) };
       }),
-    });
-
+    }));
     setEditingTareaId(null);
-    setTempTarea({});
-    setEditingFaseId(null);
+    setEditingFaseId2(null);
   };
 
   const deleteTarea = (faseId: string, tareaId: string) => {
-    setConfig({
-      ...config,
-      fases: config.fases.map((f) =>
-        f.id === faseId ? { ...f, tareas: f.tareas.filter((t) => t.id !== tareaId) } : f
+    setConfig(prev => ({
+      ...prev,
+      fases: prev.fases.map(f =>
+        f.id === faseId ? { ...f, tareas: f.tareas.filter(t => t.id !== tareaId) } : f
       ),
-    });
+    }));
   };
 
   // Submit
   const handleSubmit = async () => {
+    setStepError('');
     if (!user?.user_id) {
-      Alert.alert('Error', 'Sesión expirada. Por favor inicia sesión nuevamente.');
+      setStepError('Sesión expirada. Por favor inicia sesión nuevamente.');
       return;
     }
-
-    // Validación final
-    const fasesConTareas = config.fases.filter((f) => f.tareas.length > 0);
-    if (fasesConTareas.length === 0) {
-      Alert.alert('Requerido', 'Agrega al menos una tarea a tu plan');
+    if (config.fases.reduce((a, f) => a + f.tareas.length, 0) === 0) {
+      setStepError('Agrega al menos una tarea a tu plan');
       return;
     }
 
@@ -258,6 +308,9 @@ export default function WizardPlanCustom() {
             descripcion: t.descripcion || null,
             tipo: t.tipo,
             orden: j + 1,
+            prioridad: t.prioridad,
+            notas: t.notas || null,
+            fecha_limite: t.fecha_limite || null,
           })),
         })),
       };
@@ -267,18 +320,15 @@ export default function WizardPlanCustom() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       const data = await response.json();
 
       if (data.success && data.plan_usuario_id) {
-        // Redirigir automáticamente al plan creado
         router.replace(`/seccion_planes/seguimientoPlan?planUsuarioId=${data.plan_usuario_id}` as any);
       } else {
-        Alert.alert('Error', data.detail || data.message || 'No se pudo crear el plan');
+        setStepError(data.detail || data.message || 'No se pudo crear el plan');
       }
-    } catch (error) {
-      console.error('Error creating plan:', error);
-      Alert.alert('Error', 'No se pudo crear el plan. Por favor intenta de nuevo.');
+    } catch {
+      setStepError('Sin conexión. Por favor intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -293,11 +343,10 @@ export default function WizardPlanCustom() {
       {[1, 2, 3].map((s) => (
         <View key={s} style={styles.stepRow}>
           <View style={[styles.stepDot, step >= s && styles.stepDotActive]}>
-            {step > s ? (
-              <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
-            ) : (
-              <Text style={[styles.stepNumber, step >= s && styles.stepNumberActive]}>{s}</Text>
-            )}
+            {step > s
+              ? <Ionicons name="checkmark" size={14} color={colors.neutral[0]} />
+              : <Text style={[styles.stepNumber, step >= s && styles.stepNumberActive]}>{s}</Text>
+            }
           </View>
           {s < 3 && <View style={[styles.stepLine, step > s && styles.stepLineActive]} />}
         </View>
@@ -305,49 +354,45 @@ export default function WizardPlanCustom() {
     </View>
   );
 
-  // =====================
-  // STEP 1: Basic Info
-  // =====================
-
+  // ── STEP 1 ──
   const renderStep1 = () => (
-    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>¿Cuál es tu meta?</Text>
-      <Text style={styles.stepSubtitle}>Dale a tu plan un objetivo claro</Text>
+    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>¿Cuál es tu meta?</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>Dale a tu plan un objetivo claro</Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Meta Principal *</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Meta Principal *</Text>
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
           placeholder="Ej: Aprender a tocar guitarra"
-          placeholderTextColor={colors.neutral[400]}
+          placeholderTextColor={palette.textSubtle}
           value={config.meta_principal}
-          onChangeText={(t) => setConfig({ ...config, meta_principal: t })}
+          onChangeText={(t) => { setConfig({ ...config, meta_principal: t }); setStepError(''); }}
           maxLength={100}
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Descripción (opcional)</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Descripción (opcional)</Text>
         <TextInput
           style={[styles.textInput, styles.textArea]}
           placeholder="Describe lo que quieres lograr..."
-          placeholderTextColor={colors.neutral[400]}
+          placeholderTextColor={palette.textSubtle}
           value={config.descripcion}
           onChangeText={(t) => setConfig({ ...config, descripcion: t })}
           multiline
-          numberOfLines={3}
-          maxLength={500}
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Duración (días)</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Duración total</Text>
+        {/* Chips de sugerencia */}
         <View style={styles.chipRow}>
           {DURACIONES_SUGERIDAS.map((d) => (
             <TouchableOpacity
               key={d}
               style={[styles.chip, config.plazo_dias === d && styles.chipActive]}
-              onPress={() => setConfig({ ...config, plazo_dias: d })}
+              onPress={() => { setConfig({ ...config, plazo_dias: d }); setPlazoDiasInput(String(d)); }}
             >
               <Text style={[styles.chipText, config.plazo_dias === d && styles.chipTextActive]}>
                 {d} días
@@ -355,31 +400,31 @@ export default function WizardPlanCustom() {
             </TouchableOpacity>
           ))}
         </View>
+        {/* Input libre */}
         <View style={styles.customDurationRow}>
           <Text style={styles.customLabel}>Personalizar:</Text>
           <TextInput
             style={styles.smallInput}
             keyboardType="number-pad"
-            value={config.plazo_dias.toString()}
-            onChangeText={(t) => {
-              const num = parseInt(t) || 7;
-              setConfig({ ...config, plazo_dias: Math.min(365, Math.max(7, num)) });
-            }}
+            value={plazoDiasInput}
+            onChangeText={(t) => { setPlazoDiasInput(t.replace(/[^0-9]/g, '')); setStepError(''); }}
+            onBlur={() => commitPlazo(plazoDiasInput)}
+            selectTextOnFocus
           />
           <Text style={styles.customLabel}>días</Text>
         </View>
+        <Text style={styles.durationHint}>
+          Duración actual: <Text style={{ fontWeight: '700', color: colors.primary[600] }}>{config.plazo_dias} días</Text>
+        </Text>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Dificultad</Text>
+        <Text style={[styles.inputLabel, { color: palette.text }]}>Dificultad</Text>
         <View style={styles.chipRow}>
           {DIFICULTADES.map((d) => (
             <TouchableOpacity
               key={d.key}
-              style={[
-                styles.chip,
-                config.dificultad === d.key && { backgroundColor: d.color + '20', borderColor: d.color },
-              ]}
+              style={[styles.chip, config.dificultad === d.key && { backgroundColor: d.color + '20', borderColor: d.color }]}
               onPress={() => setConfig({ ...config, dificultad: d.key as any })}
             >
               <Text style={[styles.chipText, config.dificultad === d.key && { color: d.color }]}>
@@ -392,33 +437,23 @@ export default function WizardPlanCustom() {
     </ScrollView>
   );
 
-  // =====================
-  // STEP 2: Phases
-  // =====================
-
+  // ── STEP 2 ──
   const renderStep2 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Divídelo en fases</Text>
-      <Text style={styles.stepSubtitle}>
-        Divide tu plan de {config.plazo_dias} días en fases manejables
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>Divídelo en fases</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>
+        Plan de {config.plazo_dias} días — divide el tiempo en etapas
       </Text>
 
-      {/* Days progress */}
       <View style={styles.daysProgress}>
         <View style={styles.daysProgressBar}>
-          <View
-            style={[
-              styles.daysProgressFill,
-              { width: `${Math.min(100, (diasUsados / config.plazo_dias) * 100)}%` },
-            ]}
-          />
+          <View style={[styles.daysProgressFill, { width: `${Math.min(100, (diasUsados / config.plazo_dias) * 100)}%` }]} />
         </View>
         <Text style={styles.daysProgressText}>
-          {diasUsados} de {config.plazo_dias} días asignados ({diasRestantes} restantes)
+          {diasUsados} de {config.plazo_dias} días asignados ({diasRestantes >= 0 ? diasRestantes : 0} restantes)
         </Text>
       </View>
 
-      {/* Phases list */}
       {config.fases.map((fase, index) => (
         <View key={fase.id} style={styles.faseCard}>
           <View style={styles.faseHeader}>
@@ -426,12 +461,7 @@ export default function WizardPlanCustom() {
               <Text style={styles.faseBadgeText}>Fase {index + 1}</Text>
             </View>
             <View style={styles.faseActions}>
-              <TouchableOpacity
-                onPress={() => {
-                  setTempFase({ titulo: fase.titulo, descripcion: fase.descripcion, duracion_dias: fase.duracion_dias });
-                  setEditingFaseId(fase.id);
-                }}
-              >
+              <TouchableOpacity onPress={() => openEditFase(fase)}>
                 <Ionicons name="create-outline" size={20} color={colors.neutral[500]} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => deleteFase(fase.id)}>
@@ -441,164 +471,24 @@ export default function WizardPlanCustom() {
           </View>
           <Text style={styles.faseTitulo}>{fase.titulo}</Text>
           <Text style={styles.faseDuracion}>{fase.duracion_dias} días</Text>
-          {fase.descripcion && <Text style={styles.faseDesc}>{fase.descripcion}</Text>}
+          {fase.descripcion ? <Text style={styles.faseDesc}>{fase.descripcion}</Text> : null}
         </View>
       ))}
 
-      {/* Add phase button */}
-      <TouchableOpacity style={styles.addButton} onPress={addFase} disabled={diasRestantes <= 0}>
-        <Ionicons name="add" size={20} color={diasRestantes > 0 ? colors.primary[600] : colors.neutral[400]} />
-        <Text style={[styles.addButtonText, diasRestantes <= 0 && { color: colors.neutral[400] }]}>
-          Agregar Fase
+      <TouchableOpacity style={[styles.addButton, diasRestantes <= 0 && { opacity: 0.4 }]} onPress={openNewFase} disabled={diasRestantes <= 0}>
+        <Ionicons name="add" size={22} color={colors.primary[600]} />
+        <Text style={styles.addButtonText}>
+          {diasRestantes <= 0 ? 'Sin días disponibles' : 'Agregar Fase'}
         </Text>
       </TouchableOpacity>
-
-      </ScrollView>
+    </ScrollView>
   );
 
-  // =====================
-  // FASE MODAL (separate)
-  // =====================
-  const renderFaseModal = () => (
-    <Modal
-      visible={editingFaseId !== null && editingTareaId === null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => {
-        setEditingFaseId(null);
-        setTempFase({});
-      }}
-    >
-      <View style={styles.editModal}>
-        <View style={styles.editModalContent}>
-          <Text style={styles.editModalTitle}>
-            {editingFaseId === 'new' ? 'Nueva Fase' : 'Editar Fase'}
-          </Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Título de la fase"
-            placeholderTextColor={colors.neutral[400]}
-            value={tempFase.titulo || ''}
-            onChangeText={(t) => setTempFase({ ...tempFase, titulo: t })}
-          />
-          <TextInput
-            style={[styles.textInput, styles.textArea, { marginTop: spacing[3] }]}
-            placeholder="Descripción (opcional)"
-            placeholderTextColor={colors.neutral[400]}
-            value={tempFase.descripcion || ''}
-            onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
-            multiline
-          />
-          <View style={styles.durationRow}>
-            <Text style={styles.inputLabel}>Duración:</Text>
-            <TextInput
-              style={styles.smallInput}
-              keyboardType="number-pad"
-              value={(tempFase.duracion_dias || '').toString()}
-              onChangeText={(t) => setTempFase({ ...tempFase, duracion_dias: parseInt(t) || 1 })}
-            />
-            <Text style={styles.inputLabel}>días</Text>
-          </View>
-          <View style={styles.editModalButtons}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => {
-                setEditingFaseId(null);
-                setTempFase({});
-              }}
-            >
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={saveFase}>
-              <Text style={styles.saveBtnText}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  // =====================
-  // TAREA MODAL (separate)
-  // =====================
-  const renderTareaModal = () => (
-    <Modal
-      visible={editingTareaId !== null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => {
-        setEditingTareaId(null);
-        setTempTarea({});
-        setEditingFaseId(null);
-      }}
-    >
-      <View style={styles.editModal}>
-        <View style={styles.editModalContent}>
-          <Text style={styles.editModalTitle}>
-            {editingTareaId === 'new' ? 'Nueva Tarea' : 'Editar Tarea'}
-          </Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Título de la tarea"
-            placeholderTextColor={colors.neutral[400]}
-            value={tempTarea.titulo || ''}
-            onChangeText={(t) => setTempTarea({ ...tempTarea, titulo: t })}
-          />
-          <TextInput
-            style={[styles.textInput, styles.textArea, { marginTop: spacing[3] }]}
-            placeholder="Descripción (opcional)"
-            placeholderTextColor={colors.neutral[400]}
-            value={tempTarea.descripcion || ''}
-            onChangeText={(t) => setTempTarea({ ...tempTarea, descripcion: t })}
-            multiline
-          />
-          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Tipo de Tarea</Text>
-          <View style={styles.chipRow}>
-            {TIPOS_TAREA.map((tipo) => (
-              <TouchableOpacity
-                key={tipo.key}
-                style={[styles.chip, tempTarea.tipo === tipo.key && styles.chipActive]}
-                onPress={() => setTempTarea({ ...tempTarea, tipo: tipo.key as any })}
-              >
-                <Ionicons
-                  name={tipo.icon as any}
-                  size={14}
-                  color={tempTarea.tipo === tipo.key ? colors.primary[600] : colors.neutral[500]}
-                />
-                <Text style={[styles.chipText, tempTarea.tipo === tipo.key && styles.chipTextActive]}>
-                  {tipo.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.editModalButtons}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => {
-                setEditingTareaId(null);
-                setTempTarea({});
-                setEditingFaseId(null);
-              }}
-            >
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={saveTarea}>
-              <Text style={styles.saveBtnText}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  // =====================
-  // STEP 3: Tasks
-  // =====================
-
+  // ── STEP 3 ──
   const renderStep3 = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.stepTitle}>Agrega tareas a cada fase</Text>
-      <Text style={styles.stepSubtitle}>Define lo que harás en cada fase</Text>
+      <Text style={[styles.stepTitle, { color: palette.heading }]}>Agrega tareas a cada fase</Text>
+      <Text style={[styles.stepSubtitle, { color: palette.textMuted }]}>Define lo que harás en cada etapa</Text>
 
       {config.fases.map((fase, faseIndex) => (
         <View key={fase.id} style={styles.faseTasksCard}>
@@ -607,535 +497,395 @@ export default function WizardPlanCustom() {
             <Text style={styles.faseTasksDuration}>{fase.duracion_dias} días</Text>
           </View>
 
-          {/* Tasks list */}
           {fase.tareas.map((tarea) => (
-            <View key={tarea.id} style={styles.tareaItem}>
+            <TouchableOpacity key={tarea.id} style={styles.tareaItem} onPress={() => openEditTarea(fase.id, tarea)} activeOpacity={0.7}>
               <View style={styles.tareaInfo}>
                 <View style={[styles.tareaTipoBadge, { backgroundColor: getTipoColor(tarea.tipo) + '20' }]}>
-                  <Text style={[styles.tareaTipoText, { color: getTipoColor(tarea.tipo) }]}>
-                    {tarea.tipo}
-                  </Text>
+                  <Text style={[styles.tareaTipoText, { color: getTipoColor(tarea.tipo) }]}>{tarea.tipo}</Text>
                 </View>
-                <Text style={styles.tareaTitulo}>{tarea.titulo}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tareaTitulo}>{tarea.titulo}</Text>
+                  {tarea.fecha_limite && (
+                    <Text style={styles.tareaFecha}>
+                      <Ionicons name="calendar-outline" size={11} /> {tarea.fecha_limite}
+                    </Text>
+                  )}
+                </View>
+                <View style={[styles.prioridadDot, { backgroundColor: getPrioridadColor(tarea.prioridad) }]} />
               </View>
-              <TouchableOpacity onPress={() => deleteTarea(fase.id, tarea.id)}>
-                <Ionicons name="close-circle" size={20} color={colors.neutral[400]} />
+              <TouchableOpacity onPress={() => deleteTarea(fase.id, tarea.id)} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={20} color={colors.neutral[300]} />
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           ))}
 
-          {/* Add task button */}
-          <TouchableOpacity style={styles.addTaskBtn} onPress={() => addTarea(fase.id)}>
+          <TouchableOpacity style={styles.addTaskBtn} onPress={() => openNewTarea(fase.id)}>
             <Ionicons name="add" size={18} color={colors.primary[600]} />
             <Text style={styles.addTaskBtnText}>Agregar Tarea</Text>
           </TouchableOpacity>
         </View>
       ))}
 
-
-      {/* Summary */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Resumen del Plan</Text>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Meta:</Text>
-          <Text style={styles.summaryValue}>{config.meta_principal}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Duración:</Text>
-          <Text style={styles.summaryValue}>{config.plazo_dias} días</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Fases:</Text>
-          <Text style={styles.summaryValue}>{config.fases.length}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total de tareas:</Text>
-          <Text style={styles.summaryValue}>
-            {config.fases.reduce((acc, f) => acc + f.tareas.length, 0)}
-          </Text>
-        </View>
+        {[
+          ['Meta', config.meta_principal],
+          ['Duración', `${config.plazo_dias} días`],
+          ['Fases', String(config.fases.length)],
+          ['Total de tareas', String(config.fases.reduce((a, f) => a + f.tareas.length, 0))],
+        ].map(([label, value]) => (
+          <View key={label} style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>{label}:</Text>
+            <Text style={styles.summaryValue}>{value}</Text>
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
 
-  const getTipoColor = (tipo: string) => {
-    switch (tipo) {
-      case 'diaria':
-        return colors.primary[500];
-      case 'semanal':
-        return colors.accent.amber;
-      case 'única':
-        return colors.secondary[500];
-      default:
-        return colors.neutral[500];
-    }
-  };
+  // ── FASE MODAL ──
+  const renderFaseModal = () => (
+    <Modal
+      visible={editingFaseId !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => { setEditingFaseId(null); setFaseError(''); }}
+    >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.editModal}>
+        <ScrollView contentContainerStyle={styles.editModalContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.editModalTitle}>
+            {editingFaseId === 'new' ? 'Nueva Fase' : 'Editar Fase'}
+          </Text>
+
+          <Text style={[styles.inputLabel, { color: palette.text }]}>Título *</Text>
+          <TextInput
+            style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+            placeholder="Ej: Fundamentos"
+            placeholderTextColor={palette.textSubtle}
+            value={tempFase.titulo}
+            onChangeText={(t) => { setTempFase({ ...tempFase, titulo: t }); setFaseError(''); }}
+          />
+
+          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Descripción (opcional)</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea, { marginBottom: spacing[3] }]}
+            placeholder="¿Qué harás en esta fase?"
+            placeholderTextColor={palette.textSubtle}
+            value={tempFase.descripcion}
+            onChangeText={(t) => setTempFase({ ...tempFase, descripcion: t })}
+            multiline
+          />
+
+          <View style={styles.durationRow}>
+            <Text style={[styles.inputLabel, { color: palette.text }]}>Duración:</Text>
+            <TextInput
+              style={styles.smallInput}
+              keyboardType="number-pad"
+              value={tempFase.duracion_dias}
+              onChangeText={(t) => { setTempFase({ ...tempFase, duracion_dias: t.replace(/[^0-9]/g, '') }); setFaseError(''); }}
+              selectTextOnFocus
+            />
+            <Text style={[styles.inputLabel, { color: palette.text }]}>días</Text>
+          </View>
+          <Text style={styles.durationHint}>
+            Días disponibles: {diasRestantes + (editingFaseId !== 'new' ? (config.fases.find(f => f.id === editingFaseId)?.duracion_dias || 0) : 0)}
+          </Text>
+
+          {faseError !== '' && <InlineError msg={faseError} />}
+
+          <View style={styles.editModalButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditingFaseId(null); setFaseError(''); }}>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveBtn} onPress={saveFase}>
+              <Text style={styles.saveBtnText}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // ── TAREA MODAL ──
+  const renderTareaModal = () => (
+    <Modal
+      visible={editingTareaId !== null}
+      transparent
+      animationType="slide"
+      onRequestClose={() => { setEditingTareaId(null); setEditingFaseId2(null); setTareaError(''); }}
+    >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.editModal}>
+        <ScrollView contentContainerStyle={[styles.editModalContent, { maxHeight: '90%' }]} keyboardShouldPersistTaps="handled">
+          <Text style={styles.editModalTitle}>
+            {editingTareaId === 'new' ? 'Nueva Tarea' : 'Editar Tarea'}
+          </Text>
+
+          {/* Título */}
+          <Text style={[styles.inputLabel, { color: palette.text }]}>Título *</Text>
+          <TextInput
+            style={[styles.textInput, { backgroundColor: palette.inputBg, borderColor: palette.border, color: palette.text }]}
+            placeholder="¿Qué vas a hacer?"
+            placeholderTextColor={palette.textSubtle}
+            value={tempTarea.titulo || ''}
+            onChangeText={(t) => { setTempTarea({ ...tempTarea, titulo: t }); setTareaError(''); }}
+          />
+
+          {/* Descripción */}
+          <Text style={[styles.inputLabel, { marginTop: spacing[3] }]}>Descripción (opcional)</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea, { marginBottom: 0 }]}
+            placeholder="Más detalles de la tarea..."
+            placeholderTextColor={palette.textSubtle}
+            value={tempTarea.descripcion || ''}
+            onChangeText={(t) => setTempTarea({ ...tempTarea, descripcion: t })}
+            multiline
+          />
+
+          {/* Tipo */}
+          <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Tipo</Text>
+          <View style={styles.chipRow}>
+            {TIPOS_TAREA.map((tipo) => (
+              <TouchableOpacity
+                key={tipo.key}
+                style={[styles.chip, tempTarea.tipo === tipo.key && styles.chipActive]}
+                onPress={() => setTempTarea({ ...tempTarea, tipo: tipo.key as any })}
+              >
+                <Ionicons name={tipo.icon as any} size={14} color={tempTarea.tipo === tipo.key ? colors.primary[600] : colors.neutral[500]} />
+                <Text style={[styles.chipText, tempTarea.tipo === tipo.key && styles.chipTextActive]}>{tipo.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Prioridad */}
+          <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Prioridad</Text>
+          <View style={styles.chipRow}>
+            {PRIORIDADES.map((p) => (
+              <TouchableOpacity
+                key={p.key}
+                style={[styles.chip, tempTarea.prioridad === p.key && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                onPress={() => setTempTarea({ ...tempTarea, prioridad: p.key as any })}
+              >
+                <View style={[styles.prioridadDot, { backgroundColor: p.color }]} />
+                <Text style={[styles.chipText, tempTarea.prioridad === p.key && { color: p.color }]}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Fecha límite */}
+          <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Fecha límite (opcional)</Text>
+          <TouchableOpacity
+            style={[styles.textInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+            onPress={() => setShowTareaDatePicker(true)}
+          >
+            <Text style={{ color: tempTarea.fecha_limite ? colors.neutral[800] : colors.neutral[400], fontSize: typography.size.base }}>
+              {tempTarea.fecha_limite || 'Seleccionar fecha'}
+            </Text>
+            <Ionicons name="calendar-outline" size={18} color={colors.neutral[400]} />
+          </TouchableOpacity>
+          {tempTarea.fecha_limite && (
+            <TouchableOpacity onPress={() => setTempTarea({ ...tempTarea, fecha_limite: null })} style={styles.clearDateBtn}>
+              <Ionicons name="close-circle" size={14} color={colors.neutral[400]} />
+              <Text style={styles.clearDateText}>Quitar fecha</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* DatePicker */}
+          {showTareaDatePicker && (
+            <DateTimePicker
+              value={tempTarea.fecha_limite ? new Date(tempTarea.fecha_limite) : new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minimumDate={new Date()}
+              onChange={(_: DateTimePickerEvent, date?: Date) => {
+                setShowTareaDatePicker(Platform.OS === 'ios');
+                if (date) setTempTarea({ ...tempTarea, fecha_limite: formatDate(date) });
+              }}
+            />
+          )}
+
+          {/* Notas */}
+          <Text style={[styles.inputLabel, { marginTop: spacing[4] }]}>Notas (opcional)</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            placeholder="Recordatorios, recursos, links..."
+            placeholderTextColor={palette.textSubtle}
+            value={tempTarea.notas || ''}
+            onChangeText={(t) => setTempTarea({ ...tempTarea, notas: t })}
+            multiline
+          />
+
+          {tareaError !== '' && <InlineError msg={tareaError} />}
+
+          <View style={styles.editModalButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditingTareaId(null); setEditingFaseId2(null); setTareaError(''); }}>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveBtn} onPress={saveTarea}>
+              <Text style={styles.saveBtnText}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
 
   // =====================
   // RENDER
   // =====================
-
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+        <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crear Plan Personalizado</Text>
+          <Text style={[styles.headerTitle, { color: palette.heading }]}>Crear Plan Personalizado</Text>
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Step Indicator */}
         {renderStepIndicator()}
 
-        {/* Step Content */}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
 
+        {/* Inline step error */}
+        {stepError !== '' && (
+          <View style={styles.stepErrorBanner}>
+            <Ionicons name="alert-circle" size={16} color="#B91C1C" />
+            <Text style={styles.stepErrorText}>{stepError}</Text>
+          </View>
+        )}
+
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
           {step < 3 ? (
             <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
               <Text style={styles.nextButtonText}>Continuar</Text>
               <Ionicons name="arrow-forward" size={20} color={colors.neutral[0]} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.nextButton, styles.createButton]}
-              onPress={handleSubmit}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.neutral[0]} />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.neutral[0]} />
-                  <Text style={styles.nextButtonText}>Crear Plan</Text>
-                </>
-              )}
+            <TouchableOpacity style={[styles.nextButton, styles.createButton]} onPress={handleSubmit} disabled={saving}>
+              {saving
+                ? <ActivityIndicator size="small" color={colors.neutral[0]} />
+                : <>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.neutral[0]} />
+                    <Text style={styles.nextButtonText}>Crear Plan</Text>
+                  </>
+              }
             </TouchableOpacity>
           )}
         </View>
       </KeyboardAvoidingView>
 
-      {/* Modals */}
       {renderFaseModal()}
       {renderTareaModal()}
     </SafeAreaView>
   );
 }
 
+// ── Inline error component ──
+function InlineError({ msg }: { msg: string }) {
+  return (
+    <View style={styles.inlineError}>
+      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+      <Text style={styles.inlineErrorText}>{msg}</Text>
+    </View>
+  );
+}
+
 // =====================
 // STYLES
 // =====================
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.neutral[50],
-  },
+  container: { flex: 1, backgroundColor: colors.neutral[50] },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    backgroundColor: colors.neutral[0],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral[100],
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    backgroundColor: colors.neutral[0], borderBottomWidth: 1, borderBottomColor: colors.neutral[100],
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    backgroundColor: colors.neutral[100],
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 40, height: 40, borderRadius: radius.lg,
+    backgroundColor: colors.neutral[100], justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[900],
-  },
-  stepIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing[4],
-    backgroundColor: colors.neutral[0],
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.neutral[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepDotActive: {
-    backgroundColor: colors.primary[600],
-  },
-  stepNumber: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[500],
-  },
-  stepNumberActive: {
-    color: colors.neutral[0],
-  },
-  stepLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: colors.neutral[200],
-    marginHorizontal: spacing[2],
-  },
-  stepLineActive: {
-    backgroundColor: colors.primary[600],
-  },
-  stepContent: {
-    flex: 1,
-    padding: spacing[5],
-  },
-  stepTitle: {
-    fontSize: typography.size.xl,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[900],
-    marginBottom: spacing[1],
-  },
-  stepSubtitle: {
-    fontSize: typography.size.base,
-    color: colors.neutral[500],
-    marginBottom: spacing[6],
-  },
-  inputGroup: {
-    marginBottom: spacing[5],
-  },
-  inputLabel: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[700],
-    marginBottom: spacing[2],
-  },
+  headerTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.neutral[900] },
+  stepIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[4], backgroundColor: colors.neutral[0] },
+  stepRow: { flexDirection: 'row', alignItems: 'center' },
+  stepDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.neutral[200], justifyContent: 'center', alignItems: 'center' },
+  stepDotActive: { backgroundColor: colors.primary[600] },
+  stepNumber: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.neutral[500] },
+  stepNumberActive: { color: colors.neutral[0] },
+  stepLine: { width: 40, height: 2, backgroundColor: colors.neutral[200], marginHorizontal: spacing[2] },
+  stepLineActive: { backgroundColor: colors.primary[600] },
+  stepContent: { flex: 1, padding: spacing[5] },
+  stepTitle: { fontSize: typography.size.xl, fontWeight: typography.weight.bold, color: colors.neutral[900], marginBottom: spacing[1] },
+  stepSubtitle: { fontSize: typography.size.base, color: colors.neutral[500], marginBottom: spacing[6] },
+  inputGroup: { marginBottom: spacing[5] },
+  inputLabel: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.neutral[700], marginBottom: spacing[2] },
   textInput: {
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    fontSize: typography.size.base,
-    color: colors.neutral[800],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    backgroundColor: colors.neutral[0], borderRadius: radius.lg, padding: spacing[4],
+    fontSize: typography.size.base, color: colors.neutral[800], borderWidth: 1, borderColor: colors.neutral[200],
   },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2],
-    borderRadius: radius.lg,
-    backgroundColor: colors.neutral[0],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  chipActive: {
-    backgroundColor: colors.primary[50],
-    borderColor: colors.primary[500],
-  },
-  chipText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[600],
-  },
-  chipTextActive: {
-    color: colors.primary[600],
-  },
-  customDurationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing[3],
-    gap: spacing[2],
-  },
-  customLabel: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[600],
-  },
-  smallInput: {
-    width: 60,
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.md,
-    padding: spacing[2],
-    fontSize: typography.size.base,
-    color: colors.neutral[800],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-    textAlign: 'center',
-  },
-  daysProgress: {
-    marginBottom: spacing[5],
-  },
-  daysProgressBar: {
-    height: 8,
-    backgroundColor: colors.neutral[200],
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: spacing[2],
-  },
-  daysProgressFill: {
-    height: '100%',
-    backgroundColor: colors.primary[500],
-    borderRadius: 4,
-  },
-  daysProgressText: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[500],
-    textAlign: 'center',
-  },
-  faseCard: {
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    marginBottom: spacing[3],
-    ...shadows.sm,
-  },
-  faseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing[2],
-  },
-  faseBadge: {
-    backgroundColor: colors.primary[100],
-    paddingHorizontal: spacing[2],
-    paddingVertical: spacing[1],
-    borderRadius: radius.md,
-  },
-  faseBadgeText: {
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary[600],
-  },
-  faseActions: {
-    flexDirection: 'row',
-    gap: spacing[3],
-  },
-  faseTitulo: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[800],
-  },
-  faseDuracion: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[500],
-    marginTop: spacing[1],
-  },
-  faseDesc: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[600],
-    marginTop: spacing[2],
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    padding: spacing[4],
-    borderRadius: radius.xl,
-    borderWidth: 2,
-    borderColor: colors.neutral[200],
-    borderStyle: 'dashed',
-  },
-  addButtonText: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.medium,
-    color: colors.primary[600],
-  },
-  editModal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: spacing[5],
-  },
-  editModalContent: {
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[5],
-  },
-  editModalTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.neutral[900],
-    marginBottom: spacing[4],
-  },
-  durationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    marginTop: spacing[3],
-  },
-  editModalButtons: {
-    flexDirection: 'row',
-    gap: spacing[3],
-    marginTop: spacing[5],
-  },
-  cancelBtn: {
-    flex: 1,
-    padding: spacing[4],
-    borderRadius: radius.lg,
-    backgroundColor: colors.neutral[100],
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.medium,
-    color: colors.neutral[600],
-  },
-  saveBtn: {
-    flex: 1,
-    padding: spacing[4],
-    borderRadius: radius.lg,
-    backgroundColor: colors.primary[600],
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[0],
-  },
-  faseTasksCard: {
-    backgroundColor: colors.neutral[0],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    marginBottom: spacing[4],
-    ...shadows.sm,
-  },
-  faseTasksHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing[3],
-    paddingBottom: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral[100],
-  },
-  faseTasksTitle: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[800],
-  },
-  faseTasksDuration: {
-    fontSize: typography.size.sm,
-    color: colors.neutral[500],
-  },
-  tareaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing[2],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral[100],
-  },
-  tareaInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  tareaTipoBadge: {
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  tareaTipoText: {
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.medium,
-  },
-  tareaTitulo: {
-    flex: 1,
-    fontSize: typography.size.sm,
-    color: colors.neutral[700],
-  },
-  addTaskBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[1],
-    paddingVertical: spacing[3],
-    marginTop: spacing[2],
-  },
-  addTaskBtnText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.primary[600],
-  },
-  summaryCard: {
-    backgroundColor: colors.primary[50],
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    marginTop: spacing[4],
-  },
-  summaryTitle: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary[700],
-    marginBottom: spacing[3],
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing[2],
-  },
-  summaryLabel: {
-    fontSize: typography.size.sm,
-    color: colors.primary[600],
-  },
-  summaryValue: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary[700],
-  },
-  footer: {
-    padding: spacing[5],
-    backgroundColor: colors.neutral[0],
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral[100],
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    backgroundColor: colors.primary[600],
-    paddingVertical: spacing[4],
-    borderRadius: radius.xl,
-  },
-  createButton: {
-    backgroundColor: colors.secondary[500],
-  },
-  nextButtonText: {
-    fontSize: typography.size.base,
-    fontWeight: typography.weight.semibold,
-    color: colors.neutral[0],
-  },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderRadius: radius.lg, backgroundColor: colors.neutral[0], borderWidth: 1, borderColor: colors.neutral[200] },
+  chipActive: { backgroundColor: colors.primary[50], borderColor: colors.primary[500] },
+  chipText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.neutral[600] },
+  chipTextActive: { color: colors.primary[600] },
+  customDurationRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3], gap: spacing[2] },
+  customLabel: { fontSize: typography.size.sm, color: colors.neutral[600] },
+  smallInput: { width: 70, backgroundColor: colors.neutral[0], borderRadius: radius.md, padding: spacing[3], fontSize: typography.size.base, color: colors.neutral[800], borderWidth: 1, borderColor: colors.neutral[200], textAlign: 'center' },
+  durationHint: { fontSize: typography.size.xs, color: colors.neutral[400], marginTop: spacing[2] },
+  daysProgress: { marginBottom: spacing[5] },
+  daysProgressBar: { height: 8, backgroundColor: colors.neutral[200], borderRadius: 4, overflow: 'hidden', marginBottom: spacing[2] },
+  daysProgressFill: { height: '100%', backgroundColor: colors.primary[500], borderRadius: 4 },
+  daysProgressText: { fontSize: typography.size.sm, color: colors.neutral[500], textAlign: 'center' },
+  faseCard: { backgroundColor: colors.neutral[0], borderRadius: radius.xl, padding: spacing[4], marginBottom: spacing[3], ...shadows.sm },
+  faseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[2] },
+  faseBadge: { backgroundColor: colors.primary[100], paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.md },
+  faseBadgeText: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, color: colors.primary[600] },
+  faseActions: { flexDirection: 'row', gap: spacing[3] },
+  faseTitulo: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[800] },
+  faseDuracion: { fontSize: typography.size.sm, color: colors.neutral[500], marginTop: spacing[1] },
+  faseDesc: { fontSize: typography.size.sm, color: colors.neutral[600], marginTop: spacing[2] },
+  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], padding: spacing[4], borderRadius: radius.xl, borderWidth: 2, borderColor: colors.neutral[200], borderStyle: 'dashed' },
+  addButtonText: { fontSize: typography.size.base, fontWeight: typography.weight.medium, color: colors.primary[600] },
+  faseTasksCard: { backgroundColor: colors.neutral[0], borderRadius: radius.xl, padding: spacing[4], marginBottom: spacing[4], ...shadows.sm },
+  faseTasksHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[3], paddingBottom: spacing[3], borderBottomWidth: 1, borderBottomColor: colors.neutral[100] },
+  faseTasksTitle: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[800] },
+  faseTasksDuration: { fontSize: typography.size.sm, color: colors.neutral[500] },
+  tareaItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: colors.neutral[100] },
+  tareaInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  tareaTipoBadge: { paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radius.sm },
+  tareaTipoText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium },
+  tareaTitulo: { fontSize: typography.size.sm, color: colors.neutral[700], fontWeight: typography.weight.medium },
+  tareaFecha: { fontSize: 10, color: colors.neutral[400], marginTop: 2 },
+  prioridadDot: { width: 8, height: 8, borderRadius: 4 },
+  addTaskBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1], paddingVertical: spacing[3], marginTop: spacing[2] },
+  addTaskBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.primary[600] },
+  summaryCard: { backgroundColor: colors.primary[50], borderRadius: radius.xl, padding: spacing[4], marginTop: spacing[4] },
+  summaryTitle: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.primary[700], marginBottom: spacing[3] },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing[2] },
+  summaryLabel: { fontSize: typography.size.sm, color: colors.primary[600] },
+  summaryValue: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.primary[700] },
+  editModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing[5] },
+  editModalContent: { backgroundColor: colors.neutral[0], borderRadius: radius.xl, padding: spacing[5] },
+  editModalTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.neutral[900], marginBottom: spacing[4] },
+  durationRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[3] },
+  editModalButtons: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[5] },
+  cancelBtn: { flex: 1, padding: spacing[4], borderRadius: radius.lg, backgroundColor: colors.neutral[100], alignItems: 'center' },
+  cancelBtnText: { fontSize: typography.size.base, fontWeight: typography.weight.medium, color: colors.neutral[600] },
+  saveBtn: { flex: 1, padding: spacing[4], borderRadius: radius.lg, backgroundColor: colors.primary[600], alignItems: 'center' },
+  saveBtnText: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
+  clearDateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },
+  clearDateText: { fontSize: typography.size.xs, color: colors.neutral[400] },
+  stepErrorBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[5], marginBottom: spacing[2], backgroundColor: '#FEF2F2', borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: '#FECACA' },
+  stepErrorText: { flex: 1, fontSize: typography.size.sm, color: '#B91C1C' },
+  inlineError: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },
+  inlineErrorText: { flex: 1, fontSize: typography.size.sm, color: '#EF4444' },
+  footer: { padding: spacing[5], backgroundColor: colors.neutral[0], borderTopWidth: 1, borderTopColor: colors.neutral[100] },
+  nextButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: colors.primary[600], paddingVertical: spacing[4], borderRadius: radius.xl },
+  createButton: { backgroundColor: colors.secondary[500] },
+  nextButtonText: { fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.neutral[0] },
 });

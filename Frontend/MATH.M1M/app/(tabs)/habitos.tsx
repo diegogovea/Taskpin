@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
 
 interface HabitoHoy {
@@ -57,6 +59,7 @@ export default function HabitosScreen() {
   
   // ✅ Obtenemos user y authFetch del contexto
   const { user, isLoading: authLoading, authFetch } = useAuth();
+  const { palette } = useTheme();
 
   const [habitos, setHabitos] = useState<HabitoHoy[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({
@@ -67,8 +70,8 @@ export default function HabitosScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  // ❌ ELIMINADO: currentUserId - ahora viene de useAuth()
   const [togglingHabit, setTogglingHabit] = useState<number | null>(null);
+  const [statsModal, setStatsModal] = useState<"fecha" | "completados" | "pendientes" | null>(null);
 
   const getCurrentDate = () => {
     const now = new Date();
@@ -172,22 +175,22 @@ export default function HabitosScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Cargando hábitos...</Text>
+          <Text style={[styles.loadingText, { color: palette.textMuted }]}>Cargando hábitos...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
         <View>
-          <Text style={styles.headerTitle}>Mis Hábitos</Text>
-          <Text style={styles.headerSubtitle}>{month} {day}, {weekday}</Text>
+          <Text style={[styles.headerTitle, { color: palette.text }]}>Mis Hábitos</Text>
+          <Text style={[styles.headerSubtitle, { color: palette.textMuted }]}>{month} {day}, {weekday}</Text>
         </View>
         <TouchableOpacity
           style={styles.addButton}
@@ -205,42 +208,124 @@ export default function HabitosScreen() {
       >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          <View style={styles.dateCard}>
+          <TouchableOpacity style={styles.dateCard} activeOpacity={0.8} onPress={() => setStatsModal("fecha")}>
             <LinearGradient colors={colors.gradients.primary} style={styles.dateCardGradient}>
               <Text style={styles.dateDay}>{day}</Text>
               <Text style={styles.dateMonth}>{month}</Text>
             </LinearGradient>
-          </View>
+          </TouchableOpacity>
 
-          <View style={[styles.statCard, { backgroundColor: colors.secondary[50] }]}>
-            <View style={[styles.statIconContainer, { backgroundColor: colors.secondary[100] }]}>
+          <TouchableOpacity
+            style={[styles.statCard, { backgroundColor: palette.surface }]}
+            activeOpacity={0.8}
+            onPress={() => setStatsModal("completados")}
+          >
+            <View style={[styles.statIconContainer, { backgroundColor: colors.secondary[500] + '20' }]}>
               <Ionicons name="checkmark-circle" size={20} color={colors.secondary[600]} />
             </View>
             <Text style={[styles.statNumber, { color: colors.secondary[600] }]}>
               {estadisticas.completados}
             </Text>
-            <Text style={styles.statLabel}>Completados</Text>
-          </View>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Completados</Text>
+          </TouchableOpacity>
 
-          <View style={[styles.statCard, { backgroundColor: colors.accent.amber + "15" }]}>
+          <TouchableOpacity
+            style={[styles.statCard, { backgroundColor: palette.surface }]}
+            activeOpacity={0.8}
+            onPress={() => setStatsModal("pendientes")}
+          >
             <View style={[styles.statIconContainer, { backgroundColor: colors.accent.amber + "25" }]}>
               <Ionicons name="time" size={20} color={colors.accent.amber} />
             </View>
             <Text style={[styles.statNumber, { color: colors.accent.amber }]}>
               {estadisticas.pendientes}
             </Text>
-            <Text style={styles.statLabel}>Pendientes</Text>
-          </View>
+            <Text style={[styles.statLabel, { color: palette.textMuted }]}>Pendientes</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Modal de información de stats */}
+        <Modal
+          visible={statsModal !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setStatsModal(null)}
+        >
+          <TouchableOpacity style={styles.statsModalOverlay} activeOpacity={1} onPress={() => setStatsModal(null)}>
+            <View style={[styles.statsModalCard, { backgroundColor: palette.surface }]}>
+              {statsModal === "fecha" && (
+                <>
+                  <View style={styles.statsModalIconRow}>
+                    <Ionicons name="calendar" size={28} color={colors.primary[600]} />
+                  </View>
+                  <Text style={[styles.statsModalTitle, { color: palette.heading }]}>Fecha de hoy</Text>
+                  <Text style={[styles.statsModalText, { color: palette.textMuted }]}>
+                    Hoy es <Text style={{ fontWeight: "700" }}>{weekday}, {day} de {month}</Text>.{"\n\n"}
+                    Tienes <Text style={{ fontWeight: "700" }}>{estadisticas.total}</Text> hábitos programados para hoy.
+                    Has completado <Text style={{ fontWeight: "700", color: colors.secondary[600] }}>{estadisticas.completados}</Text> y
+                    te faltan <Text style={{ fontWeight: "700", color: colors.accent.amber }}>{estadisticas.pendientes}</Text>.
+                  </Text>
+                </>
+              )}
+              {statsModal === "completados" && (
+                <>
+                  <View style={styles.statsModalIconRow}>
+                    <Ionicons name="checkmark-circle" size={28} color={colors.secondary[600]} />
+                  </View>
+                  <Text style={[styles.statsModalTitle, { color: palette.heading }]}>Hábitos Completados</Text>
+                  <Text style={[styles.statsModalText, { color: palette.textMuted }]}>
+                    Has completado <Text style={{ fontWeight: "700", color: colors.secondary[600] }}>{estadisticas.completados}</Text> de{" "}
+                    <Text style={{ fontWeight: "700", color: palette.text }}>{estadisticas.total}</Text> hábitos hoy.
+                  </Text>
+                  {habitos.filter(h => h.completado_hoy).map(h => (
+                    <View key={h.habito_usuario_id} style={[styles.statsModalHabitRow, { borderBottomColor: palette.divider }]}>
+                      <Ionicons name="checkmark-circle" size={14} color={colors.secondary[500]} />
+                      <Text style={[styles.statsModalHabitName, { color: palette.text }]}>{h.nombre}</Text>
+                      {h.hora_completado && (
+                        <Text style={[styles.statsModalHabitTime, { color: palette.textSubtle }]}>{h.hora_completado.slice(0, 5)}</Text>
+                      )}
+                    </View>
+                  ))}
+                  {estadisticas.completados === 0 && (
+                    <Text style={[styles.statsModalEmpty, { color: palette.textMuted }]}>Aún no has completado ningún hábito hoy. ¡Ánimo!</Text>
+                  )}
+                </>
+              )}
+              {statsModal === "pendientes" && (
+                <>
+                  <View style={styles.statsModalIconRow}>
+                    <Ionicons name="time" size={28} color={colors.accent.amber} />
+                  </View>
+                  <Text style={[styles.statsModalTitle, { color: palette.heading }]}>Hábitos Pendientes</Text>
+                  <Text style={[styles.statsModalText, { color: palette.textMuted }]}>
+                    Te faltan <Text style={{ fontWeight: "700", color: colors.accent.amber }}>{estadisticas.pendientes}</Text> hábitos por completar hoy.
+                  </Text>
+                  {habitos.filter(h => !h.completado_hoy).map(h => (
+                    <View key={h.habito_usuario_id} style={[styles.statsModalHabitRow, { borderBottomColor: palette.divider }]}>
+                      <Ionicons name="ellipse-outline" size={14} color={palette.icon} />
+                      <Text style={[styles.statsModalHabitName, { color: palette.text }]}>{h.nombre}</Text>
+                    </View>
+                  ))}
+                  {estadisticas.pendientes === 0 && (
+                    <Text style={[styles.statsModalEmpty, { color: colors.secondary[600] }]}>¡Felicidades! Completaste todos tus hábitos de hoy.</Text>
+                  )}
+                </>
+              )}
+              <TouchableOpacity style={[styles.statsModalCloseBtn, { backgroundColor: palette.surfaceAlt }]} onPress={() => setStatsModal(null)}>
+                <Text style={[styles.statsModalCloseText, { color: palette.textMuted }]}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Progress Bar */}
         {habitos.length > 0 && (
-          <View style={styles.progressSection}>
+          <View style={[styles.progressSection, { backgroundColor: palette.surface }]}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Progreso de Hoy</Text>
+              <Text style={[styles.progressTitle, { color: palette.text }]}>Progreso de Hoy</Text>
               <Text style={styles.progressPercent}>{progress}%</Text>
             </View>
-            <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarBg, { backgroundColor: palette.surfaceAlt }]}>
               <LinearGradient
                 colors={colors.gradients.primary}
                 start={{ x: 0, y: 0 }}
@@ -254,11 +339,11 @@ export default function HabitosScreen() {
         {/* Habits List */}
         {habitos.length === 0 ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="leaf-outline" size={48} color={colors.neutral[300]} />
+            <View style={[styles.emptyIconContainer, { backgroundColor: palette.surfaceAlt }]}>
+              <Ionicons name="leaf-outline" size={48} color={palette.iconSubtle} />
             </View>
-            <Text style={styles.emptyTitle}>Sin hábitos aún</Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptyTitle, { color: palette.text }]}>Sin hábitos aún</Text>
+            <Text style={[styles.emptySubtitle, { color: palette.textMuted }]}>
               Empieza a construir mejores hábitos hoy
             </Text>
             <TouchableOpacity
@@ -273,7 +358,7 @@ export default function HabitosScreen() {
           </View>
         ) : (
           <View style={styles.habitsSection}>
-            <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Hábitos de Hoy</Text>
             {habitos.map((habito) => {
               // Color personal del hábito tiene prioridad sobre el color de categoría
               const catColor = habito.color
@@ -286,6 +371,7 @@ export default function HabitosScreen() {
                 key={habito.habito_usuario_id}
                 style={[
                   styles.habitCard,
+                  { backgroundColor: palette.surface },
                   habito.completado_hoy && styles.habitCardCompleted,
                   habito.tipo === 'por_eliminar' && styles.habitCardWarning,
                 ]}
@@ -310,44 +396,44 @@ export default function HabitosScreen() {
                     ) : null}
                   </TouchableOpacity>
 
-                  {/* Habit Info - navigates to detail */}
+                  {/* Habit Info - navigates to detail (whole right side is tappable) */}
                   <TouchableOpacity 
-                    style={styles.habitInfo}
+                    style={[styles.habitInfo, styles.habitInfoRow]}
                     onPress={() => router.push(`/seccion_habitos/detalleHabito?habito_usuario_id=${habito.habito_usuario_id}`)}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.habitNameRow}>
-                      {habitIcono && (
-                        <Ionicons name={habitIcono as any} size={15} color={catColor} style={{ marginRight: 4 }} />
-                      )}
-                      <Text
-                        style={[styles.habitName, habito.completado_hoy && styles.habitNameCompleted]}
-                      >
-                        {habito.nombre}
-                      </Text>
-                      {habito.tipo === 'por_eliminar' && (
-                        <View style={[styles.customBadge, { backgroundColor: '#FEE2E2' }]}>
-                          <Ionicons name="warning" size={10} color="#EF4444" />
-                          <Text style={[styles.customBadgeText, { color: '#EF4444' }]}>Eliminar</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.habitMeta}>
-                      <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
-                      <View style={styles.habitPoints}>
-                        <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
-                        <Text style={styles.habitPointsText}>{habito.puntos_base}</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.habitNameRow}>
+                        {habitIcono && (
+                          <Ionicons name={habitIcono as any} size={15} color={catColor} style={{ marginRight: 4 }} />
+                        )}
+                        <Text
+                          style={[styles.habitName, { color: palette.text }, habito.completado_hoy && styles.habitNameCompleted]}
+                        >
+                          {habito.nombre}
+                        </Text>
+                        {habito.tipo === 'por_eliminar' && (
+                          <View style={[styles.customBadge, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="warning" size={10} color="#EF4444" />
+                            <Text style={[styles.customBadgeText, { color: '#EF4444' }]}>Eliminar</Text>
+                          </View>
+                        )}
                       </View>
+                      <View style={styles.habitMeta}>
+                        <Text style={[styles.habitCategory, { color: catColor }]}>{habito.categoria_nombre}</Text>
+                        <View style={styles.habitPoints}>
+                          <Ionicons name="diamond-outline" size={12} color={colors.primary[500]} />
+                          <Text style={styles.habitPointsText}>{habito.puntos_base}</Text>
+                        </View>
+                      </View>
+                      {habito.completado_hoy && habito.hora_completado && (
+                        <Text style={styles.habitCompletedTime}>
+                          Completado a las {habito.hora_completado.slice(0, 5)}
+                        </Text>
+                      )}
                     </View>
-                    {habito.completado_hoy && habito.hora_completado && (
-                      <Text style={styles.habitCompletedTime}>
-                        Completado a las {habito.hora_completado.slice(0, 5)}
-                      </Text>
-                    )}
+                    <Ionicons name="chevron-forward" size={20} color={palette.iconSubtle} />
                   </TouchableOpacity>
-
-                  {/* Arrow indicator */}
-                  <Ionicons name="chevron-forward" size={20} color={colors.neutral[300]} />
                 </View>
               </View>
               );
@@ -359,7 +445,7 @@ export default function HabitosScreen() {
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
               <Ionicons name="add-circle-outline" size={20} color={colors.primary[600]} />
-              <Text style={styles.addMoreText}>Agregar más hábitos</Text>
+              <Text style={[styles.addMoreText, { color: colors.primary[600] }]}>Agregar más hábitos</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -473,6 +559,72 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     color: colors.neutral[500],
     marginTop: spacing[1],
+  },
+  statsModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing[6],
+  },
+  statsModalCard: {
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.xl,
+    padding: spacing[6],
+    width: "100%",
+    maxWidth: 360,
+  },
+  statsModalIconRow: {
+    alignItems: "center",
+    marginBottom: spacing[3],
+  },
+  statsModalTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[800],
+    textAlign: "center",
+    marginBottom: spacing[3],
+  },
+  statsModalText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[600],
+    lineHeight: 20,
+    marginBottom: spacing[3],
+  },
+  statsModalHabitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+    paddingVertical: spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[100],
+  },
+  statsModalHabitName: {
+    flex: 1,
+    fontSize: typography.size.sm,
+    color: colors.neutral[700],
+  },
+  statsModalHabitTime: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+  },
+  statsModalEmpty: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[400],
+    textAlign: "center",
+    marginTop: spacing[2],
+  },
+  statsModalCloseBtn: {
+    marginTop: spacing[4],
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.lg,
+    paddingVertical: spacing[3],
+    alignItems: "center",
+  },
+  statsModalCloseText: {
+    color: colors.neutral[0],
+    fontWeight: typography.weight.semibold,
+    fontSize: typography.size.sm,
   },
   progressSection: {
     backgroundColor: colors.neutral[0],
@@ -603,6 +755,10 @@ const styles = StyleSheet.create({
   },
   habitInfo: {
     flex: 1,
+  },
+  habitInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   habitNameRow: {
     flexDirection: "row",

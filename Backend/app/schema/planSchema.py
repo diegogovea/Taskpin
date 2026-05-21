@@ -422,17 +422,26 @@ class TareaCustomSchema(BaseModel):
     descripcion: Optional[str] = None
     tipo: str = 'diaria'  # diaria, semanal, única
     orden: Optional[int] = None
-    
+    prioridad: Optional[str] = 'media'   # alta | media | baja
+    notas: Optional[str] = None
+    fecha_limite: Optional[str] = None  # ISO date string YYYY-MM-DD
+
     @validator('titulo')
     def validate_titulo(cls, v):
         if len(v.strip()) < 3:
             raise ValueError('El título de la tarea debe tener al menos 3 caracteres')
         return v.strip()
-    
+
     @validator('tipo')
     def validate_tipo(cls, v):
         if v not in ['diaria', 'semanal', 'única']:
             raise ValueError('El tipo debe ser: diaria, semanal o única')
+        return v
+
+    @validator('prioridad')
+    def validate_prioridad(cls, v):
+        if v is not None and v not in ['alta', 'media', 'baja']:
+            raise ValueError('La prioridad debe ser: alta, media o baja')
         return v
 
 class FaseCustomSchema(BaseModel):
@@ -475,8 +484,8 @@ class CrearPlanCustomSchema(BaseModel):
     
     @validator('plazo_dias_estimado')
     def validate_plazo(cls, v):
-        if v < 7 or v > 365:
-            raise ValueError('El plazo debe estar entre 7 y 365 días')
+        if v < 1 or v > 3650:
+            raise ValueError('El plazo debe ser de al menos 1 día')
         return v
     
     @validator('dificultad')

@@ -5,10 +5,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing, radius, shadows } from "../constants/theme";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { isDark, palette } = useTheme();
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -38,9 +40,9 @@ export default function LoginScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: palette.bg }]}>
       <LinearGradient
-        colors={[colors.neutral[0], colors.neutral[50]]}
+        colors={isDark ? ["#1a1a1a", "#121212"] : [colors.neutral[0], colors.neutral[50]]}
         style={styles.gradient}
       >
         {/* Top Section */}
@@ -128,16 +130,16 @@ export default function LoginScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setLegalModal(null)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
+        <View style={[styles.modalContainer, { backgroundColor: palette.bg }]}>
+          <View style={[styles.modalHeader, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
+            <Text style={[styles.modalTitle, { color: palette.heading }]}>
               {legalModal === "privacidad" ? "Política de Privacidad" : "Términos de Servicio"}
             </Text>
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setLegalModal(null)}
             >
-              <Ionicons name="close" size={22} color={colors.neutral[600]} />
+              <Ionicons name="close" size={22} color={palette.icon} />
             </TouchableOpacity>
           </View>
 

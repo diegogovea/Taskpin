@@ -20,8 +20,10 @@ import { colors, typography, spacing, radius, shadows } from "../../constants/th
 import { API_BASE_URL } from "../../constants/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTutorial } from "../../contexts/TutorialContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getCategoryColor, getCategoryColorByName } from "../../constants/categoryColors";
 import ReflectionModal from "../../components/ui/ReflectionModal";
+import DateStrip from "../../components/ui/DateStrip";
 import { useWebSocket, HabitCompletedEvent, HabitUncompletedEvent } from "../../hooks/useWebSocket";
 import WSNotification from "../../components/ui/WSNotification";
 
@@ -112,11 +114,16 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading: authLoading, authFetch } = useAuth();
   const { restart } = useTutorial();
+  const { palette } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  // ❌ ELIMINADO: currentUserId y userName ya vienen del contexto
   const [habitosHoy, setHabitosHoy] = useState<HabitoHoy[]>([]);
+  // Modal de resumen de día pasado
+  const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
+  const [dayDetailHabitos, setDayDetailHabitos] = useState<HabitoHoy[]>([]);
+  const [dayDetailStats, setDayDetailStats] = useState<EstadisticasHabitos | null>(null);
+  const [dayDetailLoading, setDayDetailLoading] = useState(false);
   const [estadisticasHabitos, setEstadisticasHabitos] = useState<EstadisticasHabitos>({
     total: 0,
     completados: 0,
@@ -218,6 +225,41 @@ export default function HomeScreen() {
       console.error("Error loading habitos:", error);
       setHabitosHoy([]);
     }
+  };
+
+  // Carga el resumen de un día pasado para el modal
+  const loadDayDetail = async (date: Date) => {
+    if (!user?.user_id) return;
+    setDayDetailLoading(true);
+    setDayDetailHabitos([]);
+    setDayDetailStats(null);
+    try {
+      const dateParam = date.toISOString().split("T")[0];
+      const response = await authFetch(`/api/usuario/${user.user_id}/habitos/hoy?fecha=${dateParam}`);
+      const data = await response.json();
+      if (data.success) {
+        setDayDetailHabitos(data.data.habitos || []);
+        setDayDetailStats(data.data.estadisticas || null);
+      }
+    } catch (error) {
+      console.error("Error loading day detail:", error);
+    } finally {
+      setDayDetailLoading(false);
+    }
+  };
+
+  // Tocar una fecha en el DateStrip:
+  // - Hoy → no hace nada (ya estás viendo hoy)
+  // - Pasado → abre modal de resumen
+  // - Futuro → no hace nada
+  const handleDateChange = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    if (target >= today) return; // hoy o futuro → ignorar
+    setDayDetailDate(date);
+    loadDayDetail(date);
   };
 
   const loadMisPlanes = async (userId: number) => {
@@ -371,12 +413,12 @@ export default function HomeScreen() {
   };
 
   const getCurrentDate = () => {
-    return new Date().toLocaleDateString("es-ES", {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-    });
+    const now = new Date();
+    const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
   };
+
 
   const getDifficultyColor = (dificultad: string) => {
     switch (dificultad) {
@@ -443,10 +485,10 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Cargando tu panel...</Text>
+          <Text style={[styles.loadingText, { color: palette.textMuted }]}>Cargando tu panel...</Text>
         </View>
       </SafeAreaView>
     );
@@ -458,7 +500,7 @@ export default function HomeScreen() {
       : 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -466,19 +508,25 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: palette.bg }]}>
           <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.userName}>{(user?.nombre || "Usuario").split(" ")[0]}</Text>
-            <Text style={styles.date}>{getCurrentDate()}</Text>
+            <Text style={[styles.greeting, { color: palette.textMuted }]}>{getGreeting()}</Text>
+            <Text style={[styles.userName, { color: palette.text }]}>{(user?.nombre || "Usuario").split(" ")[0]}</Text>
+            <Text style={[styles.date, { color: palette.textMuted }]}>{getCurrentDate()}</Text>
           </View>
           <TouchableOpacity
             onPress={restart}
             style={styles.tutorialBtn}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <Ionicons name="help-circle-outline" size={24} color={colors.neutral[400]} />
+            <Ionicons name="play-circle-outline" size={15} color={colors.primary[600]} />
+            <Text style={styles.tutorialBtnText}>Tutorial</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* DateStrip — toca un día pasado para ver su resumen */}
+        <View style={styles.dateStripWrapper}>
+          <DateStrip selectedDate={new Date()} onDateChange={handleDateChange} />
         </View>
 
         {/* Stats Row */}
@@ -508,11 +556,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Today's Progress Card */}
-        <View style={styles.progressCard}>
+        <View style={[styles.progressCard, { backgroundColor: palette.surface }]}>
           <View style={styles.progressCardHeader}>
             <View>
-              <Text style={styles.progressCardTitle}>Progreso de Hoy</Text>
-              <Text style={styles.progressCardSubtitle}>
+              <Text style={[styles.progressCardTitle, { color: palette.text }]}>Progreso de Hoy</Text>
+              <Text style={[styles.progressCardSubtitle, { color: palette.textMuted }]}>
                 {estadisticasHabitos.completados} de {estadisticasHabitos.total} hábitos completados
               </Text>
             </View>
@@ -533,7 +581,7 @@ export default function HomeScreen() {
         {/* Habits Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Hábitos de Hoy</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Hábitos de Hoy</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/(tabs)/habitos")}
@@ -545,14 +593,14 @@ export default function HomeScreen() {
 
           {habitosHoy.length === 0 ? (
             <TouchableOpacity
-              style={styles.emptyCard}
+              style={[styles.emptyCard, { backgroundColor: palette.surface }]}
               onPress={() => router.push("/seccion_habitos/tiposHabitos")}
             >
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="add-circle-outline" size={32} color={colors.primary[600]} />
               </View>
-              <Text style={styles.emptyCardTitle}>Sin hábitos aún</Text>
-              <Text style={styles.emptyCardSubtitle}>Toca para agregar tu primer hábito</Text>
+              <Text style={[styles.emptyCardTitle, { color: palette.text }]}>Sin hábitos aún</Text>
+              <Text style={[styles.emptyCardSubtitle, { color: palette.textMuted }]}>Toca para agregar tu primer hábito</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.habitsList}>
@@ -563,7 +611,7 @@ export default function HomeScreen() {
                     ? getCategoryColor(habito.categoria_id)
                     : getCategoryColorByName(habito.categoria_nombre));
                 return (
-                  <View key={habito.habito_usuario_id} style={styles.habitItem}>
+                  <View key={habito.habito_usuario_id} style={[styles.habitItem, { backgroundColor: palette.surface }]}>
                     <View style={[styles.habitCategoryBar, { backgroundColor: catColor }]} />
                     <View
                       style={[
@@ -613,7 +661,7 @@ export default function HomeScreen() {
         {/* Plans Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Planes Activos</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Planes Activos</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/(tabs)/planes")}
@@ -625,14 +673,14 @@ export default function HomeScreen() {
 
           {misPlanes.length === 0 ? (
             <TouchableOpacity
-              style={styles.emptyCard}
+              style={[styles.emptyCard, { backgroundColor: palette.surface }]}
               onPress={() => router.push("/seccion_planes/tiposPlanes")}
             >
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="document-text-outline" size={32} color={colors.primary[600]} />
               </View>
-              <Text style={styles.emptyCardTitle}>Sin planes aún</Text>
-              <Text style={styles.emptyCardSubtitle}>Toca para crear tu primer plan</Text>
+              <Text style={[styles.emptyCardTitle, { color: palette.text }]}>Sin planes aún</Text>
+              <Text style={[styles.emptyCardSubtitle, { color: palette.textMuted }]}>Toca para crear tu primer plan</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.plansList}>
@@ -642,7 +690,7 @@ export default function HomeScreen() {
                 .map((plan) => (
                   <TouchableOpacity
                     key={plan.plan_usuario_id}
-                    style={styles.planCard}
+                    style={[styles.planCard, { backgroundColor: palette.surface }]}
                     onPress={() =>
                       router.push(
                         `/seccion_planes/seguimientoPlan?planUsuarioId=${plan.plan_usuario_id}` as any
@@ -650,7 +698,7 @@ export default function HomeScreen() {
                     }
                   >
                     <View style={styles.planCardHeader}>
-                      <Text style={styles.planTitle} numberOfLines={1}>
+                      <Text style={[styles.planTitle, { color: palette.text }]} numberOfLines={1}>
                         {plan.meta_principal}
                       </Text>
                       <View
@@ -666,7 +714,7 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.planDescription} numberOfLines={2}>
+                    <Text style={[styles.planDescription, { color: palette.textMuted }]} numberOfLines={2}>
                       {plan.descripcion}
                     </Text>
                     <View style={styles.planProgress}>
@@ -686,7 +734,7 @@ export default function HomeScreen() {
         {/* Daily Reflection Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Reflexión Diaria</Text>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Reflexión Diaria</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
               onPress={() => router.push("/seccion_reflexiones/historialReflexiones")}
@@ -699,7 +747,7 @@ export default function HomeScreen() {
           {reflexionHoy ? (
             // Reflexión completada
             <TouchableOpacity
-              style={styles.reflectionCard}
+              style={[styles.reflectionCard, { backgroundColor: palette.surface }]}
               onPress={() => setShowReflectionModal(true)}
             >
               <View style={styles.reflectionHeader}>
@@ -724,8 +772,8 @@ export default function HomeScreen() {
               
               {reflexionHoy.que_salio_bien && (
                 <View style={styles.reflectionTextSection}>
-                  <Text style={styles.reflectionTextLabel}>¿Qué salió bien?</Text>
-                  <Text style={styles.reflectionTextContent} numberOfLines={2}>
+                  <Text style={[styles.reflectionTextLabel, { color: palette.textMuted }]}>¿Qué salió bien?</Text>
+                  <Text style={[styles.reflectionTextContent, { color: palette.text }]} numberOfLines={2}>
                     {reflexionHoy.que_salio_bien}
                   </Text>
                 </View>
@@ -733,8 +781,8 @@ export default function HomeScreen() {
               
               {reflexionHoy.que_mejorar && (
                 <View style={styles.reflectionTextSection}>
-                  <Text style={styles.reflectionTextLabel}>¿Qué mejorar?</Text>
-                  <Text style={styles.reflectionTextContent} numberOfLines={2}>
+                  <Text style={[styles.reflectionTextLabel, { color: palette.textMuted }]}>¿Qué mejorar?</Text>
+                  <Text style={[styles.reflectionTextContent, { color: palette.text }]} numberOfLines={2}>
                     {reflexionHoy.que_mejorar}
                   </Text>
                 </View>
@@ -745,7 +793,7 @@ export default function HomeScreen() {
           ) : (
             // Sin reflexión - CTA para crear
             <TouchableOpacity
-              style={styles.reflectionEmptyCard}
+              style={[styles.reflectionEmptyCard, { backgroundColor: palette.surface }]}
               onPress={() => setShowReflectionModal(true)}
             >
               <View style={styles.reflectionEmptyIcon}>
@@ -874,6 +922,141 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── Modal: Resumen de día pasado ── */}
+      <Modal
+        visible={dayDetailDate !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDayDetailDate(null)}
+      >
+        <TouchableOpacity
+          style={styles.dayModalOverlay}
+          activeOpacity={1}
+          onPress={() => setDayDetailDate(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.dayModalSheet, { backgroundColor: palette.surface }]}>
+            {/* Handle */}
+            <View style={styles.dayModalHandle} />
+
+            {/* Header */}
+            {dayDetailDate && (() => {
+              const DAYS_ES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+              const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+              const dayName = DAYS_ES[dayDetailDate.getDay()];
+              const dayNum = dayDetailDate.getDate();
+              const monthName = MONTHS_ES[dayDetailDate.getMonth()];
+              return (
+                <View style={styles.dayModalHeader}>
+                  <View>
+                    <Text style={[styles.dayModalTitle, { color: palette.heading }]}>{dayName} {dayNum} {monthName}</Text>
+                    <Text style={[styles.dayModalSubtitle, { color: palette.textMuted }]}>Resumen del día</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.dayModalCloseBtn}
+                    onPress={() => setDayDetailDate(null)}
+                  >
+                    <Ionicons name="close" size={20} color={colors.neutral[500]} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
+
+            {dayDetailLoading ? (
+              <View style={styles.dayModalLoading}>
+                <ActivityIndicator color={colors.primary[600]} size="large" />
+                <Text style={[styles.dayModalLoadingText, { color: palette.textMuted }]}>Cargando resumen...</Text>
+              </View>
+            ) : (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.dayModalScroll}
+              >
+                {/* Stats summary */}
+                {dayDetailStats && (
+                  <View style={styles.dayModalSummary}>
+                    <LinearGradient
+                      colors={dayDetailStats.completados === dayDetailStats.total && dayDetailStats.total > 0
+                        ? colors.gradients.secondary
+                        : colors.gradients.primary}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.dayModalSummaryGradient}
+                    >
+                      <Text style={styles.dayModalSummaryNum}>
+                        {dayDetailStats.completados}/{dayDetailStats.total}
+                      </Text>
+                      <Text style={styles.dayModalSummaryLabel}>hábitos completados</Text>
+                      {/* Progress bar */}
+                      <View style={styles.dayModalProgressBg}>
+                        <View
+                          style={[
+                            styles.dayModalProgressFill,
+                            {
+                              width: dayDetailStats.total > 0
+                                ? `${Math.round((dayDetailStats.completados / dayDetailStats.total) * 100)}%`
+                                : "0%",
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.dayModalProgressPct}>
+                        {dayDetailStats.total > 0
+                          ? `${Math.round((dayDetailStats.completados / dayDetailStats.total) * 100)}% de cumplimiento`
+                          : "Sin hábitos registrados"}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                )}
+
+                {/* Lista de hábitos */}
+                {dayDetailHabitos.length > 0 ? (
+                  <View style={styles.dayModalList}>
+                    <Text style={[styles.dayModalListTitle, { color: palette.heading }]}>Detalle por hábito</Text>
+                    {dayDetailHabitos.map((h) => (
+                      <View key={h.habito_usuario_id} style={[styles.dayModalHabitRow, { borderBottomColor: palette.divider }]}>
+                        <View
+                          style={[
+                            styles.dayModalHabitStatus,
+                            { backgroundColor: h.completado_hoy ? colors.secondary[500] : palette.surfaceAlt },
+                          ]}
+                        >
+                          <Ionicons
+                            name={h.completado_hoy ? "checkmark" : "close"}
+                            size={14}
+                            color={h.completado_hoy ? colors.neutral[0] : palette.textSubtle}
+                          />
+                        </View>
+                        <View style={styles.dayModalHabitInfo}>
+                          <Text
+                            style={[
+                              styles.dayModalHabitName,
+                              { color: palette.text },
+                              !h.completado_hoy && { color: palette.textMuted },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {h.nombre}
+                          </Text>
+                          <Text style={[styles.dayModalHabitCat, { color: palette.textSubtle }]}>{h.categoria_nombre}</Text>
+                        </View>
+                        {h.completado_hoy && (
+                          <Text style={styles.dayModalHabitPts}>+{h.puntos_base} pts</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.dayModalEmpty}>
+                    <Ionicons name="calendar-outline" size={40} color={palette.iconSubtle} />
+                    <Text style={[styles.dayModalEmptyText, { color: palette.textMuted }]}>Sin hábitos ese día</Text>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Reflection Modal */}
       <ReflectionModal
         visible={showReflectionModal}
@@ -928,16 +1111,188 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: spacing[6],
+    marginBottom: spacing[4],
   },
-  tutorialBtn: {
+  dateStripWrapper: {
+    marginHorizontal: -spacing[5],
+    marginBottom: spacing[3],
+  },
+  // ── Day Detail Modal ──
+  dayModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(10,10,30,0.45)",
+    justifyContent: "flex-end",
+  },
+  dayModalSheet: {
+    backgroundColor: colors.neutral[0],
+    borderTopLeftRadius: radius["3xl"],
+    borderTopRightRadius: radius["3xl"],
+    paddingBottom: 36,
+    maxHeight: "80%",
+  },
+  dayModalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.neutral[200],
+    alignSelf: "center",
+    marginTop: spacing[3],
+    marginBottom: spacing[2],
+  },
+  dayModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[100],
+  },
+  dayModalTitle: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[900],
+    textTransform: "capitalize",
+  },
+  dayModalSubtitle: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[400],
+    marginTop: 2,
+  },
+  dayModalCloseBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.neutral[100],
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+  },
+  dayModalLoading: {
+    alignItems: "center",
+    paddingVertical: spacing[10],
+    gap: spacing[3],
+  },
+  dayModalLoadingText: {
+    fontSize: typography.size.sm,
+    color: colors.neutral[400],
+  },
+  dayModalScroll: {
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[4],
+    paddingBottom: spacing[4],
+  },
+  dayModalSummary: {
+    borderRadius: radius["2xl"],
+    overflow: "hidden",
+    marginBottom: spacing[5],
+    ...shadows.md,
+    shadowColor: colors.primary[600],
+  },
+  dayModalSummaryGradient: {
+    padding: spacing[6],
+    alignItems: "center",
+  },
+  dayModalSummaryNum: {
+    fontSize: 42,
+    fontWeight: typography.weight.bold,
+    color: colors.neutral[0],
+    lineHeight: 48,
+  },
+  dayModalSummaryLabel: {
+    fontSize: typography.size.sm,
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: spacing[4],
+  },
+  dayModalProgressBg: {
+    width: "100%",
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: spacing[2],
+  },
+  dayModalProgressFill: {
+    height: "100%",
+    backgroundColor: colors.neutral[0],
+    borderRadius: 4,
+  },
+  dayModalProgressPct: {
+    fontSize: typography.size.xs,
+    color: "rgba(255,255,255,0.75)",
+  },
+  dayModalList: {
+    gap: spacing[2],
+  },
+  dayModalListTitle: {
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[700],
+    marginBottom: spacing[2],
+  },
+  dayModalHabitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[3],
+    backgroundColor: colors.neutral[0],
+    borderRadius: radius.lg,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  dayModalHabitStatus: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dayModalHabitInfo: {
+    flex: 1,
+  },
+  dayModalHabitName: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.neutral[800],
+  },
+  dayModalHabitNameMuted: {
+    color: colors.neutral[400],
+  },
+  dayModalHabitCat: {
+    fontSize: typography.size.xs,
+    color: colors.neutral[400],
+    marginTop: 1,
+  },
+  dayModalHabitPts: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    color: colors.secondary[600],
+  },
+  dayModalEmpty: {
+    alignItems: "center",
+    paddingVertical: spacing[8],
+    gap: spacing[3],
+  },
+  dayModalEmptyText: {
+    fontSize: typography.size.base,
+    color: colors.neutral[400],
+  },
+  tutorialBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.xl,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
     marginTop: spacing[1],
+  },
+  tutorialBtnText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary[600],
   },
   greeting: {
     fontSize: typography.size.base,

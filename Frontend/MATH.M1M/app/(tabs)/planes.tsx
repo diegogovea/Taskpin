@@ -14,7 +14,8 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
 import { API_BASE_URL } from "../../constants/api";
-import { useAuth } from "../../contexts/AuthContext"; // ← NUEVO: Hook de autenticación
+import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface MiPlan {
   plan_usuario_id: number;
@@ -33,6 +34,7 @@ export default function PlanesScreen() {
   
   // ✅ Obtenemos user y authFetch del contexto
   const { user, isLoading: authLoading, authFetch } = useAuth();
+  const { palette } = useTheme();
   
   const [planes, setPlanes] = useState<MiPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,13 +136,13 @@ export default function PlanesScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.planCard}
+        style={[styles.planCard, { backgroundColor: palette.surface }]}
         activeOpacity={0.8}
         onPress={() => navigateToSeguimiento(plan.plan_usuario_id, plan.meta_principal)}
       >
         <View style={styles.planHeader}>
           <View style={styles.planTitleSection}>
-            <Text style={styles.planTitle} numberOfLines={2}>
+            <Text style={[styles.planTitle, { color: palette.heading }]} numberOfLines={2}>
               {plan.meta_principal}
             </Text>
             <View style={styles.badges}>
@@ -153,19 +155,19 @@ export default function PlanesScreen() {
               </View>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.neutral[300]} />
+          <Ionicons name="chevron-forward" size={20} color={palette.iconSubtle} />
         </View>
 
-        <Text style={styles.planDescription} numberOfLines={2}>
+        <Text style={[styles.planDescription, { color: palette.textMuted }]} numberOfLines={2}>
           {plan.descripcion}
         </Text>
 
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Progreso</Text>
+            <Text style={[styles.progressLabel, { color: palette.textMuted }]}>Progreso</Text>
             <Text style={styles.progressPercent}>{plan.progreso_porcentaje}%</Text>
           </View>
-          <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarBg, { backgroundColor: palette.surfaceAlt }]}>
             <LinearGradient
               colors={colors.gradients.primary}
               start={{ x: 0, y: 0 }}
@@ -177,15 +179,15 @@ export default function PlanesScreen() {
 
         <View style={styles.planFooter}>
           <View style={styles.footerItem}>
-            <Ionicons name="calendar-outline" size={14} color={colors.neutral[400]} />
-            <Text style={styles.footerText}>
+            <Ionicons name="calendar-outline" size={14} color={palette.textSubtle} />
+            <Text style={[styles.footerText, { color: palette.textSubtle }]}>
               Iniciado {new Date(plan.fecha_inicio).toLocaleDateString("es-ES", { month: "short", day: "numeric" })}
             </Text>
           </View>
           {diasRestantes !== null && (
             <View style={styles.footerItem}>
-              <Ionicons name="time-outline" size={14} color={colors.neutral[400]} />
-              <Text style={styles.footerText}>{diasRestantes} días restantes</Text>
+              <Ionicons name="time-outline" size={14} color={palette.textSubtle} />
+              <Text style={[styles.footerText, { color: palette.textSubtle }]}>{diasRestantes} días restantes</Text>
             </View>
           )}
         </View>
@@ -195,10 +197,10 @@ export default function PlanesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Cargando tus planes...</Text>
+          <Text style={[styles.loadingText, { color: palette.textMuted }]}>Cargando tus planes...</Text>
         </View>
       </SafeAreaView>
     );
@@ -226,14 +228,14 @@ export default function PlanesScreen() {
     : planes.filter((p) => p.estado === filtroEstado);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
         <View>
-          <Text style={styles.headerTitle}>Mis Planes</Text>
-          <Text style={styles.headerSubtitle}>{planes.length} planes en total</Text>
+          <Text style={[styles.headerTitle, { color: palette.heading }]}>Mis Planes</Text>
+          <Text style={[styles.headerSubtitle, { color: palette.textMuted }]}>{planes.length} planes en total</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={navigateToAgregarPlan}>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary[50] }]} onPress={navigateToAgregarPlan}>
           <Ionicons name="add" size={24} color={colors.primary[600]} />
         </TouchableOpacity>
       </View>
@@ -256,11 +258,11 @@ export default function PlanesScreen() {
 
         {planes.length === 0 && !error ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="document-text-outline" size={48} color={colors.neutral[300]} />
+            <View style={[styles.emptyIconContainer, { backgroundColor: palette.surfaceAlt }]}>
+              <Ionicons name="document-text-outline" size={48} color={palette.iconSubtle} />
             </View>
-            <Text style={styles.emptyTitle}>Sin planes aún</Text>
-            <Text style={styles.emptySubtitle}>Crea tu primer plan para empezar a alcanzar tus metas</Text>
+            <Text style={[styles.emptyTitle, { color: palette.text }]}>Sin planes aún</Text>
+            <Text style={[styles.emptySubtitle, { color: palette.textMuted }]}>Crea tu primer plan para empezar a alcanzar tus metas</Text>
             <TouchableOpacity style={styles.createButton} onPress={navigateToAgregarPlan}>
               <LinearGradient colors={colors.gradients.primary} style={styles.createButtonGradient}>
                 <Ionicons name="add-circle" size={20} color={colors.neutral[0]} />
@@ -272,18 +274,16 @@ export default function PlanesScreen() {
           <>
             {/* Stats */}
             <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{activePlans.length}</Text>
-                <Text style={styles.statLabel}>Planes activos</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{avgProgress}%</Text>
-                <Text style={styles.statLabel}>Progreso</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{completedPlans.length}</Text>
-                <Text style={styles.statLabel}>Planes completados</Text>
-              </View>
+              {[
+                { n: activePlans.length, label: 'Planes activos' },
+                { n: `${avgProgress}%`, label: 'Progreso' },
+                { n: completedPlans.length, label: 'Completados' },
+              ].map((s) => (
+                <View key={s.label} style={[styles.statCard, { backgroundColor: palette.surface }]}>
+                  <Text style={styles.statNumber}>{s.n}</Text>
+                  <Text style={[styles.statLabel, { color: palette.textMuted }]}>{s.label}</Text>
+                </View>
+              ))}
             </View>
 
             {/* Filter Chips */}
@@ -298,13 +298,15 @@ export default function PlanesScreen() {
                   key={filtro.key}
                   style={[
                     styles.filterChip,
-                    filtroEstado === filtro.key && styles.filterChipActive
+                    { backgroundColor: palette.surfaceAlt, borderColor: palette.border },
+                    filtroEstado === filtro.key && styles.filterChipActive,
                   ]}
                   onPress={() => setFiltroEstado(filtro.key)}
                 >
                   <Text style={[
                     styles.filterChipText,
-                    filtroEstado === filtro.key && styles.filterChipTextActive
+                    { color: palette.textMuted },
+                    filtroEstado === filtro.key && styles.filterChipTextActive,
                   ]}>
                     {filtro.label} ({conteos[filtro.key]})
                   </Text>
@@ -316,8 +318,8 @@ export default function PlanesScreen() {
             <View style={styles.plansSection}>
               {planesFiltrados.length === 0 ? (
                 <View style={styles.emptyFilterState}>
-                  <Ionicons name="filter-outline" size={32} color={colors.neutral[300]} />
-                  <Text style={styles.emptyFilterText}>Sin planes {filtroEstado}s</Text>
+                  <Ionicons name="filter-outline" size={32} color={palette.iconSubtle} />
+                  <Text style={[styles.emptyFilterText, { color: palette.textMuted }]}>Sin planes {filtroEstado}s</Text>
                 </View>
               ) : (
                 planesFiltrados.map((plan) => (

@@ -1333,14 +1333,33 @@ class PlanesConnection:
                         for i, tarea in enumerate(tareas):
                             es_diaria = tarea.get('tipo', 'diaria') == 'diaria'
                             orden = tarea.get('orden', i + 1)
-                            
+
+                            # Detectar si existen las columnas extra (migración 012)
                             cur.execute("""
-                                INSERT INTO tareas_predeterminadas 
-                                (objetivo_id, titulo, descripcion, tipo, orden, es_diaria)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (objetivo_id, tarea['titulo'], tarea.get('descripcion'),
-                                  tarea.get('tipo', 'diaria'), orden, es_diaria))
-                            
+                                SELECT column_name FROM information_schema.columns
+                                WHERE table_name='tareas_predeterminadas' AND column_name='prioridad';
+                            """)
+                            has_extras = cur.fetchone() is not None
+
+                            if has_extras:
+                                cur.execute("""
+                                    INSERT INTO tareas_predeterminadas
+                                    (objetivo_id, titulo, descripcion, tipo, orden, es_diaria,
+                                     prioridad, notas, fecha_limite)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (objetivo_id, tarea['titulo'], tarea.get('descripcion'),
+                                      tarea.get('tipo', 'diaria'), orden, es_diaria,
+                                      tarea.get('prioridad', 'media'),
+                                      tarea.get('notas'),
+                                      tarea.get('fecha_limite')))
+                            else:
+                                cur.execute("""
+                                    INSERT INTO tareas_predeterminadas
+                                    (objetivo_id, titulo, descripcion, tipo, orden, es_diaria)
+                                    VALUES (%s, %s, %s, %s, %s, %s)
+                                """, (objetivo_id, tarea['titulo'], tarea.get('descripcion'),
+                                      tarea.get('tipo', 'diaria'), orden, es_diaria))
+
                             total_tareas += 1
                     
                     # 5. Opcionalmente iniciar el plan para el usuario

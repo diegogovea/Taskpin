@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, typography, spacing, radius, shadows } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface CategoryItem {
   id: string;
@@ -72,6 +73,7 @@ const categories: CategoryItem[] = [
 
 export default function TiposHabitosScreen() {
   const router = useRouter();
+  const { palette } = useTheme();
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -82,11 +84,11 @@ export default function TiposHabitosScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.neutral[700]} />
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: palette.surfaceAlt }]} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
       </View>
 
@@ -97,8 +99,8 @@ export default function TiposHabitosScreen() {
       >
         {/* Title */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Agregar Nuevo Hábito</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: palette.heading }]}>Agregar Nuevo Hábito</Text>
+          <Text style={[styles.subtitle, { color: palette.textMuted }]}>
             Elige una categoría para encontrar hábitos que coincidan con tus metas
           </Text>
         </View>
@@ -108,42 +110,24 @@ export default function TiposHabitosScreen() {
           {categories.map((category) => (
             <TouchableOpacity
               key={category.id}
-              style={styles.categoryCard}
+              style={[styles.categoryCard, { backgroundColor: palette.surface }]}
               activeOpacity={0.8}
               onPress={() => router.push(category.route as any)}
             >
-              <LinearGradient
-                colors={category.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.categoryGradient}
-              >
+              <View style={[styles.categoryGradient]}>
                 <View style={styles.categoryContent}>
-                  <View
-                    style={[
-                      styles.categoryIcon,
-                      { backgroundColor: category.iconColor + "20" },
-                    ]}
-                  >
-                    <Ionicons
-                      name={category.icon as any}
-                      size={24}
-                      color={category.iconColor}
-                    />
+                  <View style={[styles.categoryIcon, { backgroundColor: category.iconColor + "20" }]}>
+                    <Ionicons name={category.icon as any} size={24} color={category.iconColor} />
                   </View>
                   <View style={styles.categoryText}>
-                    <Text style={styles.categoryTitle}>{category.title}</Text>
-                    <Text style={styles.categoryDescription}>
+                    <Text style={[styles.categoryTitle, { color: palette.heading }]}>{category.title}</Text>
+                    <Text style={[styles.categoryDescription, { color: palette.textMuted }]}>
                       {category.description}
                     </Text>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={colors.neutral[400]}
-                  />
+                  <Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
