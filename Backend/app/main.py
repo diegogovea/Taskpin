@@ -21,6 +21,7 @@ from .schema.habitSchema import (
     HabitoPredeterminadoSchema, 
     AddHabitoToUserSchema, 
     AddMultipleHabitosSchema,
+    AddHabitoConConfigSchema,
     HabitoUsuarioSchema,
     HabitoResponseSchema,
     HabitoFrecuenciaUpdateSchema,
@@ -604,6 +605,47 @@ def add_habito_to_user(user_id: int, habito_data: AddHabitoToUserSchema, current
             "data": {"habito_usuario_id": result}
         }
         
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al agregar hábito: {str(e)}")
+
+@app.post("/api/usuario/{user_id}/habitos/con-config", status_code=HTTP_201_CREATED)
+def add_habito_con_config(user_id: int, data: AddHabitoConConfigSchema, current_user: TokenData = Depends(verify_token)):
+    """Agregar un hábito con configuración completa (PROTEGIDO)"""
+    try:
+        verify_user_access(user_id, current_user)
+
+        existing_user = conn.read_one(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        habito = habit_conn.get_habito_by_id(data.habito_id)
+        if not habito:
+            raise HTTPException(status_code=404, detail="Hábito no encontrado")
+
+        result = habit_conn.add_habito_to_user_con_config(
+            user_id=user_id,
+            habito_id=data.habito_id,
+            frecuencia_personal=data.frecuencia_personal,
+            color=data.color,
+            icono=data.icono,
+            fecha_inicio=data.fecha_inicio,
+            fecha_fin=data.fecha_fin,
+            meta_valor=data.meta_valor,
+            meta_unidad=data.meta_unidad,
+            puntos_base_override=data.puntos_base_override,
+        )
+
+        if result is None:
+            raise HTTPException(status_code=400, detail="El hábito ya está agregado para este usuario")
+
+        return {
+            "success": True,
+            "message": "Hábito agregado correctamente",
+            "data": {"habito_usuario_id": result},
+        }
+
     except HTTPException:
         raise
     except Exception as e:

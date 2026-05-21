@@ -117,7 +117,50 @@ class habitConnection():
                     return habito_usuario_id
                     
                 except psycopg.IntegrityError:
-                    # El hábito ya está agregado para este usuario
+                    conn.rollback()
+                    return None
+
+    def add_habito_to_user_con_config(
+        self, user_id, habito_id,
+        frecuencia_personal='diario',
+        color=None, icono=None,
+        fecha_inicio=None, fecha_fin=None,
+        meta_valor=None, meta_unidad=None,
+        puntos_base_override=None,
+    ):
+        """Agrega un hábito con configuración completa en un solo INSERT."""
+        pool = get_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    # Detectar si existen las columnas de campos_extra (migración 011)
+                    cur.execute("""
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name='habitos_usuario' AND column_name='color';
+                    """)
+                    has_extras = cur.fetchone() is not None
+
+                    if has_extras:
+                        cur.execute("""
+                            INSERT INTO habitos_usuario
+                                (user_id, habito_id, frecuencia_personal, activo,
+                                 color, icono, fecha_fin, meta_valor, meta_unidad)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING habito_usuario_id;
+                        """, (user_id, habito_id, frecuencia_personal, True,
+                              color, icono, fecha_fin, meta_valor, meta_unidad))
+                    else:
+                        cur.execute("""
+                            INSERT INTO habitos_usuario (user_id, habito_id, frecuencia_personal, activo)
+                            VALUES (%s, %s, %s, %s)
+                            RETURNING habito_usuario_id;
+                        """, (user_id, habito_id, frecuencia_personal, True))
+
+                    habito_usuario_id = cur.fetchone()[0]
+                    conn.commit()
+                    return habito_usuario_id
+
+                except psycopg.IntegrityError:
                     conn.rollback()
                     return None
 

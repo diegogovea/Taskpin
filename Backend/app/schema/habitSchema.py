@@ -3,10 +3,17 @@ from typing import Optional, List
 from datetime import datetime, date
 
 FRECUENCIAS_VALIDAS = [
-    'diario', 'semanal', 'mensual',
+    'diario', 'semanal', 'mensual', 'anual',
     'cada_2_dias', 'cada_2_semanas', 'cada_2_meses',
-    'personalizado'
+    'personalizado',
 ]
+
+import re as _re
+def _es_frecuencia_valida(v: str) -> bool:
+    if v in FRECUENCIAS_VALIDAS:
+        return True
+    # Acepta patrón: cada_N_dias | cada_N_semanas | cada_N_meses
+    return bool(_re.match(r'^cada_\d+_(dias|semanas|meses)$', v))
 
 class CategoriaHabitoSchema(BaseModel):
     categoria_id: int
@@ -31,8 +38,8 @@ class AddHabitoToUserSchema(BaseModel):
 
     @validator('frecuencia_personal')
     def validate_frecuencia(cls, v):
-        if v not in FRECUENCIAS_VALIDAS:
-            raise ValueError(f'Frecuencia inválida. Opciones: {", ".join(FRECUENCIAS_VALIDAS)}')
+        if not _es_frecuencia_valida(v):
+            raise ValueError(f'Frecuencia inválida')
         return v
 
 class AddMultipleHabitosSchema(BaseModel):
@@ -44,6 +51,24 @@ class AddMultipleHabitosSchema(BaseModel):
     def validate_habito_ids(cls, v):
         if not v or len(v) == 0:
             raise ValueError('Debe seleccionar al menos un hábito')
+        return v
+
+class AddHabitoConConfigSchema(BaseModel):
+    """Agregar un hábito con toda la configuración en un solo call."""
+    habito_id: int
+    frecuencia_personal: Optional[str] = 'diario'
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    meta_valor: Optional[float] = None
+    meta_unidad: Optional[str] = None
+    puntos_base_override: Optional[int] = None
+
+    @validator('frecuencia_personal')
+    def validate_frecuencia(cls, v):
+        if not _es_frecuencia_valida(v):
+            raise ValueError('Frecuencia inválida')
         return v
 
 class HabitoUsuarioSchema(BaseModel):
